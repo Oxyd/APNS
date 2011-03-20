@@ -5,4 +5,10 @@
 .sconsign.dblite
 *.pyc
 /apnsmod.so
+/apnsmod.pyd
 src/*.os
+src/*.obj
+/apnsmod.exp
+/vc100.pdb
+/apnsmod.lib
+/apnsmod.pyd
