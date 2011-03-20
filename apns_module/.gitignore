@@ -1,0 +1,6 @@
+/test-build
+.cproject
+.project
+.pydevproject
+.sconsign.dblite
+*.pyc
