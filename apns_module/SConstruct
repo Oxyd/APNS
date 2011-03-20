@@ -1,0 +1,170 @@
+from sys import platform
+import build_config
+
+sources = Glob('src/*.cpp')
+
+debug = int(ARGUMENTS.get('debug', 0))
+
+libraries = [
+  build_config.PYTHON_LIB[debug],
+  build_config.BOOST_RANDOM_LIB[debug],
+  build_config.BOOST_PYTHON_LIB[debug],
+]
+
+env = Environment()
+env.Append(CPPPATH=[
+  build_config.BOOST_HEADERS,
+  build_config.PYTHON_HEADERS,
+])
+
+env.Append(LIBPATH=[
+  build_config.BOOST_LIBS,
+  build_config.PYTHON_LIBS,
+])
+env.Append(LIBS=libraries)
+
+if build_config.COMPILER is not None:
+  env.Replace(CXX=build_config.COMPILER)
+
+if platform == 'win32':
+  # Windows build configuration.
+
+  env.Append(CPPDEFINES=[
+    'NOMINMAX',                 # MSVS defines min and max names as macros otherwise. Evil, sad, but true.
+    '_SCL_SECURE_NO_WARNINGS',  # Reduce the number of warnings from the standard library implementation.
+    'BOOST_PYTHON_STATIC_LIB',  # I want to link against Boost.Python statically on Windows.
+    '_MBCS'
+  ])
+
+  env.Append(CCFLAGS=[
+    '/EHsc',         # Enable C++ exception handling.
+    '/Za',           # Disable langauge extensions.
+    '/Zc:forScope',  # Standard C++ scoping rules.
+    '/wd4224',       # Disable an annoying warning. (I believe MSVS is being wrong here.)
+    '/wd4180'        # Disable the "C4180: qualifier applied to function type has no meaning; ignored" warning. It looks like
+                     # MSVC likes to warn about this even though it really shouldn't.
+  ])
+
+  if debug == 1:
+    env.Append(CPPDEFINES=[
+      '_ITERATOR_DEBUG_LEVEL=2'  # Boost libraries are apparantely compiled with this flag in debug mode. Client app needs to have the same flag then.
+    ])
+
+    env.Append(CCFLAGS=[
+      '/Zi'     # Enable debugging information.
+    ])
+
+  else:
+    env.Append(CCFLAGS=[
+      '/Ot',   # Favor code speed.
+      '/Ox'    # Maximum optimisations.
+    ])
+    env.Append(CPPDEFINES=[
+      'NDEBUG'
+    ])
+
+else:
+  # FreeBSD build configuration.
+
+  env.Append(CCFLAGS=[
+    '-Wall',              # Enable all warnings.
+    '-Wextra',            # Enable even more all warnings.
+    '-ansi',              # Use standard C++03.
+    '-pedantic'           # Yes, I mean it with the standardness.
+  ])
+
+  if build_config.RPATH is not None:
+    env.Append(LINKFLAGS=[
+      '-Wl,-rpath,%s' % build_config.RPATH
+    ])
+
+  if debug == 1:
+    env.Append(CCFLAGS=[
+      '-ggdb',                  # Generate debug information.
+      '-fstack-protector-all'   # Enable the stack protector.
+    ])
+    
+    env.Append(CPPDEFINES=[
+      '_GLIBCXX_DEBUG_PEDANTIC'  # Use the debugging version of the standard library.
+    ])
+
+  else:
+    env.Append(CCFLAGS=[
+      '-O2'  # Optimize well.
+    ])
+    env.Append(CPPDEFINES=[
+      'NDEBUG'  # Disable assertions and related stuff.
+    ])
+
+if platform == 'win32':
+  # Set the shared library suffix to .pyd, which is the suffix of Python extensions on Windows systems.
+  env.Replace(SHLIBSUFFIX='.pyd')
+  env.Replace(LIBSUFFIXES=['.pyd'])
+
+else:
+  env.Replace(SHLIBPREFIX='')  # Do *not* use the 'lib' prefix on *Nix systems.
+
+# Also, don't generate any import library. It's not needed. (It'll apparantely be generated anyway, but at least, it won't be
+# installed to the parent directory.)
+env.Replace(no_import_lib=1)
+
+buildEnv = env.Clone()
+buildEnv.VariantDir('build', 'src')
+
+# Need to specify whether to use the debug version of the run-time library or the release version.
+if platform == 'win32' and debug == 1:
+  buildEnv.Append(CCFLAGS=['/MDd'])
+elif platform == 'win32' and debug == 0:
+  buildEnv.Append(CCFLAGS=['/MD'])
+
+apnslib = buildEnv.SharedLibrary(target='apnsmod', source=sources)
+install = buildEnv.Install('..', apnslib)  # Copy the Python extension module to the parent directory.
+Default(install)  # This merely ensures that the 'install' target gets invoked on 'scons'.
+
+#
+# Unit tests
+#
+
+testEnv = env.Clone()
+
+testEnv.VariantDir('test-build', 'src', duplicate=0)
+
+if platform == 'win32' and debug == 1:
+  testEnv.Append(CCFLAGS=['/MDd'])
+elif platform == 'win32' and debug == 0:
+  testEnv.Append(CCFLAGS=['/MD'])
+
+if platform == 'win32':
+  testEnv.Append(LINKFLAGS=['/SUBSYSTEM:CONSOLE'])
+
+testEnv.Append(CPPPATH=[
+  'src/',
+  build_config.GTEST_HEADERS
+])
+
+testEnv.Append(LIBPATH=[
+  build_config.GTEST_LIBS
+])
+
+testEnv.Append(LIBS=[
+  build_config.GTEST_LIB[debug]
+])
+
+test_sources = [
+  'hash_test',
+  'board_test',
+  'movement_test',
+  'util_test'
+]
+
+tests = list()
+
+objList = testEnv.Glob('test-build/*.cpp')
+
+for test in test_sources:
+  program = testEnv.Program(target='tests/%s' % test, source=['tests/%s.cpp' % test, objList])
+  command = testEnv.Command(test, [program], program[0].abspath)
+  tests.append(command)
+  AlwaysBuild(command)
+
+Alias('tests', tests)
