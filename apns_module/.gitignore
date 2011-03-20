@@ -4,3 +4,5 @@
 .pydevproject
 .sconsign.dblite
 *.pyc
+/apnsmod.so
+src/*.os
