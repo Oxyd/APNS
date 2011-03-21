@@ -1,30 +1,36 @@
 from sys import platform
-import build_config
+
+Import(['debug', 'config', 'bits'])
 
 sources = Glob('src/*.cpp')
-
-debug = int(ARGUMENTS.get('debug', 0))
+results = dict()
 
 libraries = [
-  build_config.PYTHON_LIB[debug],
-  build_config.BOOST_RANDOM_LIB[debug],
-  build_config.BOOST_PYTHON_LIB[debug],
+  config.PYTHON_LIB[debug],
+  config.BOOST_RANDOM_LIB[debug],
+  config.BOOST_PYTHON_LIB[debug],
 ]
 
-env = Environment()
+if platform == 'win32' and bits == 32:
+  env = Environment(TARGET_ARCH='x86')
+elif platform == 'win32' and bits == 64:
+  env = Environment(TARGET_ARCH='x86_64')
+else:
+  env = Environment()
+
 env.Append(CPPPATH=[
-  build_config.BOOST_HEADERS,
-  build_config.PYTHON_HEADERS,
+  config.BOOST_HEADERS,
+  config.PYTHON_HEADERS,
 ])
 
 env.Append(LIBPATH=[
-  build_config.BOOST_LIBS,
-  build_config.PYTHON_LIBS,
+  config.BOOST_LIBS,
+  config.PYTHON_LIBS,
 ])
 env.Append(LIBS=libraries)
 
-if build_config.COMPILER is not None:
-  env.Replace(CXX=build_config.COMPILER)
+if config.COMPILER is not None:
+  env.Replace(CXX=config.COMPILER)
 
 if platform == 'win32':
   # Windows build configuration.
@@ -73,9 +79,9 @@ else:
     '-pedantic'           # Yes, I mean it with the standardness.
   ])
 
-  if build_config.RPATH is not None:
+  if config.RPATH is not None:
     env.Append(LINKFLAGS=[
-      '-Wl,-rpath,%s' % build_config.RPATH
+      '-Wl,-rpath,%s' % config.RPATH
     ])
 
   if debug == 1:
@@ -113,13 +119,12 @@ buildEnv.VariantDir('build', 'src')
 
 # Need to specify whether to use the debug version of the run-time library or the release version.
 if platform == 'win32' and debug == 1:
-  buildEnv.Append(CCFLAGS=['/MDd'])
+  buildEnv.Append(CCFLAGS=['/MTd'])
 elif platform == 'win32' and debug == 0:
-  buildEnv.Append(CCFLAGS=['/MD'])
+  buildEnv.Append(CCFLAGS=['/MT'])
 
 apnslib = buildEnv.SharedLibrary(target='apnsmod', source=sources)
-install = buildEnv.Install('..', apnslib)  # Copy the Python extension module to the parent directory.
-Default(install)  # This merely ensures that the 'install' target gets invoked on 'scons'.
+results['apnslib'] = apnslib
 
 #
 # Unit tests
@@ -139,15 +144,15 @@ if platform == 'win32':
 
 testEnv.Append(CPPPATH=[
   'src/',
-  build_config.GTEST_HEADERS
+  config.GTEST_HEADERS
 ])
 
 testEnv.Append(LIBPATH=[
-  build_config.GTEST_LIBS
+  config.GTEST_LIBS
 ])
 
 testEnv.Append(LIBS=[
-  build_config.GTEST_LIB[debug]
+  config.GTEST_LIB[debug]
 ])
 
 test_sources = [
@@ -165,6 +170,10 @@ for test in test_sources:
   program = testEnv.Program(target='tests/%s' % test, source=['tests/%s.cpp' % test, objList])
   command = testEnv.Command(test, [program], program[0].abspath)
   tests.append(command)
+  results[test] = command
   AlwaysBuild(command)
 
-Alias('tests', tests)
+t = Alias('tests_', tests)  # 'tests_' because without the underscore we have a cyclic dependency tests -> tests here.
+results['tests'] = t
+
+Return('results')
