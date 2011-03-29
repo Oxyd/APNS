@@ -111,6 +111,8 @@ def loadBoard(filename):
     
     return (board, player)
 
+  else:
+    raise RuntimeError('Bad input file format: too few rows')
 
 def saveBoard(board, moveNumber, player, filename):
   '''saveBoard(Board, int, Color, str) -> None
@@ -333,7 +335,7 @@ def saveSearch(search, filename, operationController):
     
     if search.player == Piece.Color.gold: player = 'gold'
     else:                                 player = 'silver'
-    output.write('{0} {1} {2}\n'.format(type(search).__name__, player, search.positionCount))
+    output.write('{0} {1}\n'.format(player, search.positionCount))
 
   dumpTree(filename, search.root, True, operationController, search.positionCount)
 
@@ -348,25 +350,23 @@ def loadSearch(filename, operationController):
     board = _loadBoardCompact(input)
     
     searchDescr = input.readline().split(' ')
-    if len(searchDescr) != 3:
-      raise RuntimeError('Could not load search from file')
+    if len(searchDescr) != 2:
+      raise RuntimeError('Could not load search from file: invalid file format')
     
-    import apnsmod
-    searchType = getattr(apnsmod, searchDescr[0])
-    
-    if searchDescr[1] == 'gold':      player = Piece.Color.gold
-    elif searchDescr[1] == 'silver':  player = Piece.Color.silver
+    if searchDescr[0] == 'gold':      player = Piece.Color.gold
+    elif searchDescr[0] == 'silver':  player = Piece.Color.silver
     else:
       raise RuntimeError('Could not load search from file: invalid player specification')
     
     try:
-      positionCount = int(searchDescr[2])
+      positionCount = int(searchDescr[1])
     except ValueError:
       raise RuntimeError('Could not load search from file: invalid position count')
   
   tree = loadTree(filename, 2, operationController, positionCount)
   if tree is not None:
-    search = searchType(board, tree, player, apnsmod.WinStrategy(), positionCount)
+    import apnsmod
+    search = apnsmod.PnSearchAlgo_WinStrategy_ZobristHash(board, tree, player, apnsmod.WinStrategy(), positionCount)
     return search
   else:
     return None  

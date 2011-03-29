@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 '''cmdline.py -- the command line interface for the program.'''
 
 from interface.search import makeSearch
@@ -37,7 +40,7 @@ def main():
                       help='Size of the transposition table to use, in megabytes. If set to 0, don\'t use transposition table'
                       'at all')
   parser.add_argument('-k', '--trans-tbl-keep-time', type=int, default=16, metavar='trans tbl keep time', dest='transTblKeepTime',
-                      help='How long should elements be kept in the transposition table before they can be replaced before newer'
+                      help='How long should elements be kept in the transposition table before they can be replaced with newer'
                       'entries')
   parser.add_argument('-q', '--quiet', const=True, default=False, action='store_const', dest='quiet',
                       help='Don\'t print any messages to standard output.')
@@ -65,8 +68,13 @@ def main():
     raise SystemExit(1)
   
   if args.position is not None:
-    (board, player) = loadBoard(args.position)
-    search = makeSearch(board, player, WinStrategy())
+    try:
+      (board, player) = loadBoard(args.position)
+      search = makeSearch(board, player, WinStrategy())
+    except Exception, e:
+      print >> sys.stderr, 'Error loading specified initial position from specified file: {0}'.format(e)
+      raise SystemExit(1)
+      
   else:
     progress = SaveLoadProgress(args.quiet)
     if not args.quiet: print 'Loading previous search tree from {0}:'.format(args.searchFile)
@@ -76,6 +84,9 @@ def main():
     except KeyboardInterrupt:
       if not args.quiet: print 'Cancelled'
       raise SystemExit(0)
+    except Exception, e:
+      print >> sys.stderr, 'Error loading specified search tree from specified file: {0}'.format(e)
+      raise SystemExit(1)
 
     if not args.quiet: print 'Done'
   

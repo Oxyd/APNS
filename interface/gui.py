@@ -4,14 +4,19 @@ from apnsmod import Board, Vertex, Piece, Position, WinStrategy, OperationContro
 from interface.fileio import loadBoard, saveBoard, saveSearch, loadSearch
 from interface.observable import Observable
 from interface.search import makeSearch
-import Tkinter
-import tkFileDialog
-import tkMessageBox
-import sys
-import ttk
 import time
 import gc
 import os
+import sys
+
+try:
+  import Tkinter
+  import tkFileDialog
+  import tkMessageBox
+  import ttk
+except ImportError:
+  print >> sys.stderr, 'Importing one of Tkinter modules has failed. Please make sure you have Tkinter installed.'
+  raise SystemExit(1)
 
 _COLORS = (Piece.Color.gold, Piece.Color.silver)
 _TYPES = (Piece.Type.elephant, Piece.Type.camel, Piece.Type.horse, Piece.Type.dog, Piece.Type.cat, Piece.Type.rabbit)
@@ -45,7 +50,7 @@ class MainWindow(Observable):
     self._imageManager = ImageManager()
     
     self._toolbar = ttk.Frame(self._window, padding=5)
-    self._newSearchBtn = ttk.Button(self._toolbar, text='New Search', 
+    self._newSearchBtn = ttk.Button(self._toolbar, text='New Initial Position', 
                                     command=lambda: self.notifyObservers(command=MainWindow.Command.newSearch))
     self._runBtn = ttk.Button(self._toolbar, text='Run Search',
                               command=lambda: self.notifyObservers(command=MainWindow.Command.runSearch))
