@@ -2,6 +2,8 @@
 \usepackage[czech]{babel}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
+\usepackage{url}
+\usepackage{fullpage}
 
 \begin{document}
 \begin{flushright}
@@ -10,6 +12,261 @@
 \begin{center}
   \Huge Dokumentace ročníkového projektu
 \end{center}
-Foobar.
+
+\section{Účel}
+Program je primárně experimentální implementací algoritmu \emph{Proof-Number Search} v adaptaci pro hru \emph{Arimaa}.
+Má ukázat vhodnost zmíněného algoritmu při řešení koncových částí hry. Program má spíše teoretický význam, protože jeho
+hlavním výstupem je částečně prohledaný stavový prostor hry -- tento výstup je ale možné použít jako vstup jiného
+programu.
+
+\section{Podporované systémy}
+Program je určený pro systémy Microsoft Windows a FreeBSD. K běhu je na obou systémech potřeba mít instalovaný
+Python verze 2.7 (pro Windows ke stažení na \url{http://python.org/download/}). 
+
+Pro Windows je připraven zip soubor obsahující vše potřebné pro spuštění programu -- ten lze získat na adrese
+\url{https://github.com/Oxyd/APNS} kliknutím na tlačítko \emph{Download} a následně stažením souboru
+\texttt{apns-windows-32bit.zip} pro 32bitové Windows či \texttt{apns-windows-64bit.zip} pro 64bitový systém.
+
+ Na platformě FreeBSD je potřeba prvně program přeložit -- o tom více v části \ref{sec:compiling}.
+
+\section{Běh programu}
+\label{sec:running}
+Program je možné spustit buďto s grafickým rozhraním či v dávkovém režimu. Grafické rozhraní zobrazuje spočtený strom a
+v každém jeho vrcholu zobrazuje příslušnou situaci na hrací ploše. 
+
+\subsection{Grafické rozhraní}
+Grafické rozhraní lze ve Windows spustit poklepáním na ikonu souboru \texttt{gui.pyw}. Ve Windows i FreeBSD lze grafické
+rozhraní spustit příkazem \texttt{python gui.pyw} z příkazové řádky v adresáři s programem.
+
+Grafické rozhraní v levé části zobrazuje výsledný strom, pravá část ukazuje příslušnou herní pozici po vybrání některého
+z vrcholů stromu. Tlačítka v horní části rozhraní umožňují výběr nové počáteční pozice, zahájení výpočtu, načtení
+předchozího výpočtu z disku, uložení výpočtu na disk a uložení vybrané pozice na disk.
+
+Po skončení výpočtu je možné procházet výsledný strom, který je zobrazený v levé části okna programu. Sloupec
+\emph{Step} určuje krok vedoucí do příslušného vrcholu; \emph{Type} říká, jakého typu je příslušný vrchol -- buď
+\emph{OR} (tedy tento vrchol vznikl z rodičovského tahem původního hráče) nebo \emph{AND}; \emph{PN} a \emph{DN}
+zobrazují hodnoty \emph{proof number} a \emph{disproof number} pro zvolený vrchol.
+
+Vybráním některého vrcholu se v pravé části zobrazí pozice odpovídající stavu hry po provedení kroku v sloupci
+\emph{Step}.
+
+Nulová hodnota \emph{PN} znamená, že příslušný uzel stromu je \emph{dokázaný} -- tedy pokud se hra dostane do stavu
+představovaného tímto vrcholem, pak začínající hráč může zaručeně vyhrát. Podobně, je-li hodnota \emph{DN} nulová,
+znamená to, že dostane-li se hra do tohoto stavu, nemůže původní hráč vyhrát, protože tato pozice zaručuje vítězství
+protivníkovi. Takový vrchol se nazývá \emph{vyvrácený}.
+
+\subsubsection{Příklad 1: Prozkoumání stavového prostoru vedoucího z jednoduché pozice}
+V souboru \texttt{puzzle1-one-move.txt} v adresáři \texttt{example-positions} je připravena jednoduchá startovní pozice.
+Řekněme, že chceme prozkoumat všechny možnosti, abychom zjistili, zda a jak může zlatý hráč zvítězit.
+
+Klepnutím na \emph{New Initial Position} se zobrazí dialogové okno umožňující zadání nové pozice či její načtení z
+disku. Jelikož zmíněná pozice je již připravena v souboru, stačí z adreséře \texttt{example-positions} vybrat soubor
+\texttt{puzzle1-{}one-{}move.txt}. Načtená pozice se pak zobrazí na obrazovce a je možné ji dále upravovat. Stiskem
+\texttt{Ok} se pozice načte jako kořenová pozice stromu.
+
+Nyní je možné spustit výpočet. Po stisku \emph{Run Search} se zobrazí dialog umožňující nastavit dobu trvání výpočtu
+a velikost použité transpoziční tabulky. Pro zmíněnou pozici, která je velmi jednoduchá, jsou výchozí parametry naprosto
+postačující. Stiskem \emph{Run} se zahájí výpočet.
+
+Hodnota 0 v sloupci \emph{PN} znamená, že příslušný vrchol je \emph{dokázaný}. V tomto konkrétním příkladě je kořenový
+vrchol dokázaný -- tedy zlatý hráč může z původní pozice zaručeně zvítězit. Vítězství je zaručené, protože zlatý hráč
+může zvolit krok, který zaručuje vítězství -- v našem případě je to krok \emph{Dc7n} neboli přesun psa z pozice c7
+směrem vzhůru, který má hodnotu \emph{PN} rovněž rovnou nule.
+
+Po rozevření vrcholu \emph{Dc7n} je vidět, že z něj je možné provést několik dalších kroků, včetně ukončení tahu a
+přenechání hry soupeři (to jsou vrcholy typu \emph{AND}). Opět je zde vrchol -- \emph{Dc8s rd8w}, neboli pes z c8 se
+přesune dolů a potáhne za sebou zajíce z d8 --, který zaručuje vítězství, protože jeho hodnota \emph{PN} je nulová. Po
+rozbalení tohoto vrcholu se zobrazí další možné tahy. Mezi nimi je \emph{Rd7n}, kterým se zlatý zajíc z d7 přesune do
+cílové pozice -- tedy zlatý hráč zvítězí.
+
+Celkově je tedy vidět, že ze startovní pozice může zlatý hráč zvítězit volbou kroků \emph{Dc7n Dc8s rd8w Rd7n}.
+
+Za zmínku též stojí fakt, že jedním z potomků vrcholu \emph{Dc8s rd8w} je vrchol \emph{Rd7n dd6n}, který má též hodnotu
+\emph{PN} rovnu nule. Tento vrchol je ovšem typu \emph{AND}, neboli představuje situaci, kdy se zlatý hráč rozhodl svůj
+tah ukončit po kroku \emph{Dc8s rd8w} a stříbrný jako svůj první krok zvolil \emph{Dc8s rd8w}, což je odtlačení zlatého
+zajíce do cílové pozice. Nedá se však očekávat, že by stříbrný hráč tento krok zvolil vždy (má i jiné možnosti, které
+program neprozkoumal), a tedy tento vrchol samotný nedokazuje, že zlatý hráč nutně zvítězí.
+
+\subsubsection{Příklad 2: Načítání a ukládání stavového prostoru}
+\label{sec:gui-example-2}
+Pro tento příklad zvolme jako počáteční pozici soubor \texttt{gold-to-play-and-win-in-2-moves.txt}. Opět jako v příkladu
+1 stačí zvolit \emph{New Initial Position}, \emph{Load} a zvolit příslušný soubor v adresáři s příklady. Tato pozice je
+však na výpočet daleko složitější než ta z prvního příkladu.
+
+Volbou \emph{Run Search} opět spustíme výpočet -- díky složitosti této pozice se dá očekávat, že na běžném PC program
+nevydá definitivní výsledek ani po přednastaveném šedesátisekundovém limitu.
+
+Je-li tedy již strom (čátečně) spočítán, můžeme zvolit \emph{Save Search}, vybrat jméno souboru, kam se strom uloží --
+například \texttt{search-1.txt} -- a potvrdit tlačítkem \emph{Ok}. Pro demonstrační účely je nyní možné program ukončit
+a poté opět spustit. Pak stiskem \emph{Load Search} znovu vybrat soubor \texttt{search-1.txt}. Program by nyní měl
+zobrazovat stejný strom jako před ukončením.
+
+Dále je možné třeba znovu stisknout \emph{Run Search} a pokračovat ve výpočtu.
+
+\subsection{Dávkové rozhraní}
+Dávkové rozhraní umožňuje provádění výpočtu z příkazové řádky či dávkového souboru bez nutnosti použití grafického
+rozhraní. Všechny parametry výpočtu musí být zadány jako parametry na příkazové řádce. Výpočet je kdykoliv možné ukončit
+stiskem kláves \texttt{Ctrl-C}.
+
+\subsubsection{Spouštění a parametry příkazové řádky}
+Z příkazové řádky je možné dávkové rozhraní programu spustit příkazem \texttt{python batch.py \textit{parametry}}.
+Nejsou-li zadány žádné parametry, vypíše program stručný soupis všech parametrů a skončí. Stručnou nápovědu je možné
+vyvolat parametrem \texttt{--help}, tedy příkazem \texttt{python batch.py --help}.
+
+Důležité parametry jsou:\begin{description}
+  \item[\texttt{-p} \textit{pozice}] Udává cestu k souboru s počáteční pozicí. Jeho funkce je analogická funkci
+  \emph{New Initial Position} z grafického rozhraní.
+  \item[\texttt{-d} \textit{výstup}] Udává cestu k souboru, do kterého se uloží spočtený strom. Tato funkce je analogem
+  tlačítka \emph{Save Search} z grafického rozhraní.
+  \item[\texttt{-s} \textit{strom}] Udává cestu k souboru, ve kterém je částečně spočtený vyhledávací strom, ve kterém
+  se má pokračovat ve výpočtu. Tedy stejná funkce, kterou v grafickém rozhraní zastává tlačítko \emph{Load Search}.
+  \item[\texttt{-t} \textit{sekundy}] Umožňuje nastavit časový limit (v sekundách) pro vyhledávání (výchozí hodnota je
+  60 sekund)
+\end{description}
+
+Parametr \texttt{-d} je povinný. Dále uživatel musí zadat buď parametr \texttt{-p} nebo parametr \texttt{-s}.
+
+\subsubsection{Příklad 1: Prozkoumávání stavového stromu z dané pozice}
+Opět jako v prvním příkladu u grafického rozhraní budeme chtít spočítat příslušný strom, máme-li v souboru uloženou
+počáteční pozici. Pro tento příklad zvolme třeba pozici \texttt{puzzle3-one-move.txt}, pro kterou program dokáže vydat
+kladný výsledek (zlatý hráč vítězí) na mém PC po přibližně 7 sekundách. Řekněme, že výsledek chceme uložit do souboru
+\texttt{search-2.txt}.
+
+Příslušný příkaz včetně parametrů tedy bude vypadat takto:
+\begin{center}\verb+python batch.py -p example-positions/puzzle3-one-move.txt -d search-2.txt+\end{center}
+
+Pokud je výpočet přerušen ještě před jeho dokončením, program stejně vypíše částečně spočtený strom do specifikovaného
+souboru.
+
+Výstup, tedy soubor \texttt{search-2.txt}, je pak možné otevřít v grafickém rozhraní a procházet jak bylo uvedeno v
+předchozích částech.
+
+\subsubsection{Příklad 2: Pokračování v předešlém výpočtu}
+Řekněme, že chceme pokračovat ve výpočtu, který jsme začali v části \ref{sec:gui-example-2} -- tedy máme soubor
+\texttt{search-1.txt}, který je částečným výsledekm prohledávání z pozice \texttt{gold-to-play-and-win-in-2-moves.txt}.
+Výsledek chceme uložit do souboru \texttt{search-3.txt}.
+
+Nyní tedy místo parametru \texttt{-p} uvedeme parametr \texttt{-s} specifikující předešlé vyhledávání. Tedy -- za
+předpokladu, že soubor \texttt{search-1.txt} je uložen v kořenovém adresáři programu -- bude celý příkaz vypadat
+následovně:
+\begin{center}\verb+python batch.py -s search-1.txt -d search-3.txt+\end{center}
+
+\subsection{Transpoziční tabulka a její vliv na výpočet}
+Během výpočtu si program pamatuje některé navštívené pozice v \emph{transpoziční tabulce}. To umožňuje zrychlení
+výpočtu, neboť někdy je možné ke stejné pozici dojít vícero způsoby a transpoziční tabulka pak zajišťuje, že není třeba
+stejnou pozici vyhodnocovat vícekrát.
+
+Do transpoziční tabulky se však nemohou vejít všechny záznamy. Počet záznamů, které se do tabulky vejdou, je přímo určen
+její velikostí v paměti. Velikost transpoziční tabulky lze nastavit v grafickém rozhraní volbou \emph{Transposition
+Table Size}, v řádkovém rozhraní pak parametrem \texttt{-r \textit{velikost v MB}}.
+
+\subsection{Zobrazované informace během výpočtu}
+Během prohledávání stavového prostoru program vypisuje některé informace. Mezi ně patří \begin{description}
+\item[\emph{Search Memory Usage}] Přibližné množství paměti používané programem. Tato hodnota nezahrnuje všech\-nu
+použitou paměť, a tedy zobrazená hodnota bude vždy nižší než hodnota skutečná. Přesto však může sloužit jako dobrý
+ukazatel paměťové náročnosti programu.
+\item[\emph{Unique Positions Total}] Celkový počet unikátních pozic. Tento údaj nezohledňuje případné několikanásobné
+použití stejné pozice vícekrát díky transpoziční tabulce. Může se tedy stát, že výsledný strom má pak zdánlivě více
+vrcholů než je tato hodnota.
+\item[\emph{New Positions per Second}] Navýšení hodnoty \emph{Unique Positions Total} za poslední sekundu.
+\item[\emph{Transposition Table Size}] Paměť použitá transpoziční tabulkou. Tato hodnota není započítána do \emph{Search
+Memory Usage}.
+\item[\emph{Transposition Table Hits}] (Pouze v grafickém rozhraní) Počet úspěšných vyhledání v transpoziční tabulce.
+\item[\emph{Transposition Table Misses}] (Pouze v grafickém rozhraní) Počet neúspěšných pokusů o vyhledání v
+transpoziční tabulce.
+\end{description}
+
+\section{Překlad programu}
+\label{sec:compiling}
+
+\subsection{Prerekvizity}
+Pro překlad je třeba mít kompletní zdrojový kód programu. Ten lze obstarat přes systém git příkazem
+\begin{center}\verb+git clone git://github.com/Oxyd/APNS.git+\end{center} či stažením zdrojového archivu ve formátu
+\texttt{.zip} či \texttt{.tar.gz} z \url{https://github.com/Oxyd/APNS}.
+
+Dále je třeba mít v systému instalovány následující knihovny a nástroje\begin{description}
+\item[SCons] Používaný nástroj pro sestavení programu. Instalátor pro Windows je možné získat na
+\url{http://scons.org/}. Na systému FreeBSD stačí instalovat port \texttt{devel/scons}.
+\item[Boost] Kolekce knihoven, z nichž některé program používá. Je třeba mít verzi aspoň 1.44. Stáhnout lze z
+\url{http://boost.org/}, kde jsou i informace pro sestavení kolekce. Na FreeBSD je možné instalovat port
+\texttt{devel/boost-all}.
+\item[Google Test] Není nezbytně nutný pro překlad; používá se pouze pro jednotkové testy. Na FreeBSD existuje v portu
+\texttt{devel/googletest}. Pro Windows se stačí obrátit na stránky projektu na
+\url{http://code.google.com/p/googletest/}.
+\end{description}
+
+Je třeba dále mít k dispozici překladač jazyka C++. Sestavovací skript automaticky použije překladač z \emph{Microsoft
+Visual Studia} na systému Windows -- je třeba mít verzi 10. (Měla by stačit i verze 9 a 8, ale to není otestované.) Na
+FreeBSD se pro překlad používá překladač \emph{GCC} -- je ovšem třeba mít překladač verze aspoň 4.5. Ten lze instalovat
+z portu \texttt{lang/gcc45}.
+
+Překlad na Windows by měl být možný i pomocí kolekce \emph{MinGW} -- sestavovací skript to však nepodporuje, a bylo by
+tedy nutné ho před tím upravit. Dále očekávám, že program půjde beze změn či jenom s minimálními změnami přeložit a
+spustit i na dalších systémech, zejména různých distribucích systému \emph{GNU/Linux} -- to jsem ovšem netestoval, a
+výsledek není zaručen. Obdobně očekávám možnost překladu programu překladačem \emph{Clang} -- ani to jsem však
+netestoval.
+
+\subsection{Konfigurace pro překlad}
+Než je možné program přeložit, je třeba určit umístění používaných knihoven na systému, kde má překlad probíhat. To se
+provádí úpravou souboru \texttt{build\_config.py}. V souboru jsou komentáře vysvětlující jak nastavit příslušné hodnoty.
+
+\subsection{Překlad}
+Překlad lze spustit příkazem \verb+scons+ v kořenovém adresáři se zdrojovým kódem programu. Pokud překlad proběhne
+úspěšně, není třeba žádných dalších kroků; program je spustitelný tak, jak bylo popsáno v části \ref{sec:running}.
+
+Pro účely vývoje programu může být vhodné přeložit program tak, aby obsahoval ladicí informace. V tom případě je třeba
+překlad spustit příkazem \verb+scons debug=1+. Navíc je možné specifikovat cíl \texttt{tests}, který přeloží a provede
+jednotkové testy -- tedy použít příkaz \verb+scons tests+. Jednotlivé jednotkové testy je možné vyvolat cílem
+\emph{jméno\_testu}, kde \emph{jméno\_testu} odpovídá jménu souboru v adresáři \texttt{apns\_module/tests} bez koncovky
+\texttt{.cpp}. Například tedy pro spuštění jednotkových testů ze souboru \texttt{apns\_module/tests/board\_test.cpp} se
+dá použít příkaz \verb+scons board_test+.
+
+Při překladu na systému Windows je též možné specifikovat parametr \texttt{bits=32} nebo \texttt{bits=64}, který určuje,
+zda má výsledný program být přeložen pro 32bitovou nebo 64bitovou verzi systému. Kromě toho existuje cíl
+\texttt{distrib}, který vytvoří \texttt{zip} soubor s binární distribucí programu.
+
+\section{Vstupní a výstupní data}
+\subsection{Pozice}
+Vstupní pozice je textový soubor ve formátu popsaném na adrese \url{http://arimaa.com/arimaa/learn/notation.html} v
+části \emph{Notation for Recording Arimaa Positions}. Program ale ignoruje číslo tahu a předešlé kroky.
+
+\subsection{Strom}
+Stavový strom je ukládán v textovém formátu. Struktura souboru je \begin{itemize}
+  \item Na první řádce je počáteční pozice v \emph{kompaktním formátu}
+  \item Na druhé řádce je \begin{itemize}
+    \item Hráč, který je první na tahu jako řetězec buď \texttt{gold} nebo \texttt{silver}.
+    \item Počet vrcholů stromu v desítkové soustavě
+    \item Obě hodnoty jsou odděleny mezerou
+  \end{itemize}
+  Například tedy: \begin{center}\verb+gold 100617+\end{center}
+  \item Následuje seznam vrcholů stromu. Jeden vrchol je na jedné řádce. Každý vrchol je popsán
+  následovně: \begin{center}\texttt{\textit{id}: \textit{tah}: \textit{typ} \textit{kroky} \textit{PN}
+  \textit{DN}}\end{center}
+  Kde jednotlivé položky jsou:\begin{description}
+  \item[\textit{id}] Přirozené číslo v dekadickém zápisu sloužící jako jednoznačný identifikátor vrcholu. Kořen má vždy
+  \textit{id} rovno 1.
+  \item[\textit{tah}] Textový pozic tahu vedoucího do této pozice. Používá se oficiální notace pro zápis tahů hry
+  Arimaa. Kořen má místo tahu řetězec \texttt{root}.
+  \item[\textit{typ}] Řetězec \texttt{or} nebo řetězec \texttt{and}. Udává typ vrcholu.
+  \item[\textit{kroky}] Číslo v dekadickém zápisu udávající počet kroků, které ještě může hráč učinit v rámci svého
+  tahu.
+  \item[\textit{PN}] Hodnota \emph{proof number} pro tento vrchol v dekadickém zápisu nebo řetězec ,,\textit{infty}``
+  značící nekonečno.
+  \item[\textit{DN}] Hodnota \emph{disproof number} pro tento vrchol v dekadickém zápisu nebo řetězec ,,\textit{infty}``
+  značící nekonečno.
+  \end{description}
+  \item Následně řetězec ,,\texttt{---}`` sloužící jako pomocný oddělovač mezi seznamem vrcholů a seznamem hran.
+  \item Seznam hran. Každá hrana je na jedné řádce. Hrana je popsána řádkou
+  	\begin{center}\textit{id}\texttt{ : }[\textit{syn }]*\end{center}
+  	\begin{description}
+  	\item[\textit{id}] Je identifikátor vrcholu. Tento identifikátor musí odkazovat na některý vrchol ze seznamu vrcholů.
+  	\item[\textit{syn}] Opět platný identifikátor vrcholu. 
+  	\end{description}
+  	Jedna taková řádka znamená, že vrchol \textit{id} má za syny vrcholy uvedené za dvojtečkou. Jedna hrana může vypadat
+  	\begin{center}\verb+4 : 7 6 5+\end{center}Neboli, vrchol 4 má za syny vrcholy 5, 6 a 7.
+  	
+  	Pokud vrchol nemá žádné syny (je to list), pak nemusí být v seznamu uveden, případně může být uveden s prázdným
+  	seznamem za dvojtečkou: \verb+8 : +.
+\end{itemize}
 \end{document}
 % vim:textwidth=120
