@@ -1,0 +1,15 @@
+# Building rules for making the documentation using LaTeX.
+#
+# This script uses latexCmd from the root SConstruct file.
+
+import os
+
+# Make an environment using the system's environment variable. This is so that LaTeX tools can be found and they can find
+# their subparts using these variables.
+env = Environment(ENV=os.environ)
+
+Import(['latexCmd'])
+doc = env.Command(target='doc.pdf',
+                  source='doc.tex',
+                  action='@{0} $SOURCE -output-directory=${{TARGET.dir}} -aux-directory=${{TARGET.dir}}'.format(latexCmd))
+Return('doc')
