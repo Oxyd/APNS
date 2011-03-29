@@ -620,15 +620,13 @@ void steps_iter::advance_second_to_empty() {
   position const second_center = make_adjacent(piece_pos, *first_dir);
 
   if (second_dir == directions_end()) {
-    using boost::bind; using boost::cref;
     second_dir = directions_begin();
   } else {
     ++second_dir;
   }
 
   while (second_dir != directions_end()
-      &&
-      (!adjacent_valid(second_center, *second_dir)
+      && (!adjacent_valid(second_center, *second_dir)
           || !empty(make_adjacent(second_center, *second_dir), *board))) {
     ++second_dir;
   }
@@ -639,8 +637,6 @@ void steps_iter::advance_second_to_weaker() {
   position const second_center = piece_pos;
 
   if (second_dir == directions_end()) {
-    using boost::bind; using boost::cref;
-
     second_dir = directions_begin();
   } else {
     ++second_dir;

@@ -31,8 +31,13 @@ void dump_vertices(std::ostream& output, vertex_ptr root, operation_controller& 
       std::string const step = vertex->leading_step ? vertex->leading_step->to_string() : "root";
       std::string const type = vertex->type == vertex::type_and ? "and" : "or";
 
-      output << vertex->pickle_number << ": " << step << ": " << type << " " << vertex->steps_remaining << " "
-             << vertex->proof_number << " " << vertex->disproof_number << '\n';
+      output << vertex->pickle_number << ": " << step << ": " << type << " " << vertex->steps_remaining << " ";
+      if (vertex->proof_number < vertex::infty) output << vertex->proof_number;
+      else                                      output << "infty";
+      output << ' ';
+      if (vertex->disproof_number < vertex::infty) output << vertex->disproof_number;
+      else                                         output << "infty";
+      output << '\n';
 
       for (vertex::vertex_list::const_iterator child = vertex->children_begin(); child != vertex->children_end(); ++child) {
         stack.push(*child);
@@ -55,16 +60,18 @@ void dump_edges(std::ostream& output, vertex_ptr root, operation_controller& op_
     stack.pop();
 
     if (!vertex->pickled) {
-      output << vertex->pickle_number << " : ";
+      if (vertex->children_begin() != vertex->children_end()) {  // Only actually dump the vertex if it has any children.
+        output << vertex->pickle_number << " : ";
 
-      for (vertex::vertex_list::const_iterator child = vertex->children_begin(); child != vertex->children_end(); ++child) {
-        output << (*child)->pickle_number << ' ';
-        stack.push(*child);
+        for (vertex::vertex_list::const_iterator child = vertex->children_begin(); child != vertex->children_end(); ++child) {
+          output << (*child)->pickle_number << ' ';
+          stack.push(*child);
+        }
+        output << '\n';
       }
 
       vertex->pickled = true;
       op_ctrl.update(op_ctrl.get_work_done() + 1, op_ctrl.get_work_total());
-      output << '\n';
     }
   }
 }
@@ -123,11 +130,27 @@ void load_vertices(std::istream& input, std::vector<vertex_ptr>& vertices, opera
       parser >> vertex->steps_remaining;
       if (!parser) throw_loading_failed();
 
-      parser >> vertex->proof_number;
+      std::string num_str;
+      parser >> num_str;
       if (!parser) throw_loading_failed();
 
-      parser >> vertex->disproof_number;
+      if (num_str == "infty") {
+        vertex->proof_number = vertex::infty;
+      } else {
+        std::istringstream subparser(num_str);
+        subparser >> vertex->proof_number;
+        if (!subparser) throw_loading_failed();
+      }
+
+      parser >> num_str;
       if (!parser) throw_loading_failed();
+      if (num_str == "infty") {
+        vertex->disproof_number = vertex::infty;
+      } else {
+        std::istringstream subparser(num_str);
+        subparser >> vertex->disproof_number;
+        if (!subparser) throw_loading_failed();
+      }
 
       vertices.push_back(vertex);
       op_ctrl.update(op_ctrl.get_work_done() + 1, op_ctrl.get_work_total());
