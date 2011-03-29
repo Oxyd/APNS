@@ -1,2 +1,4 @@
 apnsmod.so
 apnsmod.pyd
+.sconsign.dblite
+*.pyc

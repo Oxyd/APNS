@@ -33,8 +33,8 @@ def buildConfig(platform, bits):
     config.GTEST_LIBS = 'C:/Users/Oxyd/Development/gtest-1.5.0/lib'
   
   else:  # FreeBSD, both 32-bit and 64-bit.
-    config.BOOST_HEADERS = '~/boost/boost_1_45_0/'
-    config.BOOST_LIBS = '~/boost/boost_1_45_0/stage/lib'
+    config.BOOST_HEADERS = '/usr/local/include'
+    config.BOOST_LIBS = '/usr/local/include'
   
     config.PYTHON_HEADERS = '/usr/local/include/python2.7/'
     config.PYTHON_LIBS = '/usr/local/lib/python2.7/'
