@@ -155,7 +155,7 @@ void check_for_captures(piece what, position from, position destination,
     for (neighbourhood_iter neighbour = neighbourhood_begin(from); neighbour != neighbourhood_end(); ++neighbour) {
       if (would_be_capture(*neighbour, what, from, destination, board)) {
         elementary_step capture = elementary_step::capture(*neighbour);
-        capture.what = what;
+        capture.what = *board.get(*neighbour);
         sequence.insert(sequence.end(), capture);
       }
     }

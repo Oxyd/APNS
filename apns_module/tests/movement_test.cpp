@@ -273,6 +273,30 @@ TEST(movement, simple_pull_capture_test) {
   EXPECT_TRUE(s->capture());
 }
 
+TEST(movement, sacrifice_test) {
+  board b;
+  b.put(position(6, 'f'), piece(piece::gold, piece::elephant));
+  b.put(position(7, 'f'), piece(piece::gold, piece::rabbit));
+
+  boost::optional<step> s = step::validate_ordinary_step(b, elementary_step::displacement(position(7, 'f'), north));
+  ASSERT_TRUE(s);
+  EXPECT_TRUE(s->capture());
+
+  step::elementary_step_seq el_steps(s->step_sequence_begin(), s->step_sequence_end());
+  ASSERT_EQ(2, el_steps.size());
+
+  elementary_step const& e1 = el_steps.front();
+  elementary_step const& e2 = el_steps.back();
+
+  ASSERT_TRUE(e1.what);
+  EXPECT_EQ(piece::gold, e1.what->get_color());
+  EXPECT_EQ(piece::rabbit, e1.what->get_type());
+
+  ASSERT_TRUE(e2.what);
+  EXPECT_EQ(piece::gold, e2.what->get_color());
+  EXPECT_EQ(piece::elephant, e2.what->get_type());
+}
+
 class move_generation : public testing::Test {
 protected:
   void SetUp() {
@@ -387,7 +411,7 @@ protected:
 
     b.put(position(3, 'c'), piece(piece::gold, piece::horse));
     b.put(position(3, 'd'), piece(piece::silver, piece::dog));
-    b.put(position(4, 'c'), piece(piece::silver, piece::rabbit));
+    b.put(position(4, 'c'), piece(piece::gold, piece::rabbit));
 
     b.put(position(6, 'b'), piece(piece::gold, piece::cat));
 
@@ -492,6 +516,8 @@ protected:
     b.put(position(3, 'g'), piece(piece::gold, piece::rabbit));
     b.put(position(5, 'b'), piece(piece::gold, piece::horse));
     b.put(position(5, 'c'), piece(piece::silver, piece::cat));
+    b.put(position(6, 'f'), piece(piece::gold, piece::elephant));
+    b.put(position(7, 'f'), piece(piece::gold, piece::rabbit));
   }
 };
 
@@ -547,6 +573,15 @@ TEST_F(string_test, capture) {
   ASSERT_TRUE(s);
   EXPECT_EQ("cc5n cc6x Hb5e", s->to_string());
   boost::optional<step> q = step::from_string("cc5n cc6x Hb5e");
+  ASSERT_TRUE(q);
+  EXPECT_EQ(*s, *q);
+}
+
+TEST_F(string_test, sacrifice) {
+  boost::optional<step> s = step::validate_ordinary_step(b, elementary_step::displacement(position(7, 'f'), north));
+  ASSERT_TRUE(s);
+  EXPECT_EQ("Rf7n Ef6x", s->to_string());
+  boost::optional<step> q = step::from_string("Rf7n Ef6x");
   ASSERT_TRUE(q);
   EXPECT_EQ(*s, *q);
 }
