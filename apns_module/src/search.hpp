@@ -262,6 +262,8 @@ void pn_search_algo<Strategy, H>::find_leaf(board& board, vertex_ptr root, verte
   } while (current);
 
   leaf = previous;
+
+  assert(leaf->children_begin() == leaf->children_end());
 }
 
 template <typename Strategy, typename H>
@@ -366,17 +368,23 @@ void pn_search_algo<Strategy, H>::update_numbers(vertex_ptr start) {
 template <typename Strategy, typename H>
 vertex_ptr pn_search_algo<Strategy, H>::successor(vertex_ptr node) {
   using detail::add_sum;
+  using detail::add_sum_no_infty;
   using detail::add;
 
   assert(node);
 
-  // To prove an OR it suffices to prove one OR child; to disprove it, one must disprove all OR children and one AND child.
-  // So keep track of PN-minimal OR child, the sum of all OR children disproof numbers and DN-minimal AND child.
-  // Similarilly for AND nodes.
+  // To prove an OR vertex, one needs to either prove one OR child or all AND children. To disprove an OR vertex, one needs to
+  // disprove all OR children and at least one AND child. So -- we'll keep track of how much work is needed to:
+  //   -- prove one OR child
+  //   -- prove all AND children
+  //   -- disprove all OR children
+  //   -- disprove one AND child
+  // Then we'll compare these values and decide which child is the best.
+  // AND vertices are treated in a similar fashion.
 
   // For an OR node, num1 is PN, num2 is DN; for an AND it's the other way around.
-  vertex::number_t vertex::*num1;
-  vertex::number_t vertex::*num2;
+  vertex::number_t const vertex::*num1;
+  vertex::number_t const vertex::*num2;
 
   if (node->type == vertex::type_or) {
     num1 = &vertex::proof_number;
@@ -386,54 +394,68 @@ vertex_ptr pn_search_algo<Strategy, H>::successor(vertex_ptr node) {
     num2 = &vertex::proof_number;
   }
 
-  vertex::number_t min_num1_same_player = vertex::max_num;
-  vertex::number_t sum_num2_opponent = 0;
-  vertex::number_t min_num2_total = vertex::max_num;
+  vertex::number_t min_num1_same = vertex::max_num;
+  vertex::number_t sum_num2_same = 0;
   vertex::number_t min_num2_opponent = vertex::max_num;
+  vertex::number_t sum_num1_opponent = 0;
+  vertex::number_t min_num1_opponent = vertex::max_num;
+  vertex::number_t min_num2_same = vertex::max_num;
 
-  vertex_ptr min_num1_same_player_child;
-  vertex_ptr min_num2_total_child;
+  vertex_ptr min_num1_same_child;
+  vertex_ptr min_num1_opponent_child;
+  vertex_ptr min_num2_same_child;
+  vertex_ptr min_num2_opponent_child;
 
-  for (vertex::vertex_list::const_iterator child = node->children_begin(); child != node->children_end(); ++child) {
-    if ((*child)->type == node->type) {
-      if (child->get()->*num1 < min_num1_same_player) {
-        min_num1_same_player = child->get()->*num1;
-        min_num1_same_player_child = *child;
+  for (vertex::vertex_list::const_iterator child_it = node->children_begin(); child_it != node->children_end(); ++child_it) {
+    vertex_ptr const& child_ptr = *child_it;
+    vertex const& child = *child_ptr;
+    vertex::number_t const n1 = child.*num1;
+    vertex::number_t const n2 = child.*num2;
+
+    if (child.type == node->type) {
+      if (n1 < min_num1_same) {
+        min_num1_same = n1;
+        min_num1_same_child = child_ptr;
       }
-    }
 
-
-    // Disregard children with PN/DN = 0 here, as they are already (dis-)proved and need no further attention.
-    if (child->get()->*num2 > 0 && child->get()->*num2 < min_num2_total) {
-      min_num2_total = child->get()->*num2;
-      min_num2_total_child = *child;
-    }
-
-    if ((*child)->type != node->type) {
-      add_sum(sum_num2_opponent, child->get()->*num2);
-      if (child->get()->*num2 > 0 && child->get()->*num2 < min_num2_opponent) {
-        min_num2_opponent = child->get()->*num2;
+      if (0 < n2 && n2 < min_num2_same) {
+        min_num2_same = n2;
+        min_num2_same_child = child_ptr;
       }
-    }
-  }
 
-  // XXX: What an ugly hack.
-  if (!node->children.empty() && min_num1_same_player_child == 0 && min_num2_total_child == 0) {
-    return node->children.front();
-  }
+      add_sum_no_infty(sum_num2_same, n2);
 
-  assert(!(min_num1_same_player_child == 0 && min_num2_total_child == 0) || node->children.empty());
-
-  if (min_num1_same_player_child && min_num2_total_child) {
-    if (min_num1_same_player < add(min_num2_opponent, sum_num2_opponent)) {
-      return min_num1_same_player_child;
     } else {
-      return min_num2_total_child;
+      if (n2 < min_num2_opponent) {
+        min_num2_opponent = n2;
+        min_num2_opponent_child = child_ptr;
+      }
+
+      if (0 < n1 && n1 < min_num1_opponent) {
+        min_num1_opponent = n1;
+        min_num1_opponent_child = child_ptr;
+      }
+
+      add_sum(sum_num1_opponent, n1);
     }
-  } else if (min_num1_same_player_child) {
-    return min_num1_same_player_child;
+  }
+
+  // So, which option is the best, then?
+  if (min_num1_same_child && min_num1_same <= sum_num1_opponent && min_num1_same <= add(sum_num2_same, min_num2_opponent)) {
+    return min_num1_same_child;
+  } else if (min_num1_opponent_child && min_num1_opponent <= min_num1_same && min_num1_opponent <= add(sum_num2_same, min_num2_opponent)) {
+    return min_num1_opponent_child;
+  } else if (min_num2_same_child && min_num2_opponent_child && add(sum_num2_same, min_num2_opponent) <= min_num1_opponent
+      && add(sum_num2_same, min_num2_opponent) <= min_num1_same) {
+    if (min_num2_same_child.get()->*num2 < min_num2_opponent_child.get()->*num2) {
+      return min_num2_same_child;
+    } else {
+      return min_num2_opponent_child;
+    }
+  } else if (!node->leading_step) {  // Root vertex needs a special treatement as it has no AND children.
+    return min_num1_same_child;
   } else {
-    return min_num2_total_child;
+    return vertex_ptr();
   }
 }
 
