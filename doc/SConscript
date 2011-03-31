@@ -1,11 +1,13 @@
 # Building rules for making the documentation using LaTeX.
 #
+# Building documentation via SCons is only supported on Windows. It's only here to be integrated with the 'scons distrib'
+# target anyway, so there's not much point in having it on FreeBSD as well.
+#
 # This script uses latexCmd from the root SConstruct file.
-
-import os
 
 # Make an environment using the system's environment variable. This is so that LaTeX tools can be found and they can find
 # their subparts using these variables.
+import os
 env = Environment(ENV=os.environ)
 
 Import(['latexCmd'])

@@ -12,16 +12,16 @@ if bits not in (32, 64):
 config = buildConfig(platform, bits)
 debug = int(ARGUMENTS.get('debug', 0))
 
-# Use pdflatex on Windows and texi2pdf on FreeBSD by default. Allow the user to override this using the latexcmd=
-# command line option.
-latexCmd = 'pdflatex' if platform == 'win32' else 'texi2pdf'
-latexCmd = ARGUMENTS.get('latexcmd', latexCmd)
+# Use pdflatex on Windows and let the user build the documentation manually on FreeBSD.
+if platform == 'win32':
+  latexCmd = 'pdflatex'
+  latexCmd = ARGUMENTS.get('latexcmd', latexCmd)
+
+  doc = SConscript('doc/SConscript', exports=['latexCmd'])
+
+  Alias('doc', doc)
 
 subTargets = SConscript('apns_module/SConscript', exports=['config', 'debug', 'bits'])
-doc = SConscript('doc/SConscript', exports=['latexCmd'])
-
-Alias('doc', doc)
-
 apnslib = subTargets['apnslib']
 
 install = Install('.', apnslib)  # Copy the Python extension module to the toplevel directory.
