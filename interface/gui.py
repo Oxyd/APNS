@@ -1,6 +1,6 @@
 # -*- Encoding: utf-8 -*-
 
-from apnsmod import Board, Vertex, Piece, Position, WinStrategy, OperationController, empty, apply, opponentColor, memoryUsed
+from apnsmod import Board, Vertex, Piece, Position, WinStrategy, OperationController, empty, apply, opponentColor, memoryUsedTotal
 from interface.fileio import loadBoard, saveBoard, saveSearch, loadSearch
 from interface.observable import Observable
 from interface.search import makeSearch
@@ -1180,7 +1180,7 @@ class SearchProgressController(object):
     KBYTE = 1024
     MBYTE = 1024 ** 2
     
-    alloc = memoryUsed()
+    alloc = memoryUsedTotal()
     
     if alloc < KBYTE:
       return '%d B' % alloc

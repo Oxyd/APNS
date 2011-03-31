@@ -5,11 +5,14 @@
 
 from interface.search import makeSearch
 from interface.fileio import loadBoard, loadSearch, saveSearch
-from apnsmod import WinStrategy, OperationController, memoryUsed
+from apnsmod import WinStrategy, OperationController, memoryUsedTotal
 import argparse
 import sys
 import os
 import time
+
+KB = 1024         # One kilobyte
+MB = 1024 * 1024  # One megabyte
 
 class SaveLoadProgress(OperationController):
   def __init__(self, quiet):
@@ -22,6 +25,17 @@ class SaveLoadProgress(OperationController):
       print '{0}/{1} {2}%'.format(self.workDone, self.workTotal, 
                                   int(100.0 * float(self.workDone) / float(self.workTotal)))
       sys.stdout.flush()
+
+
+def strFromMem(mem):
+  '''strFromMem(m) -> str
+  
+  Convert an integer m representing an amount of memory to a string representing the amount with units attached.
+  '''
+  
+  if mem < KB:      return '%.2f B' % mem
+  elif mem < MB:    return '%.2f kB' % (mem / KB)
+  else:             return '%.2f MB' % (mem / MB)
     
 
 def main():
@@ -90,8 +104,7 @@ def main():
 
     if not args.quiet: print 'Done'
   
-  KB = 1024         # One kilobyte
-  MB = 1024 * 1024  # One megabyte
+  
   transTblElements = args.transTblSize * MB / search.sizeOfTransTblElement
   search.useTranspositionTable(transTblElements, args.transTblKeepTime)
 
@@ -116,23 +129,12 @@ def main():
       search.run(BURST_TIME)
       
       if not args.quiet:
+        print 'Still working:'
         if args.timeLimit:
-          sys.stdout.write('{0} seconds left; '.format(int(args.timeLimit - timeElapsed)))
-        
-        mem = memoryUsed()
-        if mem < KB:      memUsed = '%.2f B' % mem
-        elif mem < MB:    memUsed = '%.2f kB' % (mem / KB)
-        else:             memUsed = '%.2f MB' % (mem / MB)
-        
-        sys.stdout.write('{0} unique positions total; {1} new positions per second; {2} search memory used'.format(
-            search.positionCount,
-            posPerSec,
-            memUsed))
-        
-        if args.transTblSize > 0:
-          sys.stdout.write('; transposition table size: {0} MB'.format(search.getTranspositionTable().memoryUsage / MB))
-        
-        print
+          print '  -- {0} seconds left'.format(int(args.timeLimit - timeElapsed))
+        print '  -- {0} Search memory used'.format(strFromMem(memoryUsedTotal()))
+        print '  -- {0} unique positions total'.format(search.positionCount)
+        print '  -- {0} new positions per second'.format(posPerSec)
       
       now = time.clock()
       timeElapsed = now - start
