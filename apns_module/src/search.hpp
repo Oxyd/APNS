@@ -456,7 +456,11 @@ vertex_ptr pn_search_algo<Strategy, H>::successor(vertex_ptr node) {
 
 template <typename S, typename H>
 void pn_search_algo<S, H>::use_transposition_table(std::size_t elements, std::size_t keep_time) {
-  trans_tbl = transposition_table_t::create(elements, keep_time);
+  if (elements > 0) {
+    trans_tbl = transposition_table_t::create(elements, keep_time);
+  } else {
+    trans_tbl.reset();
+  }
 }
 
 template class pn_search_algo<win_strategy, zobrist_hasher>;
