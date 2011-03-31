@@ -101,19 +101,7 @@ vertex::weak_vertex_list::const_iterator vertex::parents_end() const {
 }
 
 vertex_ptr vertex::create() {
-  vertex* storage = vertex::allocator::allocate();
-  vertex* v = 0;
-
-  try {
-    v = new (storage) vertex;
-  } catch (...) {
-    vertex::allocator::deallocate(storage);
-    throw;
-  }
-
-  vertex_ptr result = boost::shared_ptr<vertex>(v, &vertex::destroy);
-  result->self = result;
-  return result;
+  return vertex_ptr(new vertex);
 }
 
 vertex_ptr vertex::create(e_type type, step const& leading_step, unsigned steps_remaining) {
@@ -126,11 +114,6 @@ vertex_ptr vertex::create(e_type type, step const& leading_step, unsigned steps_
 }
 
 vertex::vertex() : pickle_number(0), pickled(false) { }
-
-void vertex::destroy(vertex* ptr) {
-  ptr->vertex::~vertex();
-  vertex::allocator::deallocate(ptr);
-}
 
 vertex::e_type opposite_type(vertex::e_type to_what) {
   switch (to_what) {

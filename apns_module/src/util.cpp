@@ -6,6 +6,7 @@
 #include <sstream>
 #include <stack>
 #include <stdexcept>
+#include <cstdlib>
 
 namespace {
 
@@ -185,35 +186,44 @@ void load_edges(std::istream& input, std::vector<vertex_ptr> const& vertices, op
   }
 }
 
+std::size_t memory_usage = 0;                     //!< Total memory usage by this module.
+
 }
 
 prng_t prng;
 
-char* counting_allocator::malloc(size_type bytes) {
-  allocated += bytes;
-  char* storage = new (std::nothrow) char [bytes + sizeof(size_type)];
+void* operator new (std::size_t size) throw (std::bad_alloc) {
+  std::size_t const total_size = size + sizeof(std::size_t);
+  char* storage = static_cast<char*>(std::malloc(total_size));
   if (storage) {
-    *reinterpret_cast<size_type*>(storage) = bytes + sizeof(size_type);
-    return storage + sizeof(size_type);
+    *reinterpret_cast<std::size_t*>(storage) = total_size;
+    memory_usage += total_size;
+    return storage + sizeof(std::size_t);
   } else {
-    return 0;
+    throw std::bad_alloc();
   }
 }
 
-void counting_allocator::free(char const* block) {
-  if (block) {
-    char const* real_block = block - sizeof(size_type);
-    size_type alloc_size = *reinterpret_cast<size_type const*>(real_block);
-    allocated -= alloc_size;
-    delete [] real_block;
+void* operator new [] (std::size_t size) throw (std::bad_alloc) {
+  return ::operator new (size);
+}
+
+//! Tracking op delete.
+void operator delete (void* storage) throw () {
+  if (storage) {
+    char* const real_storage = static_cast<char*>(storage) - sizeof(std::size_t);
+    memory_usage -= *reinterpret_cast<std::size_t*>(real_storage);
+    std::free(real_storage);
   }
 }
 
-counting_allocator::size_type counting_allocator::allocated_total() {
-  return allocated;
+void operator delete [] (void* storage) throw () {
+  ::operator delete (storage);
 }
 
-counting_allocator::size_type counting_allocator::allocated = 0;
+std::size_t get_memory_usage() {
+  return memory_usage;
+}
 
 operation_controller::operation_controller(unsigned ms_update_time)
   : ms_update_time(ms_update_time)

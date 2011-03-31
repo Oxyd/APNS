@@ -10,22 +10,8 @@ typedef boost::mt19937 prng_t;
 
 extern prng_t prng;
 
-/**
- * Custom low-level allocator that keeps track of how much memory is currently allocated. Good for use with Boost pool
- * allocators.
- */
-struct counting_allocator {
-  typedef std::size_t     size_type;
-  typedef std::ptrdiff_t  difference_type;
-
-  static char* malloc(size_type bytes);
-  static void free(char const* block);
-
-  static size_type allocated_total();  //!< Get the number of bytes currently allocated.
-
-private:
-  static size_type allocated;
-};
+//! Get the total memory usage by this module.
+std::size_t get_memory_usage();
 
 /**
  * Controller for long-running operations. It serves as a simple interface between the algorithm and the user interface.

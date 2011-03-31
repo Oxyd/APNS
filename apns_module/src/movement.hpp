@@ -14,6 +14,7 @@
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
+#include <vector>
 #include <utility>
 
 //! Maximum allowed number of steps in a move.
@@ -34,14 +35,15 @@ unsigned const MAX_STEPS = 4;
  * contains some arbitrary, unspecified value.
  */
 struct elementary_step {
-  // Even though these members are public, they are not meant to be modified by users. They're not hidden behind
-  // accessor functions, because this is meant to be only an intermediate helper structure.
+  position get_from() const;
+  direction get_where() const;
+  bool is_capture() const;
+  boost::optional<piece> get_what() const;
 
-  position    from;         //!< Source position of the displaced piece, or the position of the captured piece.
-  direction   where;        //!< Direction where the displaced piece is moving.
-  bool        is_capture;   //!< If \c true, this represents a capture; otherwise it represents a displacement.
+  std::string to_string() const;
 
-  boost::optional<piece> what;  //!< Optionally, what piece is being moved/captured?
+  void set_what(boost::optional<piece> new_what);
+
 
   //! Construct a displacement-kind elementary step.
   static elementary_step displacement(position from, direction where, boost::optional<piece> what = boost::optional<piece>());
@@ -54,6 +56,9 @@ private:
 
   //! A capture.
   explicit elementary_step(position which, boost::optional<piece> what);
+
+  //! Four-character representation of the elementary step. This is a string like "Rc7n" or " d3e" if the piece is not known.
+  char representation[4];
 };
 
 bool operator == (elementary_step const& lhs, elementary_step const& rhs);
@@ -86,12 +91,8 @@ bool operator != (elementary_step const& lhs, elementary_step const& rhs);
 class step {
 public:
   //! A sequence of elementary steps.
-  typedef std::list<
-    elementary_step,
-    boost::fast_pool_allocator<
-      elementary_step,
-      counting_allocator
-    >
+  typedef std::vector<
+    elementary_step
   > elementary_step_seq;
 
   //! Validate and possibly construct an ordinary step.

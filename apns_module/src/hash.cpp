@@ -62,8 +62,8 @@ zobrist_hasher::hash_t zobrist_hasher::update(hash_t old_hash,
   hash_t hash = old_hash;
 
   for (step::elementary_step_seq::const_iterator step = steps_begin; step != steps_end; ++step) {
-    position const& old_position = step->from;
-    piece const& piece = *step->what;  // Assumed to be non-empty.
+    position const& old_position = step->get_from();
+    piece const& piece = *step->get_what();  // Assumed to be non-empty.
 
     // First remove the piece from its old position. If this is a displacement, add the piece's new position to the
     // hash later.
@@ -72,8 +72,8 @@ zobrist_hasher::hash_t zobrist_hasher::update(hash_t old_hash,
                  [old_position.get_row() - board::MIN_ROW]
                  [old_position.get_column() - board::MIN_COLUMN];
 
-    if (!step->is_capture) {
-      position new_position = make_adjacent(old_position, step->where);
+    if (!step->is_capture()) {
+      position new_position = make_adjacent(old_position, step->get_where());
       hash ^= codes[piece.get_type()]
                    [piece.get_color()]
                    [new_position.get_row() - board::MIN_ROW]

@@ -13,6 +13,7 @@
 #include <boost/python.hpp>
 
 #include <list>
+#include <vector>
 #include <limits>
 #include <stack>
 #include <utility>
@@ -34,9 +35,8 @@ typedef boost::weak_ptr<vertex> weak_vertex_ptr;
 class vertex {
 public:
   //! Type for a list of vertices.
-  typedef std::list<
-    vertex_ptr,
-    boost::fast_pool_allocator<vertex_ptr, counting_allocator>
+  typedef std::vector<
+    vertex_ptr
   > vertex_list;
 
   //! Weak list of vertices.
@@ -78,14 +78,9 @@ public:
   static vertex_ptr create(e_type type, step const& leading_step, unsigned steps_remaining);
 
 private:
-  //! Vertex allocator type.
-  typedef boost::fast_pool_allocator<vertex, counting_allocator> allocator;
-
   weak_vertex_ptr self;
 
   vertex();  //!< Users are forbidden to create their own objects of this type directly.
-
-  static void destroy(vertex* ptr);  //!< Deallocate the memory assigned to a vertex.
 };
 
 

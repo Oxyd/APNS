@@ -307,18 +307,15 @@ void export_movement() {
           "Create an elementary step representing a capture from the given position.")
       .staticmethod("capture")
 
-      // These are intentionally defined read-only even though they're read-write in C++. Write access is only meaningful
-      // for 'direction' and 'is_capture' anyway, as position is immutable. Write access is also only provided for
-      // convenience.
-      .def_readonly("from", &elementary_step::from,
+      .add_property("from", &elementary_step::get_from,
           "For displacement, this is the initial position of the to-be-moved piece. For capture, this is the position"
           "from which the piece will be captured.")
-      .def_readonly("where", &elementary_step::where,
+      .add_property("where", &elementary_step::get_where,
           "For displacement, this is where the piece will be moved. For capture, this field has no meaning and contains"
           "an arbitrary value.")
-      .def_readonly("isCapture", &elementary_step::is_capture,
+      .add_property("isCapture", &elementary_step::is_capture,
           "If true, this is a capture move. Otherwise, this is a displacement move.")
-      .def_readonly("what", &elementary_step::what,
+      .add_property("what", &elementary_step::get_what,
           "What piece is being moved/captured? This field may be None.")
       ;
 
@@ -539,8 +536,7 @@ void export_hash() {
 void export_util() {
   using namespace boost::python;
 
-  def("memoryUsed",
-      &counting_allocator::allocated_total,
+  def("memoryUsedTotal", &get_memory_usage,
       "Get the amount of total memory used for search in bytes.");
 
   class_<operation_controller_wrapper, boost::noncopyable>("OperationController",
