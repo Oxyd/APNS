@@ -135,6 +135,13 @@ def main():
         print '  -- {0} Search memory used'.format(strFromMem(memoryUsedTotal()))
         print '  -- {0} unique positions total'.format(search.positionCount)
         print '  -- {0} new positions per second'.format(posPerSec)
+        
+        if search.getTranspositionTable() is not None:
+          tbl = search.getTranspositionTable()
+          print '  -- Transposition table:'
+          print '    -- Size: {0:.2f} MB'.format(float(tbl.memoryUsage) / MB)
+          print '    -- Hits: {0}'.format(tbl.hits)
+          print '    -- Misses: {0}'.format(tbl.misses)
       
       now = time.clock()
       timeElapsed = now - start

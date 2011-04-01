@@ -1,6 +1,7 @@
 # -*- Encoding: utf-8 -*-
 
-from apnsmod import Board, Vertex, Piece, Position, WinStrategy, OperationController, empty, apply, opponentColor, memoryUsedTotal
+from apnsmod import Board, Vertex, Piece, Position, WinStrategy, OperationController, Step, empty, apply, opponentColor,\
+                    memoryUsedTotal
 from interface.fileio import loadBoard, saveBoard, saveSearch, loadSearch
 from interface.observable import Observable
 from interface.search import makeSearch
@@ -58,8 +59,8 @@ class MainWindow(Observable):
                                      command=lambda: self.notifyObservers(command=MainWindow.Command.loadSearch))
     self._saveSearchBtn = ttk.Button(self._toolbar, text='Save Search',
                                      command=lambda: self.notifyObservers(command=MainWindow.Command.saveSearch))
-    #self._iterateBtn = ttk.Button(self._toolbar, text='Iterate',
-    #                              command=lambda: self.notifyObservers(command=MainWindow.Command.iterate))
+    self._iterateBtn = ttk.Button(self._toolbar, text='Iterate',
+                                  command=lambda: self.notifyObservers(command=MainWindow.Command.iterate))
     self._saveBtn = ttk.Button(self._toolbar, text='Save Position',
                                command=lambda: self.notifyObservers(command=MainWindow.Command.save))
     
@@ -72,7 +73,7 @@ class MainWindow(Observable):
     self._runBtn.grid(row=0, column=1, padx=(3, 3))
     self._loadSearchBtn.grid(row=0, column=2, padx=(3, 3))
     self._saveSearchBtn.grid(row=0, column=3, padx=(3, 3))
-    #self._iterateBtn.grid(row=0, column=2, padx=(3, 3))
+    self._iterateBtn.grid(row=0, column=5, padx=(3, 3))
     self._saveBtn.grid(row=0, column=4, padx=(3, 0))
     self._toolbar.grid(row=0, column=0, sticky='W')
     self._resultsDisplay.widget.grid(row=1, column=0, sticky='NSEW')
@@ -91,7 +92,7 @@ class MainWindow(Observable):
     
     self._runBtn['state'] = ['!disabled']
     self._saveSearchBtn['state'] = ['!disabled']
-    #self._iterateBtn['state'] = ['!disabled']
+    self._iterateBtn['state'] = ['!disabled']
     self._saveBtn['state'] = ['!disabled']
   
   
@@ -100,7 +101,7 @@ class MainWindow(Observable):
     
     self._runBtn['state'] = ['disabled']
     self._saveSearchBtn['state'] = ['disabled']
-    #self._iterateBtn['state'] = ['disabled']
+    self._iterateBtn['state'] = ['disabled']
     self._saveBtn['state'] = ['disabled']
 
 
@@ -135,6 +136,8 @@ class MainWindowController(object):
         self._resetSearch(search)
     
     elif command == MainWindow.Command.iterate:
+      if self._search.getTranspositionTable() is None:
+        self._search.useTranspositionTable(100 * 1024 * 1024 / self._search.sizeOfTransTblElement, 16)
       self._search.iterate()
       self._resultsCtrl.updateTree()
     
@@ -282,6 +285,30 @@ class ResultsDisplay(Observable):
     return sel
   
   
+  def getNodeStep(self, node):
+    '''Get the step string of a given node.'''
+    
+    return self._tree.item(node, 'text')
+  
+  
+  def getNodeType(self, node):
+    '''Return the type of a given node.'''
+    
+    return self._tree.set(node, 'Type')
+  
+  
+  def isRoot(self, node):
+    '''Decide whether given node is the root node.'''
+    
+    return node == ''
+  
+  
+  def getParent(self, node):
+    '''Return the handle of the parent node.'''
+    
+    return self._tree.parent(node)
+  
+  
   def _select(self, e):
     '''Handle change of selection in the tree.'''
     handle = self._tree.selection()[0]
@@ -296,6 +323,56 @@ class ResultsDisplay(Observable):
 
 class ResultsController(object):
   '''Controller of ResultsDisplay.'''
+  
+  # XXX: This thing *badly* needs refactoring. Seriously.
+  
+  class _DisplayNode(object):
+    '''A node in the display. This represents the tree that is actually displayed. It contains a list of its
+    _DisplayNode children, its _DisplayNode parent and a reference to the actual node in the real search tree.
+    '''
+    
+    _handleToNode = {}  # A dictionary handle -> _DisplayNode.
+    
+    def __init__(self, parent, vertex, display):
+      '''Create a node and attach it to the display.'''
+      
+      object.__init__(self)
+      
+      self.vertex = vertex  # The vertex in the search tree
+      self.children = []    # _DisplayNode children of this node.
+      self.parent = parent  # _DisplayNode parent of this node.
+      
+      name = 'root' if self.vertex.leadingStep is None else self.vertex.leadingStep.toString()
+      parent = self.parent.handle if self.parent is not None else None
+      self.handle = display.addNode(parent, name, self._getType(), self.vertex.proofNumber, self.vertex.disproofNumber)
+      ResultsController._DisplayNode._handleToNode[self.handle] = self
+    
+    
+    @staticmethod
+    def getNode(handle):
+      '''Given a handle, return the apropriate node from the tree.'''
+      
+      return ResultsController._DisplayNode._handleToNode[handle]
+    
+    
+    def updateDisplay(self, display):
+      '''Update the values in the display.'''
+      
+      display.updateNode(self.handle, self._getType(), self.vertex.proofNumber, self.vertex.disproofNumber)
+    
+    
+    def expand(self, display):
+      '''Add children of this vertex to the display.'''
+      
+      assert len(self.children) == 0
+      
+      for child in self.vertex.children:
+        self.children.append(ResultsController._DisplayNode(self, child, display))
+      
+    
+    def _getType(self):
+      return 'AND' if self.vertex.type_ == Vertex.Type.and_ else 'OR'
+      
   
   def __init__(self, resultsDisplay):
     object.__init__(self)
@@ -312,20 +389,15 @@ class ResultsController(object):
     '''
     
     if self._search is not None:
-      self._resultsDsply.removeNode(self._nodeToHandle[hash(self._tree)])
-      self._nodeToHandle = dict()
-      self._handleToNodeParent = dict()
+      self._resultsDsply.removeNode(self._tree.handle)
     
     self._tree = None
     self._search = search
-    self._handleToNodeParent = dict()
-    self._nodeToHandle = dict()
     
     if self._search is not None:
-      self._tree = self._search.root
-      self.updateTree()
-      self._expandVertex(self._nodeToHandle[hash(self._tree)])
-      self._resultsDsply.selectNode(self._nodeToHandle[hash(self._tree)])
+      self._tree = ResultsController._DisplayNode(None, self._search.root, self._resultsDsply)
+      self._tree.expand(self._resultsDsply)
+      self._resultsDsply.selectNode(self._tree.handle)
     else:
       self._resultsDsply.showBoard(None)
   
@@ -334,16 +406,12 @@ class ResultsController(object):
     '''Save the currently displayed position to the given file.'''
     
     selectedHandle = self._resultsDsply.selected()
-    (selected, parent) = self._handleToNodeParent[selectedHandle]
+    turn = 1  # Ignore turn numbers.
     
-    # Find out the turn number.
-    turn = 1
-    while parent is not None:
-      turn += 1
-      (_, parent) = self._handleToNodeParent[self._nodeToHandle[hash(parent)]]
-    
-    if selected.type_ == Vertex.Type.and_:  player = opponentColor(self._search.player)
-    else:                                   player = self._search.player
+    if self._resultsDsply.getNodeType(selectedHandle) == 'AND':
+      player = opponentColor(self._search.player)
+    else:
+      player = self._search.player
       
     if player == Piece.Color.gold:  p = 'g'
     else:                           p = 's'
@@ -361,31 +429,8 @@ class ResultsController(object):
     
     if command == ResultsDisplay.Command.show:
       # Display the board corresponding to the newly-selected vertex.
-      #
-      # We need to find the path from the root to the selected node, then apply the respective steps to the initial board 
-      # position to get the appropriate board to display.
       
-      # First, go *up* the tree from the selected node, and save the traversed path onto a stack.
-      path = []
-      
-      (child, parent) = self._handleToNodeParent[handle]
-      while True:
-        path.append(child)
-        
-        if parent is not None:
-          (child, parent) = self._handleToNodeParent[self._nodeToHandle[hash(parent)]]
-        else:
-          break
-      
-      # Then, with the path on the stack, go back down, transforming the initial board into the final position.
-      board = self._search.getInitialBoard()
-      
-      while len(path) > 0:
-        child = path.pop()
-        if child.leadingStep is not None:
-          apply(child.leadingStep, board)
-      
-      # Finally, display the result.
+      board = self._getDisplayedBoard(handle)
       self._resultsDsply.showBoard(board)
     
     elif command == ResultsDisplay.Command.expand:
@@ -397,49 +442,19 @@ class ResultsController(object):
     then it will attach new nodes -- that are not displayed yet -- to the display.
     '''
     
-    # We'll have to traverse the whole search tree here. For each node in the tree, see if it is displayed already -- if it is,
-    # update its PN and DN values on the display. If it isn't, add it to the display. Do not add its children, though -- they'll
-    # be added on-demand, if the user decides to expand the node.
-    #
-    # To be able to add the node to the display, we need to have its parent handle. So, while traversing the tree, we'll keep
-    # each node's parent on the search stack as well.
-    #
-    # This also requires that we be able to translate between search nodes and handles for the tree display. Currently, two
-    # dictionaries are in use here: one for the node -> handle conversion, the other one for handle -> node.
-    #
-    # XXX: The thing described in previous paragraph is ugly. Can it be made better?
+    # Traverse the whole tree. For each vertex we'll first update the values. Then check whether the displayed vertex is a leaf
+    # while the real vertex has been expanded -- if that is so, we'll expand the displayed vertex as well.
     
-    stack = [(self._tree, None)]  # list of (node, node's parent)
-    
+    stack = [self._tree]
     while len(stack) > 0:
-      (node, parent) = stack.pop()
+      node = stack.pop()
+      node.updateDisplay(self._resultsDsply)
       
-      if parent is None or hash(self._search.successor(parent)) == hash(node):
-        bold = True
-      else:
-        bold = False
+      if len(node.children) == 0 and len(list(node.vertex.children)) > 0:
+        # The real vertex has been expanded, but the display vertex hasn't.
+        node.expand(self._resultsDsply)
       
-      if hash(node) in self._nodeToHandle:
-        # The node is in the tree. Update it.
-        
-        self._resultsDsply.updateNode(self._nodeToHandle[hash(node)], 
-                                      self._nodeType(node),
-                                      self._num(node.proofNumber), self._num(node.disproofNumber),
-                                      bold)
-          
-        for child in node.children:
-          stack.append((child, node))
-      
-      else:
-        # It's not in the tree -- attach it there.
-        if parent is not None:
-          parentHandle = self._nodeToHandle[hash(parent)]
-        else:
-          parentHandle = None
-        
-        self._addToDisplay(parent, parentHandle, node, bold)
-        
-        # Don't process the children, though.
+      stack.extend(node.children)
   
   
   def _expandVertex(self, handle):
@@ -447,27 +462,31 @@ class ResultsController(object):
     in the tree yet, and if so add them to the tree.
     '''
     
-    (rootVertex, _) = self._handleToNodeParent[handle]
-    for parent in rootVertex.children:
-      if hash(parent) not in self._nodeToHandle:
-        successor = self._search.successor(rootVertex)
-        if hash(parent) == hash(successor):   bold = True
-        else:                                 bold = False
-        self._addToDisplay(rootVertex, handle, parent, bold)
-      
-      parentHandle = self._nodeToHandle[hash(parent)]
-      
-      successor = self._search.successor(parent)
-      
-      for child in parent.children:
-        if hash(child) not in self._nodeToHandle:
-          # This child is not in the tree.
-          if hash(child) == hash(successor):
-            bold = True
-          else:
-            bold = False
-          
-          self._addToDisplay(parent, parentHandle, child, bold)
+    self._resultsDsply.selectNode(handle)
+    node = ResultsController._DisplayNode.getNode(handle)
+    
+    for child in node.children:
+      if len(child.children) == 0 and len(list(child.vertex.children)) > 0:
+        child.expand(self._resultsDsply)
+    
+  
+  def _getDisplayedBoard(self, vertex):
+    '''Get the board object corresponding to the selected tree position.'''
+    
+    # First, go up the tree, saving all vertices on the path in a stack.
+    stack = []
+    while not self._resultsDsply.isRoot(vertex):
+      stack.append(self._resultsDsply.getNodeStep(vertex))
+      vertex = self._resultsDsply.getParent(vertex)
+    
+    # Now, having the path on the stack, go back down, transforming the initial board into the final result.
+    result = self._search.initialBoard.copy()
+    while len(stack) > 0:
+      step = Step.fromString(stack.pop())
+      if step is not None:
+        apply(step, result)
+    
+    return result
           
   
   def _addToDisplay(self, parent, parentHandle, child, bold):
@@ -725,7 +744,7 @@ class LoadProgressController(object):
         
         dlg.showProgress(100.0 * float(self.workDone) / float(self.workTotal))
         
-        memUsage = memoryUsed()
+        memUsage = memoryUsedTotal()
         if memUsage <= KB:
           mem = '%.2f B' % memUsage
         elif KB < memUsage <= MB:
