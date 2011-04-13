@@ -22,16 +22,6 @@
 
 namespace {
 
-//! Convert an \c int to #vertex::e_type.
-vertex::e_type vertex_type_from_int(int t) {
-  switch (t) {
-  case vertex::type_and:    return vertex::type_and;
-  case vertex::type_or:     return vertex::type_or;
-  default:
-    throw std::domain_error("type_from_int: Could not convert integer to vertex type");
-  }
-}
-
 //! Convert a C++ sequence into a Python list.
 template <typename Iterator>
 boost::python::list py_list_from_cpp_seq(Iterator begin, Iterator end) {
@@ -93,25 +83,6 @@ struct pair_to_tuple {
 };
 
 /**
- * Converter from \c boost::weak_ptr<T> to a Python object.
- *
- * If the \c weak_ptr doesn't hold the reference anymore, the converted value will be None.
- */
-template <typename T>
-struct weak_to_shared {
-  static PyObject* convert(boost::weak_ptr<T> ptr) {
-    using namespace boost::python;
-
-    boost::shared_ptr<T> shared = ptr.lock();
-    if (shared) {
-      return incref(object(shared).ptr());
-    } else {
-      return Py_None;
-    }
-  }
-};
-
-/**
  * Python wrapper for operation_controller. Required to be able to inherit from it in Python and override virtual functions.
  */
 class operation_controller_wrapper : public operation_controller, public boost::python::wrapper<operation_controller> {
@@ -154,7 +125,7 @@ unsigned position_hash(position pos) {
  * Hashing function for Vertex so that Vertex can be used in Python dictionaries.
  */
 std::ptrdiff_t vertex_hash(vertex_ptr v) {
-  return reinterpret_cast<std::ptrdiff_t>(v.get());
+  return reinterpret_cast<std::ptrdiff_t>(v);
 }
 
 //! A setter for vertex::leading_step.
@@ -397,8 +368,6 @@ void export_pn_search_algo(std::string const& identifier) {
       .add_property("initialBoard",
           make_function(&pn_search_algo<Strategy, Hasher>::get_initial_board,
               return_value_policy<copy_const_reference>()))
-      .def("successor",
-          &pn_search_algo<Strategy, Hasher>::successor)
       .def("iterate", &pn_search_algo<Strategy, Hasher>::iterate,
           "Perform one iteration of the algorithm")
 
@@ -421,15 +390,12 @@ void export_pn_search_algo(std::string const& identifier) {
 void export_search() {
   using namespace boost::python;
 
-  to_python_converter<boost::weak_ptr<vertex>, weak_to_shared<vertex> >();
-
   {
-    scope vertex_scope = class_<vertex, vertex_ptr>("Vertex", no_init)
+    scope vertex_scope = class_<vertex, vertex_ptr, boost::noncopyable>("Vertex", no_init)
         .def_readwrite("type_", &vertex::type, "Type of this vertex: either AND or OR")
         .add_property("children",
             range(&vertex::children_begin, &vertex::children_end),
             "Children of this vertex of either type")
-        .def("addChild", &vertex::add_child, with_custodian_and_ward<1, 2>())
         .add_property("parents",
             range(&vertex::parents_begin, &vertex::parents_end),
             "Parents of this vertex")
@@ -441,13 +407,9 @@ void export_search() {
         .def_readwrite("stepsRemaining", &vertex::steps_remaining, "How many steps until the end of a move")
         .def_readwrite("proofNumber", &vertex::proof_number, "Proof Number of this vertex")
         .def_readwrite("disproofNumber", &vertex::disproof_number, "Disproof number of this vertex")
-        .def_readwrite("pickleNumber", &vertex::pickle_number)
 
         .def_readonly("infty", &vertex::infty, "Infinity value")
         .def_readonly("maxNum", &vertex::max_num, "Maximum acceptable value for a PN or DN")
-
-        .def("create", static_cast<vertex_ptr (*)()>(&vertex::create))
-        .staticmethod("create")
 
         .def("__hash__", &vertex_hash)
         ;
@@ -483,7 +445,8 @@ void export_trans_tbl(char const* name) {
           "Insert a vertex into the table")
       .def("query", &transposition_table<Hash>::query,
           "t.query(Hash) -> Vertex\n\n"
-          "Find a vertex in the table by the key. Return None if the vertex doesn't exist in the table")
+          "Find a vertex in the table by the key. Return None if the vertex doesn't exist in the table",
+          return_internal_reference<>())
       .def("tick", &transposition_table<Hash>::tick,
           "t.tick() -> None\n\n"
           "Update the internal tick count.")
@@ -556,7 +519,7 @@ void export_util() {
       ;
 
   def("dumpTree", &dump_tree);
-  def("loadTree", &load_tree);
+  def("loadTree", &load_tree, return_internal_reference<>());
 }
 
 /**

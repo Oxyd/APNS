@@ -7,32 +7,35 @@
 #include <stack>
 #include <stdexcept>
 #include <cstdlib>
+#include <map>
 
 namespace {
 
+typedef std::map<vertex_ptr, unsigned> pickle_map;
+
 /**
  * Dump the vertices of the three rooted at 'root' into output. This function will assign each vertex of the tree a unique
-  positive integer and set its value as vertex.pickle_number. The root of the tree is guaranteed to be assigned pickle_number
-  of 1.
+ * positive integer and store its value in pickle_numbers. The root of the tree is guaranteed to be assigned number of 1. This function
+ * also sets the visited flag of each vertex to true, and expects that all vertices are initially unvisited.
  */
-void dump_vertices(std::ostream& output, vertex_ptr root, operation_controller& op_ctrl) {
+void dump_vertices(std::ostream& output, vertex_ptr root, pickle_map& pickle_numbers, operation_controller& op_ctrl) {
   std::stack<vertex_ptr> stack;
   stack.push(root);
+
   unsigned number = 1;
 
   while (!stack.empty() && !op_ctrl.stop()) {
     vertex_ptr vertex = stack.top();
     stack.pop();
 
-    if (vertex->pickle_number == 0) {
-      // This vertex hasn't yet been pickled.
-
-      vertex->pickle_number = number++;
+    if (!vertex->visited) {
+      pickle_numbers[vertex] = number;
+      vertex->visited = true;
 
       std::string const step = vertex->leading_step ? vertex->leading_step->to_string() : "root";
       std::string const type = vertex->type == vertex::type_and ? "and" : "or";
 
-      output << vertex->pickle_number << ": " << step << ": " << type << " " << vertex->steps_remaining << " ";
+      output << number << ": " << step << ": " << type << " " << vertex->steps_remaining << " ";
       if (vertex->proof_number < vertex::infty) output << vertex->proof_number;
       else                                      output << "infty";
       output << ' ';
@@ -40,19 +43,21 @@ void dump_vertices(std::ostream& output, vertex_ptr root, operation_controller& 
       else                                         output << "infty";
       output << '\n';
 
-      for (vertex::vertex_list::const_iterator child = vertex->children_begin(); child != vertex->children_end(); ++child) {
+      for (vertex::children_iterator child = vertex->children_begin(); child != vertex->children_end(); ++child) {
         stack.push(*child);
       }
 
+      ++number;
       op_ctrl.update(op_ctrl.get_work_done() + 1, op_ctrl.get_work_total());
     }
   }
 }
 
 /**
- * Dump the edges of the tree rooted at 'root' into output. This function will set pickled of each vertex back to true.
+ * Dump the edges of the tree rooted at 'root' into output. This function will set the visited flag of each vertex
+ * back to false.
  */
-void dump_edges(std::ostream& output, vertex_ptr root, operation_controller& op_ctrl) {
+void dump_edges(std::ostream& output, vertex_ptr root, pickle_map const& pickle_numbers, operation_controller& op_ctrl) {
   std::stack<vertex_ptr> stack;
   stack.push(root);
 
@@ -60,19 +65,18 @@ void dump_edges(std::ostream& output, vertex_ptr root, operation_controller& op_
     vertex_ptr vertex = stack.top();
     stack.pop();
 
-    if (!vertex->pickled) {
+    if (vertex->visited) {
       if (vertex->children_begin() != vertex->children_end()) {  // Only actually dump the vertex if it has any children.
-        output << vertex->pickle_number << " : ";
+        output << pickle_numbers.find(vertex)->second << " : ";
 
-        for (vertex::vertex_list::const_iterator child = vertex->children_begin(); child != vertex->children_end(); ++child) {
-          output << (*child)->pickle_number << ' ';
+        for (vertex::children_iterator child = vertex->children_begin(); child != vertex->children_end(); ++child) {
+          output << pickle_numbers.find(*child)->second << ' ';
           stack.push(*child);
         }
         output << '\n';
       }
 
-      vertex->pickled = true;
-      op_ctrl.update(op_ctrl.get_work_done() + 1, op_ctrl.get_work_total());
+      vertex->visited = false;
     }
   }
 }
@@ -86,7 +90,7 @@ void throw_loading_failed() {
 
 /**
  * Load tree vertices from the given list. Returns a list l where l[index] is the vertex that was originally saved with
- * pickle_number == index - 1. The returned vertices have pickle_number set to 0.
+ * pickle_number == index - 1. The returned vertices have the visited flag set to false.
  *
  * The separator string is consumed from the input.
  */
@@ -106,7 +110,7 @@ void load_vertices(std::istream& input, std::vector<vertex_ptr>& vertices, opera
       parser >> delimeter;
       if (!parser || delimeter != ':') throw_loading_failed();
 
-      vertex_ptr vertex = vertex::create();
+      std::auto_ptr<vertex> vertex(new ::vertex);
 
       std::string step_str;
       std::getline(parser, step_str, ':');
@@ -153,7 +157,7 @@ void load_vertices(std::istream& input, std::vector<vertex_ptr>& vertices, opera
         if (!subparser) throw_loading_failed();
       }
 
-      vertices.push_back(vertex);
+      vertices.push_back(vertex.release());
       op_ctrl.update(op_ctrl.get_work_done() + 1, op_ctrl.get_work_total());
     } else {
       break;
@@ -161,7 +165,7 @@ void load_vertices(std::istream& input, std::vector<vertex_ptr>& vertices, opera
   }
 }
 
-//! Load edges from input and store them in vertices. vertices is expected to be a list as returned by _loadVertices.
+//! Load edges from input and store them in vertices. vertices is expected to be a list as returned by load_vertices.
 void load_edges(std::istream& input, std::vector<vertex_ptr> const& vertices, operation_controller& op_ctrl) {
   std::string line;
   while (std::getline(input, line) && !op_ctrl.stop()) {
@@ -178,15 +182,18 @@ void load_edges(std::istream& input, std::vector<vertex_ptr> const& vertices, op
     if (!parser || delimeter != ':') throw_loading_failed();
 
     unsigned edge;
+    std::vector<vertex_ptr> children;
     while (parser >> edge) {
-      vertex->add_child(vertices[edge - 1]);
+      children.push_back(vertices[edge - 1]);
+      vertices[edge - 1]->add_parent(vertex);
     }
 
-    op_ctrl.update(op_ctrl.get_work_done() + 1, op_ctrl.get_work_total());
+    vertex->alloc_children(children.size());
+    std::copy(children.begin(), children.end(), vertex->children_begin());
   }
 }
 
-std::size_t memory_usage = 0;                     //!< Total memory usage by this module.
+std::size_t memory_usage = 0;                     //!< Total memory usage of this module.
 
 }
 
@@ -273,17 +280,18 @@ void dump_tree(std::string const& filename, vertex_ptr root, bool append, operat
   std::ofstream output(filename.c_str(), append ? std::ios_base::out | std::ios_base::app : std::ios_base::out);
   output.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 
-  op_ctrl.update(0, 2 * tree_size);  // The tree needs to be traversed twice.
+  op_ctrl.update(0, tree_size);
 
-  dump_vertices(output, root, op_ctrl);
+  pickle_map pickle_numbers;
+  dump_vertices(output, root, pickle_numbers, op_ctrl);
   output << VERTICES_EDGES_SEPARATOR << '\n';
-  dump_edges(output, root, op_ctrl);
+  dump_edges(output, root, pickle_numbers, op_ctrl);
 
   op_ctrl.finished();
 }
 
 vertex_ptr load_tree(std::string const& filename, unsigned skip_lines, operation_controller& op_ctrl, unsigned tree_size) {
-  op_ctrl.update(0, 2 * tree_size);
+  op_ctrl.update(0, tree_size);
 
   std::ifstream input(filename.c_str());
   input.exceptions(std::ios_base::badbit);
@@ -296,13 +304,30 @@ vertex_ptr load_tree(std::string const& filename, unsigned skip_lines, operation
 
   std::vector<vertex_ptr> vertices;
   load_vertices(input, vertices, op_ctrl);
-  load_edges(input, vertices, op_ctrl);
+  try {
+    load_edges(input, vertices, op_ctrl);
 
-  op_ctrl.finished();
-  if (vertices.size() > 0 && !op_ctrl.stop()) {
-    assert(!vertices[0]->leading_step);  // The first vertex must be the root.
-    return vertices[0];
-  } else {
-    return vertex_ptr();
+#ifndef NDEBUG
+    // Sanity check.
+    for (std::size_t index = 1; index < vertices.size(); ++index) {
+      assert(vertices[index]->parents_begin() != vertices[index]->parents_end());
+      assert(vertices[index]->leading_step);
+    }
+#endif
+
+    op_ctrl.finished();
+    if (vertices.size() > 0 && !op_ctrl.stop()) {
+      assert(!vertices[0]->leading_step);  // The first vertex must be the root.
+      return vertices[0];
+    } else {
+      return vertex_ptr();
+    }
+  } catch (...) {
+    for (std::vector<vertex_ptr>::const_iterator vertex = vertices.begin(); vertex != vertices.end(); ++vertex) {
+      delete *vertex;
+    }
+
+    throw;
   }
 }
+

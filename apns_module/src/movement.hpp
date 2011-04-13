@@ -44,7 +44,6 @@ struct elementary_step {
 
   void set_what(boost::optional<piece> new_what);
 
-
   //! Construct a displacement-kind elementary step.
   static elementary_step displacement(position from, direction where, boost::optional<piece> what = boost::optional<piece>());
   //! Construct a capture-kind elementary step.

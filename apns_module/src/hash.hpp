@@ -81,8 +81,8 @@ private:
   players_cont  players;
 };
 
-struct vertex;
-typedef boost::shared_ptr<vertex> vertex_ptr;
+class vertex;
+typedef vertex* vertex_ptr;
 
 template <typename Hasher>
 class transposition_table_pickle;
@@ -133,6 +133,16 @@ public:
    * \returns Either the found element or an empty pointer if the element wasn't found.
    */
   vertex_ptr query(hash_t hash);
+
+  /**
+   * Inform the table that a query was a hit. That is, the table returned an expected vertex.
+   */
+  void hit();
+
+  /**
+   * Inform the table that a query was a miss.
+   */
+  void miss();
 
   //! Update the internal iteration-count timer. Call this each iteration of the search algorithm.
   void tick();
@@ -220,16 +230,23 @@ vertex_ptr transposition_table<Hasher>::query(hash_t hash) {
     record& r = (*pg)[page_offset(hash % table_size)];
     r.last_accessed = current_iteration;
     if (r.vertex) {
-      ++hits;
+      return r.vertex;
     } else {
-      ++misses;
+      return vertex_ptr();
     }
-
-    return r.vertex;
   } else {
-    ++misses;
     return vertex_ptr();
   }
+}
+
+template <typename Hasher>
+void transposition_table<Hasher>::hit() {
+  ++hits;
+}
+
+template <typename Hasher>
+void transposition_table<Hasher>::miss() {
+  ++misses;
 }
 
 template <typename Hasher>

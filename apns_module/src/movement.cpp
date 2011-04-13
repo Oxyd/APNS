@@ -64,19 +64,6 @@ bool stronger_opponent_adjacent(position where, board const& board) {
 }
 
 /**
- * Is a piece captured?
- *
- * Check whether a piece is supposed to be captured and removed from the board. This occurs when it happens to stand
- * on a trap and there is no friendly piece adjacent.
- *
- * \param where Where is the given piece? This position must be nonempty.
- * \param board Board with the pieces.
- */
-bool capture(position where, board const& board) {
-  return trap(where) && !friendly_adjacent(where, board);
-}
-
-/**
  * Decide whether there would be a capture if a certain move were performed.
  *
  * The hypothetical move is #what moving from #old_position to #new_position. #old_position is thus assumed to be empty
@@ -205,6 +192,7 @@ char letter_from_piece(piece const& p) {
   case piece::rabbit:           letter = 'r'; break;
   default:
     assert(!"Never gets here");
+    letter = '?';
   }
 
   if (p.get_color() == piece::gold) {
@@ -545,7 +533,7 @@ void unapply(step const& step, board& board) {
     position const original_position = es->get_from();
 
     if (!es->is_capture()) {
-      assert(adjacent_valid(original_position, es->where));
+      assert(adjacent_valid(original_position, es->get_where()));
       position const destination = make_adjacent(original_position, es->get_where());
       boost::optional<piece> maybe_what = board.get(destination);
 
@@ -557,7 +545,7 @@ void unapply(step const& step, board& board) {
         throw std::logic_error("unapply: given step doesn't correspond to given board");
       }
     } else {
-      assert(es->what);
+      assert(es->get_what());
       piece const& what = *es->get_what();
       board.put(original_position, what);
     }
@@ -704,7 +692,6 @@ void steps_iter::advance_second_to_weaker() {
 
     if (adjacent_valid(second_center, *second_dir)
         && !empty(make_adjacent(second_center, *second_dir), *board)) {
-      position const second_position = make_adjacent(second_center, *second_dir);
       piece const second_piece = *board->get(make_adjacent(second_center, *second_dir));
 
       if (second_piece.get_color() == opponent_color(first_piece.get_color())

@@ -93,8 +93,8 @@ private:
   virtual void do_update() { }
 };
 
-struct vertex;
-typedef boost::shared_ptr<vertex> vertex_ptr;
+class vertex;
+typedef vertex* vertex_ptr;
 
 /**
  * Dump the search tree into a file specified by filename.

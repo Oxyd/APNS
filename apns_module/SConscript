@@ -96,7 +96,7 @@ else:
 
   else:
     env.Append(CCFLAGS=[
-      '-O2'  # Optimize well.
+      '-O3'  # Optimize well.
     ])
     env.Append(CPPDEFINES=[
       'NDEBUG'  # Disable assertions and related stuff.

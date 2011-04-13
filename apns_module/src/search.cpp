@@ -7,7 +7,8 @@
 
 #include <limits>
 #include <cassert>
-
+#include <stack>
+#include <queue>
 #include <iostream>
 
 namespace {
@@ -79,41 +80,114 @@ boost::optional<piece::color_t> winner(board const& board, piece::color_t player
 vertex::number_t const vertex::infty = std::numeric_limits<vertex::number_t>::max() - 1;
 vertex::number_t const vertex::max_num = std::numeric_limits<vertex::number_t>::max();
 
-void vertex::add_child(vertex_ptr child) {
-  children.insert(children.end(), child);
-  child->parents.insert(child->parents.end(), self);
+vertex::parent_iterator::parent_iterator(parent_node* current)
+  : current(current)
+{ }
+
+void vertex::parent_iterator::increment() {
+  current = current->next.get();
 }
 
-vertex::vertex_list::const_iterator vertex::children_begin() const {
-  return children.begin();
+vertex::parent_iterator::reference vertex::parent_iterator::dereference() const {
+  return current->parent;
 }
 
-vertex::vertex_list::const_iterator vertex::children_end() const {
-  return children.end();
+bool vertex::parent_iterator::equal(vertex::parent_iterator const& other) const {
+  return current == other.current;
 }
 
-vertex::weak_vertex_list::const_iterator vertex::parents_begin() const {
-  return parents.begin();
+vertex::vertex()
+  : proof_number(0)
+  , disproof_number(0)
+  , steps_remaining(0)
+  , visited(false)
+  , children_size(0)
+{ }
+
+vertex::children_iterator vertex::children_begin() {
+  return children.get();
 }
 
-vertex::weak_vertex_list::const_iterator vertex::parents_end() const {
-  return parents.end();
+vertex::children_iterator vertex::children_end() {
+  return children.get() + children_size;
 }
 
-vertex_ptr vertex::create() {
-  return vertex_ptr(new vertex);
+vertex::parent_iterator vertex::parents_begin() {
+  return parent_iterator(parent_list.get());
 }
 
-vertex_ptr vertex::create(e_type type, step const& leading_step, unsigned steps_remaining) {
-  vertex_ptr v = vertex::create();
-  v->type = type;
-  v->leading_step = leading_step;
-  v->steps_remaining = steps_remaining;
-
-  return v;
+vertex::parent_iterator vertex::parents_end() {
+  return parent_iterator();
 }
 
-vertex::vertex() : pickle_number(0), pickled(false) { }
+void vertex::alloc_children(std::size_t count) {
+  assert(!children.get());
+  children_size = count;
+  children.reset(new vertex*[count]);
+  std::fill_n(children.get(), children_size, static_cast<vertex*>(0));
+}
+
+void vertex::add_parent(vertex* parent) {
+  parent_list.reset(new parent_node(parent, parent_list));
+}
+
+void vertex::remove_parent(vertex* parent) {
+  parent_node* prev = 0;
+  parent_node* current = parent_list.get();
+
+  while (current && current->parent != parent) {
+    prev = current;
+    current = current->next.get();
+  }
+
+  assert(current);
+
+  if (prev) {
+    prev->next.reset(current->next.get());
+  } else {
+    parent_list.reset(current->next.get());
+  }
+}
+
+void delete_subtree(vertex* root) try {
+  std::queue<vertex*> queue;
+  queue.push(root);
+
+  while (!queue.empty()) {
+    vertex* v = queue.front();
+    queue.pop();
+
+    for (vertex::children_iterator child = v->children_begin(); child != v->children_end(); ++child) {
+      if (*child) {
+        (*child)->remove_parent(v);
+
+        if ((*child)->parent_list.get() == 0) {
+          // This was the last parent of the child.
+          queue.push(*child);
+        }
+      }
+    }
+
+    delete v;
+  }
+} catch (...) {
+  std::cerr << "Error: Exception thrown during subtree deallocation. Memory leaked.\n";
+  throw;
+}
+
+vertex* find_min(vertex::children_iterator begin, vertex::children_iterator end, vertex::number_t vertex::*number) {
+  vertex::number_t min = vertex::max_num;
+  vertex* min_child = 0;
+
+  for (; begin != end; ++begin) {
+    if ((*begin)->*number < min) {
+      min = (*begin)->*number;
+      min_child = *begin;
+    }
+  }
+
+  return min_child;
+}
 
 vertex::e_type opposite_type(vertex::e_type to_what) {
   switch (to_what) {
@@ -151,85 +225,63 @@ void detail::add_sum_no_infty(vertex::number_t& sum, vertex::number_t addend) {
   }
 }
 
+board detail::board_from_vertex(vertex_ptr vertex, board const& initial_board) {
+  std::stack<step> stack;
+
+  boost::optional<step> s = vertex->leading_step;
+  while (s) {
+    stack.push(*s);
+
+    // It doesn't matter which parent we choose here, so let's just grab the first one each time. Also, if leading step is not
+    // empty, a parent must always exist.
+    assert(vertex->parents_begin() != vertex->parents_end());
+    vertex = vertex_ptr(*vertex->parents_begin());
+
+    s = vertex->leading_step;
+  }
+
+  // Now, go from initial_board to the final one by going down the stack and applying the steps.
+  board result = initial_board;
+  while (!stack.empty()) {
+    apply(stack.top(), result);
+    stack.pop();
+  }
+
+  return result;
+}
+
 pn_dn_pair_t win_strategy::updated_numbers(vertex_ptr vertex) const {
   using detail::add_sum;
   using detail::add;
   using detail::add_sum_no_infty;
 
-  // To prove an OR vertex, we need to either prove one OR child (that is, find one good step for the same player) or prove
-  // *all* AND children (that is, give it over to the opponent and prove that the opponent necessarily loses every time).
-  // Therefore:
-  //     PN := min { min_{c is an OR child} c.PN, sum_{c is an AND child} c.PN } .
-  //
-  // To disprove this vertex, we need to show that all possible moves of the player from this position result in the player's
-  // loss and that the opponent has at least one winning option. So:
-  //     DN := min_{c is an AND child} c.DN + sum_{c is an OR child & c.DN =/= oo} c.DN .
-  //
-  // To prove an AND vertex -- that is, show that the opponent loses no matter what move he choses -- means to prove all
-  // his possible moves -- AND children -- and at least one player's move.
-  //     PN := min_{c is an OR child} c.PN + sum_{c is an AND child} c.PN
-  //
-  // To disprove this vertex one needs to either find a good AND child that will lead to opponent's victory, or show
-  // that all OR successors are disproved. So:
-  //     DN := min { min_{c is an AND child} c.DN, sum_{c is an OR child & c.DN =/= oo} c.DN }
-  //
-  // We don't sum up infinities in the two sums, because children with PN/DN = oo are already disproved and nothing needs to be
-  // done about them.
-
-  vertex::number_t vertex::*num1;
-  vertex::number_t vertex::*num2;
+  vertex::number_t vertex::* minimise_num;  // The number to take the minimum of.
+  vertex::number_t vertex::* add_num;       // The number to take sum of.
 
   if (vertex->type == vertex::type_or) {
-    num1 = &vertex::proof_number;
-    num2 = &vertex::disproof_number;
+    minimise_num = &vertex::proof_number;
+    add_num = &vertex::disproof_number;
   } else {
-    num1 = &vertex::disproof_number;
-    num2 = &vertex::proof_number;
+    minimise_num = &vertex::disproof_number;
+    add_num = &vertex::proof_number;
   }
 
-  vertex::number_t min_num1_same = vertex::max_num;
-  vertex::number_t min_num2_opposite = vertex::max_num;
-  vertex::number_t sum_num1_opposite = 0;
-  vertex::number_t sum_num2_same = 0;
+  vertex::number_t min = vertex::max_num;
+  vertex::number_t sum = 0;
 
-  if (!vertex->leading_step) {
-    // Root is not going to have any AND children, but that doesn't mean the opponent is immobilised.
-    sum_num1_opposite = vertex::infty;
-    min_num2_opposite = 0;
-  }
-
-  for (vertex::vertex_list::const_iterator child = vertex->children_begin(); child != vertex->children_end(); ++child) {
-    if ((*child)->type == vertex->type) {
-      if (child->get()->*num1 < min_num1_same) {
-        min_num1_same = child->get()->*num1;
-      }
-
-      add_sum(sum_num2_same, child->get()->*num2);
-    } else {
-      if (child->get()->*num2 < min_num2_opposite) {
-        min_num2_opposite = child->get()->*num2;
-      }
-
-      add_sum(sum_num1_opposite, child->get()->*num1);
+  for (vertex::children_iterator child = vertex->children_begin(); child != vertex->children_end(); ++child) {
+    assert(*child);
+    if ((*child)->*minimise_num < min) {
+      min = (*child)->*minimise_num;
     }
+
+    add_sum(sum, (*child)->*add_num);
   }
 
-  if (vertex->type == vertex::type_or) {
-    vertex::number_t const pn = std::min(min_num1_same, sum_num1_opposite);
-    vertex::number_t const dn = add(min_num2_opposite, sum_num2_same);
+  vertex::number_t const pn = vertex->type == vertex::type_or ? min : sum;
+  vertex::number_t const dn = vertex->type == vertex::type_or ? sum : min;
 
-    assert((pn != 0 || dn == vertex::infty) && (dn != 0 || pn == vertex::infty));
-
-    return std::make_pair(pn, dn);
-
-  } else {
-    vertex::number_t const pn = add(min_num2_opposite, sum_num2_same);
-    vertex::number_t const dn = std::min(min_num1_same, sum_num1_opposite);
-
-    assert((pn != 0 || dn == vertex::infty) && (dn != 0 || pn == vertex::infty));
-
-    return std::make_pair(pn, dn);
-  }
+  return std::make_pair(pn, dn);
 }
 
 pn_dn_pair_t win_strategy::initial_numbers(board const& board, vertex::e_type type, piece::color_t player) const {
