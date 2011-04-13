@@ -12,13 +12,13 @@ TEST(elementary_step, elementary_step_test) {
       direction dir = north;
       elementary_step es = elementary_step::displacement(pos, dir);
 
-      EXPECT_TRUE(es.from == pos);
-      EXPECT_EQ(es.where, dir);
-      EXPECT_EQ(es.is_capture, false);
+      EXPECT_TRUE(es.get_from() == pos);
+      EXPECT_EQ(es.get_where(), dir);
+      EXPECT_EQ(es.is_capture(), false);
 
       elementary_step capture = elementary_step::capture(pos);
-      EXPECT_TRUE(capture.from == pos);
-      EXPECT_EQ(capture.is_capture, true);
+      EXPECT_TRUE(capture.get_from() == pos);
+      EXPECT_EQ(capture.is_capture(), true);
     }
   }
 }
@@ -288,13 +288,13 @@ TEST(movement, sacrifice_test) {
   elementary_step const& e1 = el_steps.front();
   elementary_step const& e2 = el_steps.back();
 
-  ASSERT_TRUE(e1.what);
-  EXPECT_EQ(piece::gold, e1.what->get_color());
-  EXPECT_EQ(piece::rabbit, e1.what->get_type());
+  ASSERT_TRUE(e1.get_what());
+  EXPECT_EQ(piece::gold, e1.get_what()->get_color());
+  EXPECT_EQ(piece::rabbit, e1.get_what()->get_type());
 
-  ASSERT_TRUE(e2.what);
-  EXPECT_EQ(piece::gold, e2.what->get_color());
-  EXPECT_EQ(piece::elephant, e2.what->get_type());
+  ASSERT_TRUE(e2.get_what());
+  EXPECT_EQ(piece::gold, e2.get_what()->get_color());
+  EXPECT_EQ(piece::elephant, e2.get_what()->get_type());
 }
 
 class move_generation : public testing::Test {
