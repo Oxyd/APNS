@@ -39,7 +39,7 @@ class MainWindow(Observable):
   
   class Command:
     '''Enumeration type that specifies what kind of action the user has selected.'''
-    newSearch, iterate, runSearch, save, loadSearch, saveSearch = range(6)
+    newSearch, iterate, runSearch, save, loadSearch, saveSearch, close = range(7)
   
   
   def __init__(self):
@@ -63,6 +63,8 @@ class MainWindow(Observable):
                                   command=lambda: self.notifyObservers(command=MainWindow.Command.iterate))
     self._saveBtn = ttk.Button(self._toolbar, text='Save Position',
                                command=lambda: self.notifyObservers(command=MainWindow.Command.save))
+    
+    self._window.protocol('WM_DELETE_WINDOW', lambda: self.notifyObservers(command=MainWindow.Command.close))
     
     self.disableSearch()
 
@@ -103,6 +105,12 @@ class MainWindow(Observable):
     self._saveSearchBtn['state'] = ['disabled']
     self._iterateBtn['state'] = ['disabled']
     self._saveBtn['state'] = ['disabled']
+  
+  
+  def destroy(self):
+    '''Destroy this window.'''
+    
+    self._window.quit()
 
 
 class MainWindowController(object):
@@ -132,6 +140,10 @@ class MainWindowController(object):
                                                  'Specify an initial search position or load one from disk:', 
                                                  self._mainWindowDsply.imageManager)
       if positionEditorDlg.board is not None:
+        del self._search
+        self._resetSearch(None)
+        gc.collect()
+        
         search = makeSearch(positionEditorDlg.board, positionEditorDlg.player, WinStrategy())
         self._resetSearch(search)
     
@@ -143,8 +155,13 @@ class MainWindowController(object):
     
     elif command == MainWindow.Command.runSearch:
       dlg = RunSearchDialog(self._mainWindowDsply.window)
-      RunSearchController(dlg, self._search)
+      runSearchCtrl = RunSearchController(dlg, self._search)
+      self._search.useTranspositionTable(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
+      dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft)
+      searchProgressCtrl = SearchProgressController(self._search, dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit)
+      searchProgressCtrl.run()
       self._resultsCtrl.updateTree()
+      self._mainWindowDsply.window.focus_set()
       gc.collect()
     
     elif command == MainWindow.Command.save:
@@ -169,6 +186,11 @@ class MainWindowController(object):
       if len(filename) > 0:
         dlg = SaveProgressDialog(self._mainWindowDsply.window)
         SaveProgressController(dlg, self._search, str(filename))
+    
+    elif command == MainWindow.Command.close:
+      self._resetSearch(None)
+      gc.collect()
+      self._mainWindowDsply.destroy()
   
   
   def _resetSearch(self, newSearch):
@@ -319,6 +341,15 @@ class ResultsDisplay(Observable):
     '''Handle the expansion of a vertex in the tree.'''
     handle = self._tree.selection()[0]
     self.notifyObservers(handle=handle, command=ResultsDisplay.Command.expand)
+
+
+def strFromNum(n):
+  '''Return the string representation of n as a proof-/disproof-number.'''
+  
+  if n < Vertex.infty:
+    return unicode(n)
+  else:
+    return u'∞'
     
 
 class ResultsController(object):
@@ -333,6 +364,13 @@ class ResultsController(object):
     
     _handleToNode = {}  # A dictionary handle -> _DisplayNode.
     
+    @staticmethod
+    def release():
+      '''Release references to vertices in the tree.'''
+      
+      ResultsController._DisplayNode._handleToNode = {}
+      
+    
     def __init__(self, parent, vertex, display):
       '''Create a node and attach it to the display.'''
       
@@ -344,7 +382,9 @@ class ResultsController(object):
       
       name = 'root' if self.vertex.leadingStep is None else self.vertex.leadingStep.toString()
       parent = self.parent.handle if self.parent is not None else None
-      self.handle = display.addNode(parent, name, self._getType(), self.vertex.proofNumber, self.vertex.disproofNumber)
+      self.handle = display.addNode(parent, name, self._getType(), 
+                                    strFromNum(self.vertex.proofNumber),
+                                    strFromNum(self.vertex.disproofNumber))
       ResultsController._DisplayNode._handleToNode[self.handle] = self
     
     
@@ -358,7 +398,9 @@ class ResultsController(object):
     def updateDisplay(self, display):
       '''Update the values in the display.'''
       
-      display.updateNode(self.handle, self._getType(), self.vertex.proofNumber, self.vertex.disproofNumber)
+      display.updateNode(self.handle, self._getType(), 
+                         strFromNum(self.vertex.proofNumber), 
+                         strFromNum(self.vertex.disproofNumber))
     
     
     def expand(self, display):
@@ -390,9 +432,11 @@ class ResultsController(object):
     
     if self._search is not None:
       self._resultsDsply.removeNode(self._tree.handle)
+      del self._search
     
-    self._tree = None
     self._search = search
+    self._tree = None
+    ResultsController._DisplayNode.release()
     
     if self._search is not None:
       self._tree = ResultsController._DisplayNode(None, self._search.root, self._resultsDsply)
@@ -453,6 +497,8 @@ class ResultsController(object):
       if len(node.children) == 0 and len(list(node.vertex.children)) > 0:
         # The real vertex has been expanded, but the display vertex hasn't.
         node.expand(self._resultsDsply)
+        
+        continue  # But do not process the children recursively.
       
       stack.extend(node.children)
   
@@ -507,7 +553,7 @@ class ResultsController(object):
     h = self._resultsDsply.addNode(parentHandle, 
                                    name,
                                    self._nodeType(child),
-                                   self._num(child.proofNumber), self._num(child.disproofNumber),
+                                   strFromNum(child.proofNumber), strFromNum(child.disproofNumber),
                                    bold)
     self._nodeToHandle[hash(child)] = h
     self._handleToNodeParent[h] = (child, parent)
@@ -520,15 +566,6 @@ class ResultsController(object):
       return 'AND'
     else:
       return 'OR'
-  
-  
-  def _num(self, n):
-    '''Return the string representation of n as a proof-/disproof-number.'''
-    
-    if n < Vertex.infty:
-      return unicode(n)
-    else:
-      return u'∞'
     
 
 class DialogWindow(object):
@@ -592,8 +629,9 @@ class DialogWindow(object):
   def close(self):
     '''Close this dialog and return control back to the parent.'''
     
-    self._parent.focus_set()
+    self._window.grab_release()
     self._window.destroy()
+    self._parent.focus_set()
   
   
   def setDeleteAction(self, newAction):
@@ -865,7 +903,7 @@ class RunSearchDialog(Observable):
   
   def run(self):
     '''Enter the modal dialog loop and wait for the user to close the dialog.'''
-    self._dialog.run()
+    self._dialog.run(wait=True)
   
   
   def close(self):
@@ -922,6 +960,11 @@ class RunSearchController(object):
   dialog showing the progress.
   '''
   
+  timeLimit = property(lambda self: self._timeLimit)
+  posLimit = property(lambda self: self._posLimit)
+  transTblSize = property(lambda self: self._transTblSize)
+  showTimeLeft = property(lambda self: self._showTimeLeft)
+  
   def __init__(self, runSearchDlg, search):
     object.__init__(self)
     
@@ -941,7 +984,6 @@ class RunSearchController(object):
     '''React to user input from the dialog.'''
     
     MB = 1024 ** 2  # Megabyte.
-    TRANS_TBL_KEEP_TIME = 16  # Not user-settable ATM.
     
     if command == RunSearchDialog.Command.start:
       if self._validateInput():
@@ -957,13 +999,13 @@ class RunSearchController(object):
           posLimit = int(self._runSearchDlg.positionLimit)
         else:
           posLimit = None
+          
+        self._transTblSize = (int(self._runSearchDlg.transTblSize) * MB) / self._search.sizeOfTransTblElement
+        self._timeLimit = sTimeLimit
+        self._posLimit = posLimit
+        self._showTimeLeft = showTimeLeft
         
-        transTblElements = (int(self._runSearchDlg.transTblSize) * MB) / self._search.sizeOfTransTblElement
-        self._search.useTranspositionTable(transTblElements, TRANS_TBL_KEEP_TIME)
-        
-        searchProgressDlg = SearchProgressDialog(self._runSearchDlg.parent, showTimeLeft)
-        self._searchProgressCtrl = SearchProgressController(self._search, searchProgressDlg, sTimeLimit, posLimit)
-        self._searchProgressCtrl.run()
+        self._runSearchDlg.close()
     
     elif command == RunSearchDialog.Command.timeLimitCheck:
       self._runSearchDlg.enableTimeLimit(self._runSearchDlg.timeLimitCheck)
@@ -1257,6 +1299,7 @@ class PositionEditorDialog(object):
     okButton.focus_set()
     self._window.window.bind('<Return>', lambda e: self._window.close())
     self._window.window.bind('<Escape>', lambda e: self._cancel)
+    self._window.setDeleteAction(lambda: self._cancel())
     
     self._window.run()
     
@@ -1846,3 +1889,4 @@ if __name__ == '__main__':
   mainWindowCtrl.runApplication()
   del mainWindowCtrl
   del mainWindowDsply
+  gc.collect()
