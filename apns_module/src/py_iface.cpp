@@ -347,7 +347,6 @@ void export_pn_search_algo(std::string const& identifier) {
       init<board const&, piece::color_t, Strategy>()[
           with_custodian_and_ward<1, 2>()
       ])
-      .def(init<board const&, int, Strategy>()[with_custodian_and_ward<1, 2>()])
       .def(init<board const&, vertex_ptr, piece::color_t, Strategy, unsigned>()[
           with_custodian_and_ward<1, 2,
           with_custodian_and_ward<1, 3> >()

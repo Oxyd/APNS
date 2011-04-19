@@ -325,6 +325,23 @@ bool operator != (board const& lhs, board const& rhs) {
   return !operator == (lhs, rhs);
 }
 
+std::string string_from_board(board const& board) {
+  std::ostringstream output;
+
+  for (board::pieces_iterator pos_piece = board.pieces_begin(); pos_piece != board.pieces_end(); ++pos_piece) {
+    if (pos_piece != board.pieces_begin()) {
+      output << ' ';
+    }
+
+    position const& pos = pos_piece->first;
+    piece const& piece = pos_piece->second;
+
+    output << pos.get_row() << pos.get_column() << piece_letter(piece);
+  }
+
+  return output.str();
+}
+
 bool empty(position pos, board const& board) {
   return board.get(pos).get_ptr() == 0;
 }

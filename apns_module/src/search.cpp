@@ -284,9 +284,14 @@ pn_dn_pair_t win_strategy::updated_numbers(vertex_ptr vertex) const {
   return std::make_pair(pn, dn);
 }
 
-pn_dn_pair_t win_strategy::initial_numbers(board const& board, vertex::e_type type, piece::color_t player) const {
-  boost::optional<piece::color_t> winner = ::winner(board, player);
-  if (winner && ((*winner == player && type == vertex::type_or) || (*winner != player && type == vertex::type_and))) {
+pn_dn_pair_t win_strategy::initial_numbers(board const& board,
+    piece::color_t initial_player, piece::color_t from_player, piece::color_t to_player) const {
+  boost::optional<piece::color_t> winner;
+  if (from_player != to_player) {
+    winner = ::winner(board, from_player);
+  }
+
+  if (winner && *winner == initial_player) {
     return std::make_pair(0, vertex::infty);
   } else if (winner) {
     return std::make_pair(vertex::infty, 0);

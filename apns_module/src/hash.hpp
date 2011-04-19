@@ -110,7 +110,7 @@ private:
     vertex_ptr  vertex;
     iteration_t last_accessed;
 
-    record() : last_accessed(0) { }
+    record() : vertex(0), last_accessed(0) { }
   };
 
 public:

@@ -263,6 +263,9 @@ private:
 bool operator == (board const& lhs, board const& rhs);  //<! Test whether two board contain exactly the same elements.
 bool operator != (board const& lhs, board const& rhs);
 
+//! Create a single-line string representation of a board.
+std::string string_from_board(board const& board);
+
 //! Is the given position on a given board empty?
 bool empty(position pos, board const& board);
 

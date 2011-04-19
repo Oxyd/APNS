@@ -137,7 +137,6 @@ public:
   typedef typename transposition_table_t::const_pointer trans_tbl_const_ptr;
 
   pn_search_algo(board const& initial_board, piece::color_t player, Strategy strategy);
-  pn_search_algo(board const& initial_board, int player, Strategy strategy);
   pn_search_algo(board const& initial_board, vertex* tree, piece::color_t player, Strategy strategy, unsigned position_count);
   ~pn_search_algo();
 
@@ -204,7 +203,8 @@ private:
 
 struct win_strategy {
   pn_dn_pair_t updated_numbers(vertex_ptr vertex) const;
-  pn_dn_pair_t initial_numbers(board const& board, vertex::e_type type, piece::color_t player) const;
+  pn_dn_pair_t initial_numbers(board const& board,
+      piece::color_t initial_player, piece::color_t from_player, piece::color_t to_player) const;
 };
 
 namespace detail {
@@ -230,27 +230,7 @@ try
   , position_count(1)
 {
   root->type = vertex::type_or;
-  pn_dn_pair_t pn_dn = strategy.initial_numbers(initial_board, vertex::type_or, player);
-  root->proof_number = pn_dn.first;
-  root->disproof_number = pn_dn.second;
-  root->steps_remaining = MAX_STEPS;
-} catch (...) {
-  delete root;
-  throw;
-}
-
-template <typename Strategy, typename Hasher>
-pn_search_algo<Strategy, Hasher>::pn_search_algo(board const& initial_board, int player, Strategy strategy)
-try
-  : strategy(strategy)
-  , root(new vertex)
-  , initial_board(initial_board)
-  , initial_hash(hasher.generate_initial(initial_board, color_from_int(player)))
-  , player(color_from_int(player))
-  , position_count(1)
-{
-  root->type = vertex::type_or;
-  pn_dn_pair_t pn_dn = strategy.initial_numbers(initial_board, vertex::type_or, this->player);
+  pn_dn_pair_t pn_dn = strategy.initial_numbers(initial_board, player, opponent_color(player), player);
   root->proof_number = pn_dn.first;
   root->disproof_number = pn_dn.second;
   root->steps_remaining = MAX_STEPS;
@@ -360,7 +340,7 @@ void pn_search_algo<Strategy, H>::expand(board& board, vertex_ptr leaf, hash_t l
   using detail::board_from_vertex;
 
   assert(leaf->children_begin() == leaf->children_end());
-  assert(!(leaf->proof_number == 0 && leaf->disproof_number == 0));
+  assert(!(leaf->proof_number == 0 || leaf->disproof_number == 0));
 
   piece::color_t const player = (leaf->type == vertex::type_or ? this->player : opponent_color(this->player));
   piece::color_t const opponent = opponent_color(player);
@@ -389,82 +369,82 @@ void pn_search_algo<Strategy, H>::expand(board& board, vertex_ptr leaf, hash_t l
     step const& step = s->first;
     vertex::e_type const type = s->second;
 
-    ::board vertex_board = board;
     apply(step, board);
 
-    vertex* new_vertex = 0;
+    std::auto_ptr<vertex> new_vertex(new vertex);
+    new_vertex->leading_step = step;
+    new_vertex->type = type;
 
+    if (new_vertex->type == leaf->type) {
+      new_vertex->steps_remaining = leaf->steps_remaining - (signed)step.steps_used();
+    } else {
+      new_vertex->steps_remaining = MAX_STEPS - (signed)step.steps_used();
+    }
+
+    ++position_count;
+
+    bool pn_dn_set = false;
+
+    hash_t new_hash = hasher.update(leaf_hash,
+        step.step_sequence_begin(), step.step_sequence_end(),
+        player,
+        type == leaf->type ? player : opponent);
     if (trans_tbl) {
-      hash_t step_hash = hasher.update(leaf_hash,
-          step.step_sequence_begin(), step.step_sequence_end(),
-          player,
-          type == leaf->type ? player : opponent);
-
-      new_vertex = trans_tbl->query(step_hash);
-      if (new_vertex
-          && new_vertex->steps_remaining == leaf->steps_remaining - (signed)step.steps_used()
-          && !new_vertex->visited
-          && board_from_vertex(new_vertex, initial_board) == vertex_board) {
-        // This is a perfect match. Use the cached vertex.
+      vertex* record = trans_tbl->query(new_hash);
+      if (record
+          && record->steps_remaining == new_vertex->steps_remaining
+          && board_from_vertex(record, initial_board) == board
+          && record->proof_number != 0
+          && record->disproof_number != 0) {
+        new_vertex->proof_number = record->proof_number;
+        new_vertex->disproof_number = record->disproof_number;
+        pn_dn_set = true;
         trans_tbl->hit();
-        *child = new_vertex;
-      } else {
-        new_vertex = 0;
       }
     }
 
-    if (!new_vertex) {
-      // No match in the transposition table.
+    if (!pn_dn_set) {
       trans_tbl->miss();
+    }
 
-      new_vertex = new vertex;
-      ++position_count;
+    // Check for repetitions.
+    bool lose = false;
 
-      // Check for repetitions.
-      bool lose = false;
-
-      if (!history.empty() && type != leaf->type) {  // Only check for repetitions if this is the end of the move.
-        if (history.back().position == board && history.back().player == player) {
-          lose = true;  // Lose because a move must lead to a net change in overall position.
-        } else {
-          // Check for third-time repetitions.
-          unsigned count = 0;
-          for (typename history_seq::const_iterator h = history.begin(); h != history.end(); ++h) {
-            if (h->player == player
-                && h->position == board) {
-              ++count;
-            }
-          }
-
-          if (count >= 3) {
-            lose = true;
+    if (!history.empty() && type != leaf->type) {  // Only check for repetitions if this is the end of the move.
+      if (history.back().position == board && history.back().player == player) {
+        lose = true;  // Lose because a move must lead to a net change in overall position.
+      } else {
+        // Check for third-time repetitions.
+        unsigned count = 0;
+        for (typename history_seq::const_iterator h = history.begin(); h != history.end(); ++h) {
+          if (h->player == player && h->position == board) {
+            ++count;
           }
         }
-      }
 
-      if (!lose) {
-        pn_dn_pair_t const numbers = strategy.initial_numbers(board, type, type == leaf->type ? player : opponent);
-        new_vertex->proof_number = numbers.first;
-        new_vertex->disproof_number = numbers.second;
-      } else {
-        new_vertex->proof_number    = player == this->player ? vertex::infty : 0;
-        new_vertex->disproof_number = player == this->player ? 0 : vertex::infty;
+        if (count >= 3) {
+          lose = true;
+        }
       }
+    }
 
-      new_vertex->type = type;
-      new_vertex->leading_step = step;
+    if (!lose && !pn_dn_set) {
+      pn_dn_pair_t const numbers = strategy.initial_numbers(board, this->player, player,
+          new_vertex->type == leaf->type ? player : opponent);
+      new_vertex->proof_number = numbers.first;
+      new_vertex->disproof_number = numbers.second;
 
-      if (type == leaf->type) {
-        new_vertex->steps_remaining = leaf->steps_remaining - (signed)step.steps_used();
-        assert(new_vertex->steps_remaining >= 1);
-      } else {
-        new_vertex->steps_remaining = MAX_STEPS;
+      if (trans_tbl && new_vertex->proof_number != 0 && new_vertex->disproof_number != 0) {
+        trans_tbl->insert(new_hash, new_vertex.get());
       }
+    } else if (lose) {
+      new_vertex->proof_number    = player == this->player ? vertex::infty : 0;
+      new_vertex->disproof_number = player == this->player ? 0 : vertex::infty;
     }
 
     new_vertex->add_parent(leaf);
-    *child = new_vertex;
     unapply(step, board);
+    *child = new_vertex.release();
   }
 }
 

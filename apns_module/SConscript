@@ -91,7 +91,8 @@ else:
     ])
     
     env.Append(CPPDEFINES=[
-      '_GLIBCXX_DEBUG_PEDANTIC'  # Use the debugging version of the standard library.
+      '_GLIBCXX_DEBUG',           # Use the debugging version of the standard library.
+      '_GLIBCXX_DEBUG_PEDANTIC'   # Be real picky about the errors.
     ])
 
   else:
