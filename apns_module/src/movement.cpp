@@ -391,7 +391,7 @@ boost::optional<step> step::validate_pull(board const& board,
 boost::optional<step> step::from_string(std::string const& string) {
   // Split the input up into elementary steps separated by spaces. Convert each elementary step separately.
 
-  std::size_t const MAX_ELEMENTARY_STEPS_POSSIBLE = 3;  // At most three elementary steps per one step are possible.
+  std::size_t const MAX_ELEMENTARY_STEPS_POSSIBLE = 4;  // At most four elementary steps per one step are possible.
 
   elementary_step_seq elementary_steps;
   std::string el_step_description;

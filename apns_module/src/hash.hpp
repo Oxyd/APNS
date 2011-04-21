@@ -115,7 +115,7 @@ private:
 
 public:
   typedef typename Hasher::hash_t hash_t;
-  typedef boost::shared_ptr<transposition_table<Hasher> > pointer;  //!< Shared pointer type to this transposition table.
+  typedef boost::shared_ptr<transposition_table<Hasher> > pointer;             //!< Shared pointer type to this transposition table.
   typedef boost::shared_ptr<transposition_table<Hasher> const> const_pointer;  //!< Shared pointer type to immutable trans. tbl.
 
   static std::size_t const SIZE_OF_ELEMENT = sizeof(record);  //!< Size, in bytes, of one element of the table.

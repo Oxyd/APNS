@@ -18,13 +18,12 @@
 #include <utility>
 #include <stdexcept>
 #include <memory>
+#include <iterator>
 
 #include <iostream>
 
 //! One vertex of the search tree.
 class vertex : boost::noncopyable {
-  struct parent_node;
-
 public:
   //! Type of the proof- and disproof-number values.
   typedef unsigned number_t;
@@ -36,37 +35,32 @@ public:
   static number_t const infty;
 
   //! Iterator type over the children list.
-  typedef vertex** children_iterator;
+  typedef vertex* children_iterator;
 
-  //! Iterator type over the parents list.
-  class parent_iterator : public boost::iterator_facade<
-    parent_iterator,
-    vertex*,
-    boost::forward_traversal_tag
-  > {
-  public:
-    parent_iterator() : current(0) { }  //!< Construct the singular iterator.
+  //! Const vertsion of #children_iterator.
+  typedef vertex const* const_children_iterator;
 
-  private:
-    friend class boost::iterator_core_access;
-    friend class vertex;
+  //! Reverse iterator over the children list.
+  typedef std::reverse_iterator<vertex*> reverse_children_iterator;
 
-    explicit parent_iterator(parent_node* current);
-
-    void increment();
-    reference dereference() const;
-    bool equal(parent_iterator const& other) const;
-
-    parent_node* current;
-  };
+  //! Constant reverse iterator over the children list.
+  typedef std::reverse_iterator<vertex const*> const_reverse_children_iterator;
 
   vertex();
 
   children_iterator children_begin();   //!< Beginning of the sequence of children.
   children_iterator children_end();     //!< End of the sequence of children.
 
-  parent_iterator parents_begin();      //!< Beginning of the sequence of parents.
-  parent_iterator parents_end();        //!< End of the sequence of parents.
+  const_children_iterator children_begin() const;
+  const_children_iterator children_end() const;
+
+  reverse_children_iterator children_rbegin();
+  reverse_children_iterator children_rend();
+
+  const_reverse_children_iterator children_rbegin() const;
+  const_reverse_children_iterator children_rend() const;
+
+  vertex* get_parent();  //!< Get the parent of this vertex or null if this is the root.
 
   //! Type of this vertex.
   enum e_type {
@@ -77,7 +71,6 @@ public:
   number_t proof_number;        //!< Proof-number of this vertex.
   number_t disproof_number;     //!< Disproof-number of this vertex.
   int steps_remaining;          //!< How many steps does this player have left until the end of their move?
-  bool visited;                 //!< Has this vertex been visited in the current iteration?
 
   boost::optional<step> leading_step;  //!< The step that has led to this state.
 
@@ -85,37 +78,16 @@ public:
   void alloc_children(std::size_t count);
 
   //! Add the given vertex as a new parent of this one.
-  void add_parent(vertex* parent);
+  void set_parent(vertex* parent);
 
 private:
-  //! One node of the linked list of parents.
-  struct parent_node {
-    vertex*                     parent;
-    std::auto_ptr<parent_node>  next;
-
-    explicit parent_node(vertex* parent = 0, std::auto_ptr<parent_node> next = std::auto_ptr<parent_node>())
-      : parent(parent)
-      , next(next)
-    { }
-  };
-
-  //! Remove a parent from the list of parents. This function assumes the specified parent does exist in the list.
-  void remove_parent(vertex* parent);
-
-  friend void delete_subtree(vertex*);  // Give #delete_subtree access to #remove_parent.
-
-  std::auto_ptr<parent_node>    parent_list;
-  boost::scoped_array<vertex*>  children;
+  vertex*                       parent;
+  boost::scoped_array<vertex>   children;
   std::size_t                   children_size;
 };
 
 //! Pointer to vertex type.
 typedef vertex* vertex_ptr;
-
-//! Delete all possible vertices rooted at #root. This does not necessarily deallocate the whole subtree -- if a vertex has
-//! multiple parents, and only one of them is removed, the vertex is still kept in memory. This function uses operator delete
-//! to deallocate vertices.
-void delete_subtree(vertex* root);
 
 //! Find the number-minimal child in the sequence [begin, end). number may be either &vertex::proof_number or disproof_number.
 vertex* find_min(vertex::children_iterator begin, vertex::children_iterator end, vertex::number_t vertex::*number);
@@ -145,7 +117,7 @@ public:
 
   void iterate();
 
-  vertex* get_root() const                { return root; }
+  vertex* get_root() const                { return root.get(); }
   board const& get_initial_board() const  { return initial_board; }
   piece::color_t get_player() const       { return player; }
   std::size_t get_position_count() const  { return position_count; }
@@ -169,11 +141,10 @@ private:
   };
 
   typedef std::vector<history_record> history_seq;
-  typedef std::vector<vertex*> path_seq;
 
   Hasher                        hasher;
   Strategy                      strategy;
-  vertex*                       root;
+  boost::scoped_ptr<vertex>     root;
   board const&                  initial_board;
   hash_t                        initial_hash;
   piece::color_t                player;
@@ -187,8 +158,7 @@ private:
   //! \param leaf_hash Hash of #leaf.
   //! \param history Upon return, this will contain the sequence of all first steps on the path from root to the leaf.
   //!     Any previous contents of this container will be overwritten.
-  //! \param path All vertices on the path from root to leaf.
-  void find_leaf(board& board, vertex_ptr& leaf, hash_t& leaf_hash, history_seq& history, path_seq& path);
+  void find_leaf(board& board, vertex_ptr& leaf, hash_t& leaf_hash, history_seq& history);
 
   //! Expand a leaf.
   //! \param board Board corresponding to #leaf.
@@ -221,7 +191,6 @@ board board_from_vertex(vertex_ptr v, board const& initial_board);
 
 template <typename Strategy, typename Hasher>
 pn_search_algo<Strategy, Hasher>::pn_search_algo(board const& initial_board, piece::color_t player, Strategy strategy)
-try
   : strategy(strategy)
   , root(new vertex)
   , initial_board(initial_board)
@@ -234,9 +203,6 @@ try
   root->proof_number = pn_dn.first;
   root->disproof_number = pn_dn.second;
   root->steps_remaining = MAX_STEPS;
-} catch (...) {
-  delete root;
-  throw;
 }
 
 template <typename Strategy, typename Hasher>
@@ -252,8 +218,7 @@ pn_search_algo<Strategy, Hasher>::pn_search_algo(board const& initial_board,
 
 template <typename Strategy, typename Hasher>
 pn_search_algo<Strategy, Hasher>::~pn_search_algo() {
-  delete_subtree(root);
-  root = 0;
+  root.reset();
 }
 
 template <typename Strategy, typename H>
@@ -279,38 +244,27 @@ void pn_search_algo<Strategy, H>::iterate() {
   }
 
   history_seq history;
-  path_seq path;
 
   vertex_ptr leaf;
   hash_t leaf_hash = initial_hash;
-  find_leaf(board, leaf, leaf_hash, history, path);
+  find_leaf(board, leaf, leaf_hash, history);
   expand(board, leaf, leaf_hash, history);
   update_numbers(leaf);
-
-  for (path_seq::const_iterator vertex = path.begin(); vertex != path.end(); ++vertex) {
-    assert((*vertex)->visited);
-    (*vertex)->visited = false;
-  }
 }
 
 template <typename Strategy, typename H>
-void pn_search_algo<Strategy, H>::find_leaf(board& board, vertex_ptr& leaf, hash_t& leaf_hash, history_seq& history,
-    path_seq& path) {
-  leaf = root;
-  vertex_ptr current = root;
+void pn_search_algo<Strategy, H>::find_leaf(board& board, vertex_ptr& leaf, hash_t& leaf_hash, history_seq& history) {
+  leaf = root.get();
+  vertex_ptr current = root.get();
   board = initial_board;
   leaf_hash = initial_hash;
   piece::color_t last_player = player;
   history.clear();
-  path.clear();
 
   history.push_back(history_record(board, player));
 
   while (current) {
     piece::color_t const current_player = current->type == vertex::type_or ? player : opponent_color(player);
-
-    current->visited = true;
-    path.push_back(current);
 
     // The player has changed. This is the first step of a move.
     if (current_player != last_player) {
@@ -324,7 +278,7 @@ void pn_search_algo<Strategy, H>::find_leaf(board& board, vertex_ptr& leaf, hash
           current->leading_step->step_sequence_end(),
           last_player, current_player);
     } else {
-      assert(current == root);
+      assert(current == root.get());
     }
 
     last_player = current_player;
@@ -364,14 +318,13 @@ void pn_search_algo<Strategy, H>::expand(board& board, vertex_ptr leaf, hash_t l
   leaf->alloc_children(steps.size());
 
   steps_seq::const_iterator s = steps.begin();
-  vertex::children_iterator child = leaf->children_begin();
-  for (; s != steps.end() && child != leaf->children_end(); ++s, ++child) {
+  vertex::children_iterator new_vertex = leaf->children_begin();
+  for (; s != steps.end() && new_vertex != leaf->children_end(); ++s, ++new_vertex) {
     step const& step = s->first;
     vertex::e_type const type = s->second;
 
     apply(step, board);
 
-    std::auto_ptr<vertex> new_vertex(new vertex);
     new_vertex->leading_step = step;
     new_vertex->type = type;
 
@@ -403,7 +356,7 @@ void pn_search_algo<Strategy, H>::expand(board& board, vertex_ptr leaf, hash_t l
       }
     }
 
-    if (!pn_dn_set) {
+    if (!pn_dn_set && trans_tbl) {
       trans_tbl->miss();
     }
 
@@ -435,28 +388,21 @@ void pn_search_algo<Strategy, H>::expand(board& board, vertex_ptr leaf, hash_t l
       new_vertex->disproof_number = numbers.second;
 
       if (trans_tbl && new_vertex->proof_number != 0 && new_vertex->disproof_number != 0) {
-        trans_tbl->insert(new_hash, new_vertex.get());
+        trans_tbl->insert(new_hash, new_vertex);
       }
     } else if (lose) {
       new_vertex->proof_number    = player == this->player ? vertex::infty : 0;
       new_vertex->disproof_number = player == this->player ? 0 : vertex::infty;
     }
 
-    new_vertex->add_parent(leaf);
+    new_vertex->set_parent(leaf);
     unapply(step, board);
-    *child = new_vertex.release();
   }
 }
 
 template <typename Strategy, typename H>
-void pn_search_algo<Strategy, H>::update_numbers(vertex_ptr start) {
-  std::stack<vertex_ptr> stack;
-  stack.push(start);
-
-  while (!stack.empty()) {
-    vertex_ptr vertex = stack.top();
-    stack.pop();
-
+void pn_search_algo<Strategy, H>::update_numbers(vertex_ptr vertex) {
+  while (vertex) {
     pn_dn_pair_t const numbers = strategy.updated_numbers(vertex);
     vertex::number_t const new_pn = numbers.first;
     vertex::number_t const new_dn = numbers.second;
@@ -464,16 +410,9 @@ void pn_search_algo<Strategy, H>::update_numbers(vertex_ptr start) {
     if (new_pn != vertex->proof_number || new_dn != vertex->disproof_number) {
       vertex->proof_number = new_pn;
       vertex->disproof_number = new_dn;
-
-      for (vertex::parent_iterator parent = vertex->parents_begin(); parent != vertex->parents_end(); ++parent) {
-        vertex_ptr p = *parent;
-        assert(p);
-        stack.push(p);
-      }
-
+      vertex = vertex->get_parent();
     } else {
-      // There's no update, and so continuing with this path to root is pointless. Quit it and consider other paths.
-      continue;
+      break;  // No update on this level, so there aren't going to be any updates higher up either.
     }
   }
 }

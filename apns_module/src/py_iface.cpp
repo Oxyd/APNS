@@ -17,6 +17,7 @@
 #include <boost/python.hpp>
 #include <boost/optional.hpp>
 #include <boost/multi_array.hpp>
+#include <boost/iterator/transform_iterator.hpp>
 
 #include <string>
 
@@ -94,6 +95,13 @@ public:
     : operation_controller(update_interval)
   { }
 };
+
+/**
+ * Vertex.childrenCount function.
+ */
+std::size_t vertex_children_count(vertex const& v) {
+  return std::distance(v.children_begin(), v.children_end());
+}
 
 /**
  * Macro to ease generation of a bunch of helper functions. These are needed to provide a Python getter for
@@ -385,6 +393,20 @@ void export_pn_search_algo(std::string const& identifier) {
       ;
 }
 
+vertex* deref(vertex& v) {
+  return &v;
+}
+
+typedef boost::transform_iterator<vertex* (*)(vertex&), vertex::children_iterator> vertex_children_deref_iter;
+
+vertex_children_deref_iter vertex_deref_children_begin(vertex& v) {
+  return vertex_children_deref_iter(v.children_begin(), &deref);
+}
+
+vertex_children_deref_iter vertex_deref_children_end(vertex& v) {
+  return vertex_children_deref_iter(v.children_end(), &deref);
+}
+
 //! Export functions and types declared in search.hpp.
 void export_search() {
   using namespace boost::python;
@@ -393,11 +415,18 @@ void export_search() {
     scope vertex_scope = class_<vertex, vertex_ptr, boost::noncopyable>("Vertex", no_init)
         .def_readwrite("type_", &vertex::type, "Type of this vertex: either AND or OR")
         .add_property("children",
-            range(&vertex::children_begin, &vertex::children_end),
+            range(
+                &vertex_deref_children_begin,
+                &vertex_deref_children_end),
+
+                //static_cast<vertex::children_iterator (vertex::*)()>(&vertex::children_begin),
+                //static_cast<vertex::children_iterator (vertex::*)()>(&vertex::children_end)),
             "Children of this vertex of either type")
-        .add_property("parents",
-            range(&vertex::parents_begin, &vertex::parents_end),
-            "Parents of this vertex")
+        .add_property("childrenCount",
+            &vertex_children_count)
+        .add_property("parent",
+            make_function(&vertex::get_parent, return_internal_reference<>()),
+            "Parent of this vertex")
         .add_property("leadingStep",
             make_getter(&vertex::leading_step, return_value_policy<return_by_value>()),
             &set_vertex_leading_step,
