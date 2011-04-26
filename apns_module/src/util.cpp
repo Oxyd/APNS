@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <map>
 
+#include <boost/lexical_cast.hpp>
+
 namespace {
 
 //! Throw a "Loading Tree Failed" error.
@@ -116,7 +118,10 @@ void dump_tree(std::string const& filename, vertex_ptr root, bool append, operat
     std::string const type = v->type == vertex::type_and ? "and" : "or";
 
     output << step << " : " << type << ' ' << v->steps_remaining << ' '
-           << v->proof_number << ' ' << v->disproof_number << ' '
+           << (v->proof_number < vertex::infty ? boost::lexical_cast<std::string>(v->proof_number) : std::string("infty"))
+           << ' '
+           << (v->disproof_number < vertex::infty ? boost::lexical_cast<std::string>(v->disproof_number) : std::string("infty"))
+           << ' '
            << std::distance(v->children_begin(), v->children_end())
            << '\n';
 
@@ -191,11 +196,32 @@ vertex_ptr load_tree(std::string const& filename, unsigned skip_lines, operation
     input >> v->steps_remaining;
     if (!input) throw_loading_failed();
 
-    input >> v->proof_number;
+    std::string num;
+    input >> num;
     if (!input) throw_loading_failed();
 
-    input >> v->disproof_number;
+    if (num == "infty") {
+      v->proof_number = vertex::infty;
+    } else {
+      try {
+        v->proof_number = boost::lexical_cast<vertex::number_t>(num);
+      } catch (boost::bad_lexical_cast&) {
+        throw_loading_failed();
+      }
+    }
+
+    input >> num;
     if (!input) throw_loading_failed();
+
+    if (num == "infty") {
+      v->disproof_number = vertex::infty;
+    } else {
+      try {
+        v->disproof_number = boost::lexical_cast<vertex::number_t>(num);
+      } catch (boost::bad_lexical_cast&) {
+        throw_loading_failed();
+      }
+    }
 
     unsigned children_count;
     input >> children_count;
