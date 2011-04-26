@@ -978,7 +978,7 @@ class RunSearchController(object):
     self._runSearchDlg.timeLimitCheck = True
     self._runSearchDlg.positionLimit = 10000
     self._runSearchDlg.positionLimitCheck = False
-    self._runSearchDlg.transTblSize = 100
+    self._runSearchDlg.transTblSize = 32
     self._runSearchDlg.run()
   
   

@@ -50,7 +50,7 @@ def main():
                       help='Maximum running time of the algorithm, excluding any I/O operations, in seconds')
   parser.add_argument('-n', '--positions', type=int, default=0, metavar='position limit', dest='posLimit',
                       help='Maximum number of unique positions examined')
-  parser.add_argument('-r', '--trans-tbl-size', type=int, default=100, metavar='trans tbl size', dest='transTblSize',
+  parser.add_argument('-r', '--trans-tbl-size', type=int, default=32, metavar='trans tbl size', dest='transTblSize',
                       help='Size of the transposition table to use, in megabytes. If set to 0, don\'t use transposition table'
                       'at all')
   parser.add_argument('-k', '--trans-tbl-keep-time', type=int, default=16, metavar='trans tbl keep time', dest='transTblKeepTime',
