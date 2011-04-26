@@ -162,46 +162,6 @@ direction inverse_dir(direction dir) {
   return north;
 }
 
-//! Convert a piece letter into a piece, or nothing if the letter doesn't describe a valid piece.
-boost::optional<piece> piece_from_letter(char letter) {
-  piece::type_t type;
-  switch (std::tolower(letter)) {
-  case 'e':   type = piece::elephant;   break;
-  case 'm':   type = piece::camel;      break;
-  case 'h':   type = piece::horse;      break;
-  case 'd':   type = piece::dog;        break;
-  case 'c':   type = piece::cat;        break;
-  case 'r':   type = piece::rabbit;     break;
-  default:
-    return boost::optional<piece>();
-  }
-
-  piece::color_t const color = (std::islower(letter) ? piece::silver : piece::gold);
-  return piece(color, type);
-}
-
-//! Convert a piece to the corresponding letter.
-char letter_from_piece(piece const& p) {
-  char letter;
-  switch (p.get_type()) {
-  case piece::elephant:         letter = 'e'; break;
-  case piece::camel:            letter = 'm'; break;
-  case piece::horse:            letter = 'h'; break;
-  case piece::dog:              letter = 'd'; break;
-  case piece::cat:              letter = 'c'; break;
-  case piece::rabbit:           letter = 'r'; break;
-  default:
-    assert(!"Never gets here");
-    letter = '?';
-  }
-
-  if (p.get_color() == piece::gold) {
-    letter = std::toupper(letter);
-  }
-
-  return letter;
-}
-
 //! Convert a string description of an elementary step into a real elementary step, or nothing if the description isn't valid.
 boost::optional<elementary_step> elementary_step_from_string(std::string const& string) {
   if (string.length() == 4) {  // Each elementary step is exactly four characters long.
@@ -296,7 +256,7 @@ elementary_step elementary_step::capture(position from, boost::optional<piece> w
 elementary_step::elementary_step(position from, direction where, boost::optional<piece> what) {
   representation[ROW_INDEX] = '0' + from.get_row();
   representation[COLUMN_INDEX] = from.get_column();
-  representation[DIR_INDEX] = direction_letter(where);
+  representation[DIR_INDEX] = letter_from_direction(where);
   set_what(what);
 }
 

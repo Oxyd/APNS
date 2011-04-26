@@ -63,13 +63,16 @@ bool operator == (piece lhs, piece rhs);
 bool operator != (piece lhs, piece rhs);
 
 //! Return the letter representing given piece according to the Arimaa notation rules.
-char piece_letter(piece p);
+char letter_from_piece(piece p);
+
+//! Convert a piece letter into a piece, or nothing if the letter doesn't describe a valid piece.
+boost::optional<piece> piece_from_letter(char letter);
 
 //! The four cardinal directions.
 enum direction { north, south, east, west };
 
 //! Return the letter representing the given direction according to the Arimaa notation rules.
-char direction_letter(direction d);
+char letter_from_direction(direction d);
 
 /**
  * Convert an \c int to #piece::color_t.

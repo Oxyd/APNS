@@ -346,11 +346,11 @@ void export_movement() {
       "Given a player's color, return the opponent's color.");
 }
 
-template <typename Strategy, typename Hasher>
+template <typename Strategy>
 void export_pn_search_algo(std::string const& identifier) {
   using namespace boost::python;
 
-  class_<pn_search_algo<Strategy, Hasher>, boost::noncopyable>(identifier.c_str(),
+  class_<pn_search_algo<Strategy>, boost::noncopyable>(identifier.c_str(),
       "The Proof-Number Search algorithm",
       init<board const&, piece::color_t, Strategy>()[
           with_custodian_and_ward<1, 2>()
@@ -359,35 +359,35 @@ void export_pn_search_algo(std::string const& identifier) {
           with_custodian_and_ward<1, 2,
           with_custodian_and_ward<1, 3> >()
       ])
-      .def("run", &pn_search_algo<Strategy, Hasher>::run,
+      .def("run", &pn_search_algo<Strategy>::run,
           "search.run(msHowLong) -> None\n\n"
           "Continue the search. The msHowLong parameter specifies how long the search should run, in milliseconds.")
       .add_property("root",
-          make_function(&pn_search_algo<Strategy, Hasher>::get_root,
+          make_function(&pn_search_algo<Strategy>::get_root,
               return_internal_reference<>()))
-      .add_property("finished", &pn_search_algo<Strategy, Hasher>::finished)
-      .add_property("player", &pn_search_algo<Strategy, Hasher>::get_player)
-      .add_property("positionCount", &pn_search_algo<Strategy, Hasher>::get_position_count)
+      .add_property("finished", &pn_search_algo<Strategy>::finished)
+      .add_property("player", &pn_search_algo<Strategy>::get_player)
+      .add_property("positionCount", &pn_search_algo<Strategy>::get_position_count)
 
       .def("getInitialBoard",
-          &pn_search_algo<Strategy, Hasher>::get_initial_board,
+          &pn_search_algo<Strategy>::get_initial_board,
           return_value_policy<copy_const_reference>())
       .add_property("initialBoard",
-          make_function(&pn_search_algo<Strategy, Hasher>::get_initial_board,
+          make_function(&pn_search_algo<Strategy>::get_initial_board,
               return_value_policy<copy_const_reference>()))
-      .def("iterate", &pn_search_algo<Strategy, Hasher>::iterate,
+      .def("iterate", &pn_search_algo<Strategy>::iterate,
           "Perform one iteration of the algorithm")
 
       .add_static_property("sizeOfTransTblElement",
-          &pn_search_algo<Strategy, Hasher>::get_size_of_trans_tbl_element,
+          &pn_search_algo<Strategy>::get_size_of_trans_tbl_element,
           "Size of one element in the transposition table")
       .def("useTranspositionTable",
-          &pn_search_algo<Strategy, Hasher>::use_transposition_table,
+          &pn_search_algo<Strategy>::use_transposition_table,
           "algo.useTranspositionTable(size, keepTime) -> None\n\n"
           "Instruct the algorithm to use a transposition table capable of holding 'size' elements which are kept for"
           "at most 'keepTime' collisions.")
       .def("getTranspositionTable",
-          &pn_search_algo<Strategy, Hasher>::get_transposition_table,
+          &pn_search_algo<Strategy>::get_transposition_table,
           return_internal_reference<>(),
           "Get the used transposition table instance")
       ;
@@ -454,8 +454,7 @@ void export_search() {
       ;
 
   export_pn_search_algo<
-    win_strategy,
-    zobrist_hasher
+    win_strategy
   >("PnSearchAlgo_WinStrategy_ZobristHash");
 }
 

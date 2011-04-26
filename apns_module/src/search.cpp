@@ -83,6 +83,7 @@ vertex::number_t const vertex::max_num = std::numeric_limits<vertex::number_t>::
 vertex::vertex()
   : proof_number(0)
   , disproof_number(0)
+  , hash(0)
   , steps_remaining(0)
   , parent(0)
   , children_size(0)

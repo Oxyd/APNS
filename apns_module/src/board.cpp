@@ -58,7 +58,7 @@ bool operator != (piece lhs, piece rhs) {
   return !operator == (lhs, rhs);
 }
 
-char piece_letter(piece p) {
+char letter_from_piece(piece p) {
   char letter = '?';
   switch (p.get_type()) {
   case piece::elephant:     letter = 'e'; break;
@@ -77,7 +77,24 @@ char piece_letter(piece p) {
   return letter;
 }
 
-char direction_letter(direction d) {
+boost::optional<piece> piece_from_letter(char letter) {
+  piece::type_t type;
+  switch (std::tolower(letter)) {
+  case 'e':   type = piece::elephant;   break;
+  case 'm':   type = piece::camel;      break;
+  case 'h':   type = piece::horse;      break;
+  case 'd':   type = piece::dog;        break;
+  case 'c':   type = piece::cat;        break;
+  case 'r':   type = piece::rabbit;     break;
+  default:
+    return boost::optional<piece>();
+  }
+
+  piece::color_t const color = (std::islower(letter) ? piece::silver : piece::gold);
+  return piece(color, type);
+}
+
+char letter_from_direction(direction d) {
   switch (d) {
   case north:   return 'n';
   case east:    return 'e';
@@ -336,7 +353,7 @@ std::string string_from_board(board const& board) {
     position const& pos = pos_piece->first;
     piece const& piece = pos_piece->second;
 
-    output << pos.get_row() << pos.get_column() << piece_letter(piece);
+    output << pos.get_row() << pos.get_column() << letter_from_piece(piece);
   }
 
   return output.str();

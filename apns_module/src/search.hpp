@@ -28,6 +28,9 @@ public:
   //! Type of the proof- and disproof-number values.
   typedef unsigned number_t;
 
+  //! Type of the hash value for a vertex.
+  typedef zobrist_hasher::hash_t hash_t;
+
   //! Maximum value that number_t can hold.
   static number_t const max_num;
 
@@ -70,6 +73,7 @@ public:
 
   number_t proof_number;        //!< Proof-number of this vertex.
   number_t disproof_number;     //!< Disproof-number of this vertex.
+  hash_t   hash;                //!< Hash value of this vertex.
   int steps_remaining;          //!< How many steps does this player have left until the end of their move?
 
   boost::optional<step> leading_step;  //!< The step that has led to this state.
@@ -101,16 +105,15 @@ typedef std::pair<vertex::number_t, vertex::number_t> pn_dn_pair_t;
 /**
  * The Proof-Number Search algorithm.
  */
-template <typename Strategy, typename Hasher>
+template <typename Strategy>
 class pn_search_algo : boost::noncopyable {
 public:
-  typedef transposition_table<Hasher> transposition_table_t;
+  typedef transposition_table<zobrist_hasher> transposition_table_t;
   typedef typename transposition_table_t::pointer       trans_tbl_ptr;
   typedef typename transposition_table_t::const_pointer trans_tbl_const_ptr;
 
   pn_search_algo(board const& initial_board, piece::color_t player, Strategy strategy);
   pn_search_algo(board const& initial_board, vertex* tree, piece::color_t player, Strategy strategy, unsigned position_count);
-  ~pn_search_algo();
 
   void run(unsigned ms_how_long);
   bool finished() const;
@@ -128,7 +131,8 @@ public:
   transposition_table_t const* get_transposition_table() const { return trans_tbl.get(); }
 
 private:
-  typedef typename Hasher::hash_t hash_t;
+  typedef zobrist_hasher hasher_t;
+  typedef hasher_t::hash_t hash_t;
 
   struct history_record {
     board               position;       //!< Placement of the pieces.
@@ -142,7 +146,7 @@ private:
 
   typedef std::vector<history_record> history_seq;
 
-  Hasher                        hasher;
+  hasher_t                      hasher;
   Strategy                      strategy;
   boost::scoped_ptr<vertex>     root;
   board const&                  initial_board;
@@ -189,8 +193,8 @@ board board_from_vertex(vertex_ptr v, board const& initial_board);
 
 }
 
-template <typename Strategy, typename Hasher>
-pn_search_algo<Strategy, Hasher>::pn_search_algo(board const& initial_board, piece::color_t player, Strategy strategy)
+template <typename Strategy>
+pn_search_algo<Strategy>::pn_search_algo(board const& initial_board, piece::color_t player, Strategy strategy)
   : strategy(strategy)
   , root(new vertex)
   , initial_board(initial_board)
@@ -205,8 +209,8 @@ pn_search_algo<Strategy, Hasher>::pn_search_algo(board const& initial_board, pie
   root->steps_remaining = MAX_STEPS;
 }
 
-template <typename Strategy, typename Hasher>
-pn_search_algo<Strategy, Hasher>::pn_search_algo(board const& initial_board,
+template <typename Strategy>
+pn_search_algo<Strategy>::pn_search_algo(board const& initial_board,
     vertex_ptr tree, piece::color_t player, Strategy strategy, unsigned position_count)
   : strategy(strategy)
   , root(tree)
@@ -216,13 +220,8 @@ pn_search_algo<Strategy, Hasher>::pn_search_algo(board const& initial_board,
   , position_count(position_count)
 { }
 
-template <typename Strategy, typename Hasher>
-pn_search_algo<Strategy, Hasher>::~pn_search_algo() {
-  root.reset();
-}
-
-template <typename Strategy, typename H>
-void pn_search_algo<Strategy, H>::run(unsigned ms_how_long) {
+template <typename Strategy>
+void pn_search_algo<Strategy>::run(unsigned ms_how_long) {
   boost::timer timer;
 
   while (!finished() && (ms_how_long == 0 || timer.elapsed() < ms_how_long / 1000.0)) {
@@ -230,13 +229,13 @@ void pn_search_algo<Strategy, H>::run(unsigned ms_how_long) {
   }
 }
 
-template <typename Strategy, typename H>
-bool pn_search_algo<Strategy, H>::finished() const {
+template <typename Strategy>
+bool pn_search_algo<Strategy>::finished() const {
   return root->proof_number == 0 || root->disproof_number == 0;
 }
 
-template <typename Strategy, typename H>
-void pn_search_algo<Strategy, H>::iterate() {
+template <typename Strategy>
+void pn_search_algo<Strategy>::iterate() {
   board board = initial_board;
 
   if (trans_tbl) {
@@ -252,12 +251,11 @@ void pn_search_algo<Strategy, H>::iterate() {
   update_numbers(leaf);
 }
 
-template <typename Strategy, typename H>
-void pn_search_algo<Strategy, H>::find_leaf(board& board, vertex_ptr& leaf, hash_t& leaf_hash, history_seq& history) {
+template <typename Strategy>
+void pn_search_algo<Strategy>::find_leaf(board& board, vertex_ptr& leaf, hash_t& leaf_hash, history_seq& history) {
   leaf = root.get();
   vertex_ptr current = root.get();
   board = initial_board;
-  leaf_hash = initial_hash;
   piece::color_t last_player = player;
   history.clear();
 
@@ -273,10 +271,6 @@ void pn_search_algo<Strategy, H>::find_leaf(board& board, vertex_ptr& leaf, hash
 
     if (current->leading_step) {
       apply(*current->leading_step, board);
-      leaf_hash = hasher.update(leaf_hash,
-          current->leading_step->step_sequence_begin(),
-          current->leading_step->step_sequence_end(),
-          last_player, current_player);
     } else {
       assert(current == root.get());
     }
@@ -287,10 +281,12 @@ void pn_search_algo<Strategy, H>::find_leaf(board& board, vertex_ptr& leaf, hash
     vertex::number_t vertex::* number = current->type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
     current = find_min(current->children_begin(), current->children_end(), number);
   }
+
+  leaf_hash = leaf->hash;
 }
 
-template <typename Strategy, typename H>
-void pn_search_algo<Strategy, H>::expand(board& board, vertex_ptr leaf, hash_t leaf_hash, history_seq const& history) {
+template <typename Strategy>
+void pn_search_algo<Strategy>::expand(board& board, vertex_ptr leaf, hash_t leaf_hash, history_seq const& history) {
   using detail::board_from_vertex;
 
   assert(leaf->children_begin() == leaf->children_end());
@@ -342,11 +338,13 @@ void pn_search_algo<Strategy, H>::expand(board& board, vertex_ptr leaf, hash_t l
         step.step_sequence_begin(), step.step_sequence_end(),
         player,
         type == leaf->type ? player : opponent);
+    new_vertex->hash = new_hash;
+
     if (trans_tbl) {
       vertex* record = trans_tbl->query(new_hash);
       if (record
           && record->steps_remaining == new_vertex->steps_remaining
-          && board_from_vertex(record, initial_board) == board
+          && record->hash == new_vertex->hash
           && record->proof_number != 0
           && record->disproof_number != 0) {
         new_vertex->proof_number = record->proof_number;
@@ -400,8 +398,8 @@ void pn_search_algo<Strategy, H>::expand(board& board, vertex_ptr leaf, hash_t l
   }
 }
 
-template <typename Strategy, typename H>
-void pn_search_algo<Strategy, H>::update_numbers(vertex_ptr vertex) {
+template <typename Strategy>
+void pn_search_algo<Strategy>::update_numbers(vertex_ptr vertex) {
   while (vertex) {
     pn_dn_pair_t const numbers = strategy.updated_numbers(vertex);
     vertex::number_t const new_pn = numbers.first;
@@ -417,8 +415,8 @@ void pn_search_algo<Strategy, H>::update_numbers(vertex_ptr vertex) {
   }
 }
 
-template <typename S, typename H>
-void pn_search_algo<S, H>::use_transposition_table(std::size_t elements, std::size_t keep_time) {
+template <typename S>
+void pn_search_algo<S>::use_transposition_table(std::size_t elements, std::size_t keep_time) {
   if (elements > 0) {
     trans_tbl = transposition_table_t::create(elements, keep_time);
   } else {
@@ -426,6 +424,6 @@ void pn_search_algo<S, H>::use_transposition_table(std::size_t elements, std::si
   }
 }
 
-template class pn_search_algo<win_strategy, zobrist_hasher>;
+template class pn_search_algo<win_strategy>;
 
 #endif
