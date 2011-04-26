@@ -59,8 +59,8 @@ class MainWindow(Observable):
                                      command=lambda: self.notifyObservers(command=MainWindow.Command.loadSearch))
     self._saveSearchBtn = ttk.Button(self._toolbar, text='Save Search',
                                      command=lambda: self.notifyObservers(command=MainWindow.Command.saveSearch))
-    self._iterateBtn = ttk.Button(self._toolbar, text='Iterate',
-                                  command=lambda: self.notifyObservers(command=MainWindow.Command.iterate))
+    #self._iterateBtn = ttk.Button(self._toolbar, text='Iterate',
+    #                              command=lambda: self.notifyObservers(command=MainWindow.Command.iterate))
     self._saveBtn = ttk.Button(self._toolbar, text='Save Position',
                                command=lambda: self.notifyObservers(command=MainWindow.Command.save))
     
@@ -75,7 +75,7 @@ class MainWindow(Observable):
     self._runBtn.grid(row=0, column=1, padx=(3, 3))
     self._loadSearchBtn.grid(row=0, column=2, padx=(3, 3))
     self._saveSearchBtn.grid(row=0, column=3, padx=(3, 3))
-    self._iterateBtn.grid(row=0, column=5, padx=(3, 3))
+    #self._iterateBtn.grid(row=0, column=5, padx=(3, 3))
     self._saveBtn.grid(row=0, column=4, padx=(3, 0))
     self._toolbar.grid(row=0, column=0, sticky='W')
     self._resultsDisplay.widget.grid(row=1, column=0, sticky='NSEW')
@@ -94,7 +94,7 @@ class MainWindow(Observable):
     
     self._runBtn['state'] = ['!disabled']
     self._saveSearchBtn['state'] = ['!disabled']
-    self._iterateBtn['state'] = ['!disabled']
+    #self._iterateBtn['state'] = ['!disabled']
     self._saveBtn['state'] = ['!disabled']
   
   
@@ -103,7 +103,7 @@ class MainWindow(Observable):
     
     self._runBtn['state'] = ['disabled']
     self._saveSearchBtn['state'] = ['disabled']
-    self._iterateBtn['state'] = ['disabled']
+    #self._iterateBtn['state'] = ['disabled']
     self._saveBtn['state'] = ['disabled']
   
   
