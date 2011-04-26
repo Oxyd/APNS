@@ -88,7 +88,7 @@ def buildConfig(platform, bits):
     config.RPATH = None     # Makes no sense for MSVS.
   
   else:
-    config.COMPILER = '/usr/local/bin/g++45'  # Use G++ 4.5 which is not in base by default.
-    config.RPATH = '/usr/local/lib/gcc45/'
+    config.COMPILER = '/usr/local/bin/g++46'  # Use G++ 4.6 which is not in base by default.
+    config.RPATH = '/usr/local/lib/gcc46/'
 
   return config
