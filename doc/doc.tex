@@ -229,7 +229,11 @@ Vstupní pozice je textový soubor ve formátu popsaném na adrese \url{http://a
 
 \subsection{Strom}
 Stavový strom je ukládán v textovém formátu. Struktura souboru je \begin{itemize}
-  \item Na první řádce je počáteční pozice v \emph{kompaktním formátu}
+  \item Na první řádce je počáteční pozice v kompaktním formátu: Seznam figurek na hrací ploše, které jsou oddělené
+  mezerami. Jedna figurka je popsána trojznakovým řetězcem, kde první znak určuje řádek ('1' až '8'), druhý značí
+  sloupec ('a' až 'h') a třetí znak typ figurky podle oficiálního značení: 'E' značí slona, 'M' velblouda, 'H' koně, 'D'
+  psa, 'C' kočku a 'R' zajíce. Typ je značen velkým písmenem, pokud je to figurka zlatého hráče -- figurky stříbrného
+  hráče jsou značeny písmeny malými. Například: \begin{center}\verb+5cC 6bE 6cd 6dR 6ee 7cr+\end{center}
   \item Na druhé řádce je \begin{itemize}
     \item Hráč, který je první na tahu jako řetězec buď \texttt{gold} nebo \texttt{silver}.
     \item Počet vrcholů stromu v desítkové soustavě
@@ -292,6 +296,8 @@ Pro vrchol $v$ typu \emph{OR} jsou tedy čísla $v.PN$ a $v.DN$ určena následo
 	v.PN &:= \min_{u \text{ je potomek $v$}} u.PN \\
 	v.DN &:= \sum_{u \text{ je potomek $v$}} u.DN
 \end{align*}
+
+Pro vrchol typu \emph{AND} se tyto hodnoty počítají analogicky.
 
 \subsection{Procházení stromu}
 Při sestupu stromem od kořene k listu se program snaží najít takový list, na jehož dokázání či vyvrácení bude třeba co
@@ -370,7 +376,8 @@ Rozvíjení listu pak vypadá následovně:
 \end{algorithmic}
 \end{figure}
 
-\section{Struktura programu}
+\section{Implementace}
+\subsection{Struktura programu}
 Program sestává ze dvou částí: Nativního modulu, který implementuje algoritmus samotný a pomocné datové typy a algoritmy
 pro reprezentaci hry; a uživatelského rozhraní, které je implementované v jazyku Python.
 
@@ -403,5 +410,53 @@ Rovněž je možné spustit interpret Pythonu v interaktivním režimu, v něm n
 části algoritmu či procházet vzniklé datové struktury. To se mi prokázalo jako poměrně praktický nástroj při ladění
 programu.
 
+\subsection{Reprezentace dat}
+\subsubsection{Hrací plocha}
+Hrací plocha je reprezentována jednoduše jako 64-prvkové pole, kde každý prvek obsahuje, zda na té pozici je figurka,
+jakého je typu a jaké barvy. Dohromady tedy aspoň 3 B na jednu možnou pozici. Tato reprezentace, ač se zdá neefektivní
+(teoreticky by stačil 1 B na jednu pozici, či dokonce jen 4 bity), se mi prakticky projevila jako nejlepší, neboť
+nevyžaduje žádnou další interpretaci dat -- každý bajt je možné bez další konverze přímo interpretovat jako správnou
+informaci. Implementace se navíc snaží nevytvářet zbytečné kopie hrací plochy.
+
+\subsubsection{Kroky}
+Krok -- změna hrací plochy z jednoho platného stavu do druhého platného stavu -- je reprezentován jako řetězec ve
+stejném formátu v jakém jsou kroky popisovány v oficiálních zápisech hry. Program vytváří poměrně mnoho kroků a
+prakticky se mi ukázalo vhodné zvolit tuto poměrně kompaktní reprezentaci oproti přímějším variantám.
+
+Krok samotný navíc nevyžaduje, aby k němu byla v paměti uložena odpovídající hrací plocha. V každém vrcholu stromu je
+proto uložen jenom krok, kterým vznikne patřičná hrací plocha z rodičovského vrcholu, namísto aby tam byla uložena celá
+hrací plocha.
+
+\subsubsection{Vrchol stromu}
+Kromě nezbytných informací o kroku, hodnotách \emph{PN} a \emph{DN} je v každém vrcholu třeba udržovat informaci o jeho
+rodiči a potomcích.
+
+Pro reprezentaci potomků jsem zvolil pole následníků. Tato reprezentace má několik výhod:\begin{itemize}
+  \item Nízký overhead: V každém vrcholu stačí mít uložený pouze ukazatel na začátek pole následníků a velikost tohoto
+  pole. Žádné další informace nejsou potřeba.
+  \item Následníci jsou v paměti uloženi pořadě ihned za sebou. Taková reprezentace je cache-friendly při sekvenčním
+  procházení všech následníků, což je velmi častá operace. (Jiný druh průchodu ostatně ani není třeba.)
+\end{itemize}
+
+Na druhou stranu taková reprezentace neumožňuje snadno měnit seznam potomků bez zavedení další režie. Algoritmu však
+stačí vytvářet listy, které jsou bez potomků, a pak listy rozvíjet -- to lze udělat tak, aby se všichni potomci přidali
+najednou. Po rozvinutí vrcholu se jeho seznam potomků již nemění.
+
+Tato reprezentace mi tedy připadá jako nejvhodnější, ač je poměrně neflexibilní.
+
+\section{Závěrem}
+Můj původní záměr byl reprezentovat stavový prostor hry jako orientovaný acyklický graf (DAG) -- místo používání pouze
+hodnot \emph{PN}, \emph{DN} z transpoziční tabulky by se k rozvíjenému listu připojil přímo již existující vrchol. To by
+znamenalo zefektivnění výpočtu, protože většina duplicitních pozic by nemusela být ve stromu vícekrát.
+
+Zajištění acykličnosti grafu se však prokázalo jako netriviální ale velmi podstatné. Cyklus v grafu neznamená jenom
+možnost zacyklení celého algoritmu při výběru nejlepšího listu, ale též to nereprezentuje správně stavový prostor hry --
+pravidla explicitně znemožňují opakování stále těch samých pozic dokola (pravidlo \emph{third-time repetition}).
+
+Nakonec jsem od tohoto záměru upustil a rozhodl se pro jednodušší, i když méně efektivní reprezentaci obyčejným
+stromem. Transpoziční tabulka pouze dodává ,,lepší`` počáteční hodnoty \emph{PN}, \emph{DN}. I zde vzniká problém s
+\emph{graph history interaction} -- vyzvednuté hodnoty mohou být nesprávné, to však neovlivňuje správnost algoritmu --
+pouze jeho efektivitu. Program však nemůže použít vyzvednuté hodnoty, pokud značí dokázaný či vyvrácený vrchol (neboť
+hodnoty nemusí být správné).
 \end{document}
 % vim:textwidth=120
