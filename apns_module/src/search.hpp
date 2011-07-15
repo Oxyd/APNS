@@ -327,7 +327,7 @@ void pn_search_algo<Strategy>::expand(board& board, vertex_ptr leaf, hash_t leaf
     if (new_vertex->type == leaf->type) {
       new_vertex->steps_remaining = leaf->steps_remaining - (signed)step.steps_used();
     } else {
-      new_vertex->steps_remaining = MAX_STEPS - (signed)step.steps_used();
+      new_vertex->steps_remaining = MAX_STEPS;
     }
 
     ++position_count;
