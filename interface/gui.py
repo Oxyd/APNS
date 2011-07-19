@@ -39,7 +39,7 @@ class MainWindow(Observable):
   
   class Command:
     '''Enumeration type that specifies what kind of action the user has selected.'''
-    newSearch, iterate, runSearch, save, loadSearch, saveSearch, close = range(7)
+    newSearch, iterate, runSearch, savePosition, loadSearch, saveSearch, close = range(7)
   
   
   def __init__(self):
@@ -62,7 +62,7 @@ class MainWindow(Observable):
     #self._iterateBtn = ttk.Button(self._toolbar, text='Iterate',
     #                              command=lambda: self.notifyObservers(command=MainWindow.Command.iterate))
     self._saveBtn = ttk.Button(self._toolbar, text='Save Position',
-                               command=lambda: self.notifyObservers(command=MainWindow.Command.save))
+                               command=lambda: self.notifyObservers(command=MainWindow.Command.savePosition))
     
     self._window.protocol('WM_DELETE_WINDOW', lambda: self.notifyObservers(command=MainWindow.Command.close))
     
@@ -123,12 +123,18 @@ class MainWindowController(object):
     self._mainWindowDsply.addObserver(self)
     self._resultsCtrl = mainWindowDsply.searchResultsController
     self._search = None
+    self._runPreferences = dict()
     
   
   def runApplication(self):
     '''Start the GUI of the application.'''
     
-    self._mainWindowDsply.mainloop()
+    try:
+      self._mainWindowDsply.mainloop()
+    except MemoryError:
+      del self._search
+      gc.collect()
+      tkMessageBox.showerror('Fatal Error', 'Ran out of memory. Aborting.')
   
   
   def update(self, source, command):
@@ -155,19 +161,25 @@ class MainWindowController(object):
     
     elif command == MainWindow.Command.runSearch:
       dlg = RunSearchDialog(self._mainWindowDsply.window)
-      runSearchCtrl = RunSearchController(dlg, self._search)
-      self._search.useTranspositionTable(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
-      dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft)
-      searchProgressCtrl = SearchProgressController(self._search, dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit)
-      searchProgressCtrl.run()
-      self._resultsCtrl.updateTree()
-      self._mainWindowDsply.window.focus_set()
-      gc.collect()
+      runSearchCtrl = RunSearchController(dlg, self._search, self._runPreferences)
+      (doRun, newPrefs) = runSearchCtrl.run()
+      
+      if doRun:
+        if newPrefs is not None:
+          self._runPreferences = newPrefs
+        
+        self._search.useTranspositionTable(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
+        dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft)
+        searchProgressCtrl = SearchProgressController(self._search, dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit)
+        searchProgressCtrl.run()
+        self._resultsCtrl.updateTree()
+        self._mainWindowDsply.window.focus_set()
+        gc.collect()
     
-    elif command == MainWindow.Command.save:
+    elif command == MainWindow.Command.savePosition:
       filename = tkFileDialog.asksaveasfilename()
       if len(filename) > 0:
-        self._resultsCtrl.save(str(filename))
+        self._resultsCtrl.savePosition(str(filename))
     
     elif command == MainWindow.Command.loadSearch:
       filename = tkFileDialog.askopenfilename()
@@ -316,7 +328,7 @@ class ResultsDisplay(Observable):
   def getNodeType(self, node):
     '''Return the type of a given node.'''
     
-    return self._tree.set(node, 'Type')
+    return self._tree.set(node, 'type')
   
   
   def isRoot(self, node):
@@ -446,7 +458,7 @@ class ResultsController(object):
       self._resultsDsply.showBoard(None)
   
   
-  def save(self, filename):
+  def savePosition(self, filename):
     '''Save the currently displayed position to the given file.'''
     
     selectedHandle = self._resultsDsply.selected()
@@ -711,7 +723,7 @@ class SaveProgressController(object):
     try:
       saveSearch(search, filename, opCtrl)
     except RuntimeError, e:
-      tkMessageBox.showerror('Could not save search', 'Saving search to {0} failed:\n{1}'.format(filename, e))
+      tkMessageBox.showerror('Could not savePosition search', 'Saving search to {0} failed:\n{1}'.format(filename, e))
       os.remove(filename)
     
     dialog.close()
@@ -832,6 +844,8 @@ class RunSearchDialog(Observable):
     timeLimitCheck, positionLimitCheck, start = range(3)
   
   def __init__(self, parent):
+    '''Create the dialog.'''
+    
     Observable.__init__(self)
     
     self._dialog = DialogWindow(parent, 'Run Search')
@@ -840,13 +854,13 @@ class RunSearchDialog(Observable):
     
     limitsFrame = ttk.Labelframe(self._dialog.content, text='Search limits:', padding=5)
     
-    self._timeLimitCheckVar = Tkinter.StringVar(value='1')
+    self._timeLimitCheckVar = Tkinter.StringVar(value='0')
     self._timeLimitCheck = ttk.Checkbutton(limitsFrame, text='Time limit:',
                                            variable=self._timeLimitCheckVar,
                                            command=lambda: self.notifyObservers(
                                                                       command=RunSearchDialog.Command.timeLimitCheck))
     
-    self._timeLimit = Tkinter.StringVar(value='60')
+    self._timeLimit = Tkinter.StringVar(value='0')
     self._timeLimitSpin = Tkinter.Spinbox(limitsFrame, from_=1, to=9000, textvariable=self._timeLimit)
     timeLimitUnits = ttk.Label(limitsFrame, text='seconds')
     
@@ -855,7 +869,7 @@ class RunSearchDialog(Observable):
                                                variable=self._positionLimitCheckVar,
                                                command=lambda: self.notifyObservers(
                                                                       command=RunSearchDialog.Command.positionLimitCheck))
-    self._positionLimitVar = Tkinter.StringVar(value='10000')
+    self._positionLimitVar = Tkinter.StringVar(value='0')
     self._positionLimitSpin = Tkinter.Spinbox(limitsFrame, from_=1, to=99999999999999999,
                                               textvariable=self._positionLimitVar)
     positionLimitUnits = ttk.Label(limitsFrame, text='positions')
@@ -864,7 +878,7 @@ class RunSearchDialog(Observable):
     sizeLabel = ttk.Label(transTblFrame, text='Size: ')
     sizeUnits = ttk.Label(transTblFrame, text='MB')
     
-    self._memorySpinVar = Tkinter.StringVar(value='130')
+    self._memorySpinVar = Tkinter.StringVar(value='0')
     
     self._memorySpin = Tkinter.Spinbox(transTblFrame, from_=1, to=999999999999999999,
                                        textvariable=self._memorySpinVar)
@@ -934,7 +948,7 @@ class RunSearchDialog(Observable):
     
     if enable:
       self._positionLimitSpin['state'] = ['normal']
-      self._timeLimitCheckVar.set('1')
+      self._positionLimitCheckVar.set('1')
     else:
       self._positionLimitSpin['state'] = ['disabled']
       self._positionLimitCheckVar.set('0')
@@ -967,19 +981,36 @@ class RunSearchController(object):
   transTblSize = property(lambda self: self._transTblSize)
   showTimeLeft = property(lambda self: self._showTimeLeft)
   
-  def __init__(self, runSearchDlg, search):
+  def __init__(self, runSearchDlg, search, lastValues):
+    '''Create the controller and attach it to the dialog and search.
+    
+    lastValues is a dictionary specifying last set values in the dialog.
+    '''
     object.__init__(self)
     
     self._runSearchDlg = runSearchDlg
     self._search = search
     
     self._runSearchDlg.addObserver(self)
-    self._runSearchDlg.timeLimit = 60
-    self._runSearchDlg.timeLimitCheck = True
-    self._runSearchDlg.positionLimit = 10000
-    self._runSearchDlg.positionLimitCheck = False
-    self._runSearchDlg.transTblSize = 32
+    self._runSearchDlg.timeLimit = lastValues.get('timeLimit', 60)
+    self._runSearchDlg.timeLimitCheck = lastValues.get('timeLimitCheck', True)
+    self._runSearchDlg.positionLimit = lastValues.get('positionLimit', 10000)
+    self._runSearchDlg.positionLimitCheck = lastValues.get('positionLimitCheck', False)
+    self._runSearchDlg.transTblSize = lastValues.get('transTblSize', 32)
+    
+    self._doRun = False
+    self._lastSetValues = None
+  
+  
+  def run(self):
+    '''ctrl.run() -> (doRun, lastValues)
+    
+    Execute the dialog. Return a boolean value indicating whether the search should be performed or not, and a 
+    new dictionary of last set values of None if last set values should not be updated.
+    '''
+    
     self._runSearchDlg.run()
+    return (self._doRun, self._lastSetValues)
   
   
   def update(self, source, command):
@@ -1007,6 +1038,16 @@ class RunSearchController(object):
         self._posLimit = posLimit
         self._showTimeLeft = showTimeLeft
         
+        self._lastSetValues = dict()
+        last = self._lastSetValues
+        
+        last['timeLimitCheck'] = showTimeLeft
+        last['timeLimit'] = self._runSearchDlg.timeLimit
+        last['positionLimit'] = self._runSearchDlg.positionLimit
+        last['positionLimitCheck'] = self._runSearchDlg.positionLimitCheck
+        last['transTblSize'] = self._runSearchDlg.transTblSize
+        
+        self._doRun = True
         self._runSearchDlg.close()
     
     elif command == RunSearchDialog.Command.timeLimitCheck:
@@ -1188,29 +1229,40 @@ class SearchProgressController(object):
     posPerSec = 0
     lastPosPerSecMeasure = self._sNow
     
-    while not self._finished():
-      self._search.run(SearchProgressController._MS_BURST_TIME)
-      
-      self._sElapsedTime = self._sNow - self._sStart
-      if self._timeLimit is not None:
-        self._searchProgressDlg.showTimeLeft(self._timeLimit - self._sElapsedTime)
-      
-      self._searchProgressDlg.showTimeElapsed(self._sElapsedTime)
-      self._searchProgressDlg.showMemoryAllocated(self._memoryAllocated())
-      
-      mbTransTblSize = float(self._search.getTranspositionTable().memoryUsage) / float(1024 ** 2)
-      self._searchProgressDlg.showTransTblStats(memUsed='%.2f MB' % mbTransTblSize,
-                                                hits=self._search.getTranspositionTable().hits,
-                                                misses=self._search.getTranspositionTable().misses)
-      self._searchProgressDlg.showPosCount(posCount=self._search.positionCount, posPerSec=posPerSec)
-      self._searchProgressDlg.updateGui()
-      
-      self._sNow = time.clock()
-      
-      if self._sNow - lastPosPerSecMeasure >= 1.0:
-        posPerSec = self._search.positionCount - lastPosCount
-        lastPosCount = self._search.positionCount
-        lastPosPerSecMeasure = self._sNow
+    try:
+      while not self._finished():
+        self._search.run(SearchProgressController._MS_BURST_TIME)
+        
+        self._sElapsedTime = self._sNow - self._sStart
+        if self._timeLimit is not None:
+          self._searchProgressDlg.showTimeLeft(self._timeLimit - self._sElapsedTime)
+        
+        self._searchProgressDlg.showTimeElapsed(self._sElapsedTime)
+        self._searchProgressDlg.showMemoryAllocated(self._memoryAllocated())
+        
+        tt = self._search.getTranspositionTable()
+        if tt is not None:
+          mbTransTblSize  = float(self._search.getTranspositionTable().memoryUsage) / float(1024 ** 2)
+          hits            = tt.hits
+          misses          = tt.misses
+        else:
+          mbTransTblSize  = 0.0
+          hits            = 0
+          misses          = 0
+          
+        self._searchProgressDlg.showTransTblStats(memUsed='%.2f MB' % mbTransTblSize, hits=hits, misses=misses)
+        self._searchProgressDlg.showPosCount(posCount=self._search.positionCount, posPerSec=posPerSec)
+        self._searchProgressDlg.updateGui()
+        
+        self._sNow = time.clock()
+        
+        if self._sNow - lastPosPerSecMeasure >= 1.0:
+          posPerSec = self._search.positionCount - lastPosCount
+          lastPosCount = self._search.positionCount
+          lastPosPerSecMeasure = self._sNow
+    
+    except MemoryError:
+      tkMessageBox.showerror('Error', 'Not enough memory to expand the tree')
     
     self._searchProgressDlg.close()
   
@@ -1323,8 +1375,8 @@ class PositionDisplay(Observable):
   # color = property(...)  <-- Yes, it's here; it's just actually defined at the bottom.
   
   class Command:
-    '''Command invoked by the user. Either load position, save position, clear position or switch player to move.'''
-    load, save, clear, switch = range(4)
+    '''Command invoked by the user. Either load position, savePosition position, clear position or switch player to move.'''
+    load, savePosition, clear, switch = range(4)
   
   
   def __init__(self, parent, board, imageManager):
@@ -1345,7 +1397,7 @@ class PositionDisplay(Observable):
     self._silver = ttk.Radiobutton(goldSilverFrame, text='Silver', value='s', variable=self._color)
     
     self._loadButton['command'] = lambda: self.notifyObservers(cmd=PositionDisplay.Command.load)
-    self._saveButton['command'] = lambda: self.notifyObservers(cmd=PositionDisplay.Command.save)
+    self._saveButton['command'] = lambda: self.notifyObservers(cmd=PositionDisplay.Command.savePosition)
     self._clearButton['command'] = lambda: self.notifyObservers(cmd=PositionDisplay.Command.clear)
     
     self._boardDisplay = BoardDisplay(self._frame, imageManager)
@@ -1455,7 +1507,7 @@ class PositionController(object):
   def update(self, source, cmd):
     '''Update the controller's state if the user invoked any GUI action.'''
     
-    if cmd == PositionDisplay.Command.save:
+    if cmd == PositionDisplay.Command.savePosition:
       filename = tkFileDialog.asksaveasfilename(parent=self._parent)
       
       if len(filename) > 0:
