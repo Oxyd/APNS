@@ -262,3 +262,8 @@ pn_dn_pair_t win_strategy::initial_numbers(board const& board,
     return std::make_pair(1, 1);
   }
 }
+
+vertex* win_strategy::successor(vertex* v) {
+  vertex::number_t vertex::* number = v->type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
+  return find_min(v->children_begin(), v->children_end(), number);
+}

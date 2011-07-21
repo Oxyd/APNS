@@ -346,6 +346,9 @@ void export_movement() {
       "Given a player's color, return the opponent's color.");
 }
 
+/**
+ * Export a concrete instantiation of the pn_search_algo template.
+ */
 template <typename Strategy>
 void export_pn_search_algo(std::string const& identifier) {
   using namespace boost::python;
@@ -364,10 +367,15 @@ void export_pn_search_algo(std::string const& identifier) {
           "Continue the search. The msHowLong parameter specifies how long the search should run, in milliseconds.")
       .add_property("root",
           make_function(&pn_search_algo<Strategy>::get_root,
-              return_internal_reference<>()))
+              return_internal_reference<>()),
+          "Root of the search tree")
       .add_property("finished", &pn_search_algo<Strategy>::finished)
       .add_property("player", &pn_search_algo<Strategy>::get_player)
       .add_property("positionCount", &pn_search_algo<Strategy>::get_position_count)
+      .add_property("strategy",
+          make_function(&pn_search_algo<Strategy>::get_strategy,
+              return_internal_reference<>()),
+          "The strategy object used with this algorithm")
 
       .def("getInitialBoard",
           &pn_search_algo<Strategy>::get_initial_board,
@@ -470,6 +478,7 @@ void export_search() {
   class_<win_strategy>("WinStrategy")
       .def("updatedNumbers", &win_strategy::updated_numbers)
       .def("initialNumbers", &win_strategy::initial_numbers)
+      .def("successor", &win_strategy::successor, return_internal_reference<2>())
       ;
 
   export_pn_search_algo<win_strategy>("PnSearchAlgo_WinStrategy");

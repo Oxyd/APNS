@@ -182,6 +182,7 @@ struct win_strategy {
   pn_dn_pair_t updated_numbers(vertex_ptr vertex) const;
   pn_dn_pair_t initial_numbers(board const& board,
       piece::color_t initial_player, piece::color_t from_player, piece::color_t to_player) const;
+  vertex* successor(vertex* v);
 };
 
 namespace detail {
@@ -289,8 +290,7 @@ void pn_search_algo<Strategy>::find_leaf(board& board, vertex_ptr& leaf, hash_t&
     last_player = current_player;
     leaf = current;
 
-    vertex::number_t vertex::* number = current->type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
-    current = find_min(current->children_begin(), current->children_end(), number);
+    current = strategy.successor(current);
   }
 
   leaf_hash = leaf->hash;
