@@ -1,4 +1,4 @@
-from apnsmod import PnSearchAlgo_WinStrategy_ZobristHash, WinStrategy
+from apnsmod import PnSearchAlgo_WinStrategy, WinStrategy
 
 def makeSearch(board, player, strategy):
   '''Make an instance of a PnSearchAlgo using the specified strategy, board and player.
@@ -8,6 +8,6 @@ def makeSearch(board, player, strategy):
   '''
   
   if type(strategy) == WinStrategy:
-    return PnSearchAlgo_WinStrategy_ZobristHash(board, player, strategy)
+    return PnSearchAlgo_WinStrategy(board, player, strategy)
   else:
     raise NotImplemented('No matching search algorithm for strategy %s' % type(strategy))

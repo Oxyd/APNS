@@ -5,10 +5,8 @@ from apnsmod import Board, Vertex, Piece, Position, WinStrategy, OperationContro
 from interface.fileio import loadBoard, saveBoard, saveSearch, loadSearch
 from interface.observable import Observable
 from interface.search import makeSearch
-import time
-import gc
-import os
-import sys
+
+import time, gc, os, sys, itertools
 
 try:
   import Tkinter
@@ -420,7 +418,11 @@ class ResultsController(object):
       
       assert len(self.children) == 0
       
-      for child in self.vertex.children:
+      vertexChildren = self.vertex.children
+      sameTypeChildren  = (c for c in vertexChildren if c.type_ == self.vertex.type_)
+      otherTypeChildren = (c for c in vertexChildren if c.type_ != self.vertex.type_)
+      
+      for child in itertools.chain(sameTypeChildren, otherTypeChildren):
         self.children.append(ResultsController._DisplayNode(self, child, display))
       
     
@@ -1449,42 +1451,6 @@ class PositionDisplay(Observable):
       return Piece.Color.silver
 
   color = property(_getColor)
-  
-
-class SearchParametersDisplay(Observable):
-  '''Displays the widget containing search parameters and the 'Search' button.'''
-  
-  widget = property(lambda self: self._frame)
-  
-  def __init__(self, parent):
-    Observable.__init__(self)
-    
-    self._frame = ttk.Labelframe(parent, text='Search')
-    
-    timeLimitLabel = ttk.Label(self._frame, text='Time limit:')
-    memoryLimitLabel = ttk.Label(self._frame, text='Memory limit:')
-    
-    self._timeLimit = Tkinter.StringVar()
-    timeLimitSpin = Tkinter.Spinbox(self._frame, from_=0, to=9000, textvariable=self._timeLimit)
-    timeLimitSpin['validate'] = 'all'
-    timeLimitSpin['validatecommand'] = lambda: self._timeLimit.get().isdigit() or self._timeLimit.get() == ''
-    
-    self._memoryLimit = Tkinter.StringVar()
-    memoryLimitSpin = Tkinter.Spinbox(self._frame, from_=0, to=9000, textvariable=self._memoryLimit)
-    memoryLimitSpin['validate'] = 'all'
-    memoryLimitSpin['validatecommand'] = lambda: self._memoryLimit.get().isdigit() or self._memoryLimit.get() == ''
-    
-    self._searchButton = ttk.Button(self._frame, text='Start')
-    
-    timeLimitLabel.grid(row=0, column=0, sticky='E', padx=3)
-    memoryLimitLabel.grid(row=1, column=0, sticky='E', padx=3)
-    timeLimitSpin.grid(row=0, column=1, sticky='WE', padx=5)
-    memoryLimitSpin.grid(row=1, column=1, sticky='WE', padx=5)
-    
-    self._searchButton.grid(row=2, column=0, columnspan=2, sticky='SEW', pady=5, padx=5)
-    
-    self._frame.columnconfigure(1, weight=1)
-    self._frame.rowconfigure(2, weight=1)
   
 
 class PositionController(object):
