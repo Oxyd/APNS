@@ -81,6 +81,9 @@ public:
   //! Allocate specified amount of children and default-initialise them.
   void alloc_children(std::size_t count);
 
+  //! Delete the children of this vertex.
+  void dealloc_children();
+
   //! Add the given vertex as a new parent of this one.
   void set_parent(vertex* parent);
 
@@ -235,7 +238,7 @@ bool pn_search_algo<Strategy>::finished() const {
 }
 
 template <typename Strategy>
-void pn_search_algo<Strategy>::iterate() {
+void pn_search_algo<Strategy>::iterate() try {
   board board = initial_board;
 
   if (trans_tbl) {
@@ -249,6 +252,14 @@ void pn_search_algo<Strategy>::iterate() {
   find_leaf(board, leaf, leaf_hash, history);
   expand(board, leaf, leaf_hash, history);
   update_numbers(leaf);
+
+} catch (std::bad_alloc&) {
+  // Ran out of memory. Toss out the whole search tree so that the error can be reported.
+  if (root) {
+    root->dealloc_children();
+  }
+
+  throw;
 }
 
 template <typename Strategy>

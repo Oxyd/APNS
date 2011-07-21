@@ -393,40 +393,54 @@ void export_pn_search_algo(std::string const& identifier) {
       ;
 }
 
-vertex* deref(vertex& v) {
-  return &v;
-}
+/**
+ * A Python iterator over the children of a vertex.
+ *
+ * Boost.Python doesn't operate very well with just vertex::children_iterator -- it is currently a typedef for vertex*, which
+ * after dereference yields a vertex, which Boost.Python cannot work with, as it can only work with vertex*.
+ */
+class vertex_children_iterator {
+public:
+  vertex_children_iterator(vertex::children_iterator begin, vertex::children_iterator end)
+    : current(begin)
+    , end(end)
+  { }
 
-typedef boost::transform_iterator<vertex* (*)(vertex&), vertex::children_iterator> vertex_children_deref_iter;
+  //! Create the iterator for the given vertex.
+  static vertex_children_iterator create(vertex* v) {
+    return vertex_children_iterator(v->children_begin(), v->children_end());
+  }
 
-vertex_children_deref_iter vertex_deref_children_begin(vertex& v) {
-  return vertex_children_deref_iter(v.children_begin(), &deref);
-}
+  //! Python requires that iterators have a member __iter__ function that returns the iterator itself.
+  vertex_children_iterator iter() const {
+    return *this;
+  }
 
-vertex_children_deref_iter vertex_deref_children_end(vertex& v) {
-  return vertex_children_deref_iter(v.children_end(), &deref);
-}
+  //! Python's iter.next().
+  vertex* next() {
+    if (current != end) {
+      return &*current++;
+    } else {
+      PyErr_SetString(PyExc_StopIteration, "");
+      throw boost::python::error_already_set();
+    }
+  }
+
+private:
+  vertex::children_iterator current;
+  vertex::children_iterator end;
+};
 
 //! Export functions and types declared in search.hpp.
 void export_search() {
   using namespace boost::python;
 
   {
-    scope vertex_scope = class_<vertex, vertex_ptr, boost::noncopyable>("Vertex", no_init)
+    scope vertex_scope = class_<vertex, boost::noncopyable>("Vertex", no_init)
         .def_readwrite("type_", &vertex::type, "Type of this vertex: either AND or OR")
-        .add_property("children",
-            range(
-                &vertex_deref_children_begin,
-                &vertex_deref_children_end),
-
-                //static_cast<vertex::children_iterator (vertex::*)()>(&vertex::children_begin),
-                //static_cast<vertex::children_iterator (vertex::*)()>(&vertex::children_end)),
-            "Children of this vertex of either type")
-        .add_property("childrenCount",
-            &vertex_children_count)
-        .add_property("parent",
-            make_function(&vertex::get_parent, return_internal_reference<>()),
-            "Parent of this vertex")
+        .add_property("children", &vertex_children_iterator::create, "Children of this vertex of either type")
+        .add_property("childrenCount", &vertex_children_count)
+        .add_property("parent", make_function(&vertex::get_parent, return_internal_reference<>()), "Parent of this vertex")
         .add_property("leadingStep",
             make_getter(&vertex::leading_step, return_value_policy<return_by_value>()),
             &set_vertex_leading_step,
@@ -446,6 +460,11 @@ void export_search() {
         .value("and_", vertex::type_and)
         .value("or_", vertex::type_or)
         ;
+
+    class_<vertex_children_iterator>("ChildrenIterator", no_init)
+        .def("__iter__", &vertex_children_iterator::iter)
+        .def("next", &vertex_children_iterator::next, return_internal_reference<>())
+        ;
   }
 
   class_<win_strategy>("WinStrategy")
@@ -453,9 +472,7 @@ void export_search() {
       .def("initialNumbers", &win_strategy::initial_numbers)
       ;
 
-  export_pn_search_algo<
-    win_strategy
-  >("PnSearchAlgo_WinStrategy_ZobristHash");
+  export_pn_search_algo<win_strategy>("PnSearchAlgo_WinStrategy");
 }
 
 //! Export an instantiation of TranspositionTable<H>.

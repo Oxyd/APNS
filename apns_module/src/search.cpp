@@ -131,6 +131,11 @@ void vertex::alloc_children(std::size_t count) {
   children.reset(new vertex[count]);
 }
 
+void vertex::dealloc_children() {
+  children_size = 0;
+  children.reset();
+}
+
 void vertex::set_parent(vertex* new_parent) {
   assert(parent == 0);
   parent = new_parent;
