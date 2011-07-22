@@ -37,7 +37,7 @@ class MainWindow(Observable):
   
   class Command:
     '''Enumeration type that specifies what kind of action the user has selected.'''
-    newSearch, iterate, runSearch, savePosition, loadSearch, saveSearch, close = range(7)
+    newSearch, iterate, runSearch, savePosition, loadSearch, saveSearch, close, searchStats = range(8)
   
   
   def __init__(self):
@@ -61,10 +61,13 @@ class MainWindow(Observable):
     #                              command=lambda: self.notifyObservers(command=MainWindow.Command.iterate))
     self._saveBtn = ttk.Button(self._toolbar, text='Save Position',
                                command=lambda: self.notifyObservers(command=MainWindow.Command.savePosition))
+    self._statsBtn = ttk.Button(self._toolbar, text='Search Stats',
+                                command=lambda: self.notifyObservers(command=MainWindow.Command.searchStats))
     
     self._window.protocol('WM_DELETE_WINDOW', lambda: self.notifyObservers(command=MainWindow.Command.close))
     
     self.disableSearch()
+    self.disableStats()
 
     self._resultsDisplay = ResultsDisplay(self._window, self._imageManager)
     self._searchResultsCtrl = ResultsController(self._resultsDisplay)
@@ -73,8 +76,10 @@ class MainWindow(Observable):
     self._runBtn.grid(row=0, column=1, padx=(3, 3))
     self._loadSearchBtn.grid(row=0, column=2, padx=(3, 3))
     self._saveSearchBtn.grid(row=0, column=3, padx=(3, 3))
-    #self._iterateBtn.grid(row=0, column=5, padx=(3, 3))
-    self._saveBtn.grid(row=0, column=4, padx=(3, 0))
+    self._saveBtn.grid(row=0, column=4, padx=(3, 3))
+    self._statsBtn.grid(row=0, column=5, padx=(3, 0))
+    #self._iterateBtn.grid(row=0, column=6, padx=(3, 0))
+    
     self._toolbar.grid(row=0, column=0, sticky='W')
     self._resultsDisplay.widget.grid(row=1, column=0, sticky='NSEW')
 
@@ -105,6 +110,14 @@ class MainWindow(Observable):
     self._saveBtn['state'] = ['disabled']
   
   
+  def enableStats(self):
+    self._statsBtn['state'] = ['!disabled']
+  
+  
+  def disableStats(self):
+    self._statsBtn['state'] = ['disabled']
+  
+  
   def destroy(self):
     '''Destroy this window.'''
     
@@ -122,6 +135,7 @@ class MainWindowController(object):
     self._resultsCtrl = mainWindowDsply.searchResultsController
     self._search = None
     self._runPreferences = dict()
+    self._runStats = None
     
   
   def runApplication(self):
@@ -150,6 +164,7 @@ class MainWindowController(object):
         
         search = makeSearch(positionEditorDlg.board, positionEditorDlg.player, WinStrategy())
         self._resetSearch(search)
+        self._mainWindowDsply.disableStats()
     
     elif command == MainWindow.Command.iterate:
       if self._search.getTranspositionTable() is None:
@@ -167,12 +182,15 @@ class MainWindowController(object):
           self._runPreferences = newPrefs
         
         self._search.useTranspositionTable(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
-        dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft)
+        dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
         searchProgressCtrl = SearchProgressController(self._search, dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit)
-        searchProgressCtrl.run()
+        self._runStats = searchProgressCtrl.run()
         self._resultsCtrl.updateTree()
-        self._mainWindowDsply.window.focus_set()
+        
         gc.collect()
+        
+        self._mainWindowDsply.window.focus_set()
+        self._mainWindowDsply.enableStats()
     
     elif command == MainWindow.Command.savePosition:
       filename = tkFileDialog.asksaveasfilename()
@@ -197,10 +215,15 @@ class MainWindowController(object):
         dlg = SaveProgressDialog(self._mainWindowDsply.window)
         SaveProgressController(dlg, self._search, str(filename))
     
+    elif command == MainWindow.Command.searchStats:
+      dlg = SearchProgressDialog(self._mainWindowDsply.window, showTimeLeft=False, running=False)
+      SearchStatsController(dlg, self._runStats)
+     
     elif command == MainWindow.Command.close:
       self._resetSearch(None)
       gc.collect()
       self._mainWindowDsply.destroy()
+    
   
   
   def _resetSearch(self, newSearch):
@@ -1102,12 +1125,24 @@ class RunSearchController(object):
 class SearchProgressDialog(Observable):
   '''A dialog window showing the progress of a search along with a Cancel button.'''
   
-  def __init__(self, parent, showTimeLeft=True):
+  def __init__(self, parent, showTimeLeft=True, running=True):
+    '''Create the dialogue.
+    
+    If running is True, the dialog should display strings informing the user that the computation is in progress. Otherwise,
+    it'll inform the user that it's displaying the statistics of a previous run.
+    '''
+    
     Observable.__init__(self)
     
-    self._dialog = DialogWindow(parent, 'Expanding tree...')
+    if running:
+      self._dialog = DialogWindow(parent, 'Expanding tree...')
+    else:
+      self._dialog = DialogWindow(parent, 'Statistics')
     
-    infoLabel = ttk.Label(self._dialog.content, text='Computation is now in progress. Please wait.')
+    if running:
+      infoLabel = ttk.Label(self._dialog.content, text='Computation is now in progress. Please wait.')
+    else:
+      infoLabel = ttk.Label(self._dialog.content, text='Last search statistics:')
     
     stats = ttk.Labelframe(self._dialog.content, text='Statistics:', padding=3)
     
@@ -1128,7 +1163,9 @@ class SearchProgressDialog(Observable):
     self._cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel', command=self._cancel)
     self._dialog.setDeleteAction(lambda: self._cancelBtn.invoke())
     
-    progress = ttk.Labelframe(self._dialog.content, text='Progress:', padding=3)
+    progress = ttk.Labelframe(self._dialog.content, 
+                              text='Progress:' if running else 'Time:', 
+                              padding=3)
     
     rootPnLabel = ttk.Label(progress, text='Root PN:')
     rootDnLabel = ttk.Label(progress, text='Root DN:')
@@ -1138,12 +1175,16 @@ class SearchProgressDialog(Observable):
     timeElapsedLabel = ttk.Label(progress, text='Time elapsed:')
     self._timeElapsed = ttk.Label(progress)
     
-    rootPnLabel.grid(row=0, column=0, sticky='E')
-    rootDnLabel.grid(row=1, column=0, sticky='E')
-    self._rootPn.grid(row=0, column=1, sticky='W', padx=(5, 0))
-    self._rootDn.grid(row=1, column=1, sticky='W', padx=(5, 0))
-    timeElapsedLabel.grid(row=2, column=0, sticky='E')
-    self._timeElapsed.grid(row=2, column=1, sticky='W', padx=(5, 0))
+    if running:
+      rootPnLabel.grid(row=0, column=0, sticky='E')
+      rootDnLabel.grid(row=1, column=0, sticky='E')
+      self._rootPn.grid(row=0, column=1, sticky='W', padx=(5, 0))
+      self._rootDn.grid(row=1, column=1, sticky='W', padx=(5, 0))
+      timeElapsedLabel.grid(row=2, column=0, sticky='E')
+      self._timeElapsed.grid(row=2, column=1, sticky='W', padx=(5, 0))
+    else:
+      timeElapsedLabel.grid(row=0, column=0, sticky='E')
+      self._timeElapsed.grid(row=0, column=1, sticky='W', padx=(5, 0))
     
     if showTimeLeft: 
       timeLeftLabel = ttk.Label(progress, text='Time left:')
@@ -1261,7 +1302,10 @@ class SearchProgressController(object):
     
   
   def run(self):
-    '''Run the search. This call will only return after the search is either finished or the user has decided to cancel it.'''
+    '''Run the search. This call will only return after the search is either finished or the user has decided to cancel it.
+    
+    Returns a dictionary with the statistics, that can later be fed into PositionStatsController.
+    '''
     
     self._searchProgressDlg.run()
     
@@ -1270,8 +1314,16 @@ class SearchProgressController(object):
     self._sElapsedTime = 0
     
     lastPosCount = 0
-    posPerSec = 0
     lastPosPerSecMeasure = self._sNow
+    
+    memAllocated = 0
+    mbTransTblSize = '0.0'
+    hits = 0
+    misses = 0
+    posCount = 0
+    posPerSec = 0
+    rootPn = 0
+    rootDn = 0
     
     try:
       while not self._finished():
@@ -1282,21 +1334,27 @@ class SearchProgressController(object):
           self._searchProgressDlg.showTimeLeft(self._timeLimit - self._sElapsedTime)
         
         self._searchProgressDlg.showTimeElapsed(self._sElapsedTime)
-        self._searchProgressDlg.showMemoryAllocated(self._memoryAllocated())
+        memAllocated = self._memoryAllocated()
+        self._searchProgressDlg.showMemoryAllocated(memAllocated)
         
         tt = self._search.getTranspositionTable()
         if tt is not None:
-          mbTransTblSize  = float(self._search.getTranspositionTable().memoryUsage) / float(1024 ** 2)
+          mbTransTblSize  = '%.2f MB' % (float(self._search.getTranspositionTable().memoryUsage) / float(1024 ** 2))
           hits            = tt.hits
           misses          = tt.misses
         else:
-          mbTransTblSize  = 0.0
+          mbTransTblSize  = '0.0'
           hits            = 0
           misses          = 0
           
-        self._searchProgressDlg.showTransTblStats(memUsed='%.2f MB' % mbTransTblSize, hits=hits, misses=misses)
-        self._searchProgressDlg.showPosCount(posCount=self._search.positionCount, posPerSec=posPerSec)
-        self._searchProgressDlg.showRootPnDn(self._search.root.proofNumber, self._search.root.disproofNumber)
+        self._searchProgressDlg.showTransTblStats(memUsed=mbTransTblSize, hits=hits, misses=misses)
+        
+        posCount = self._search.positionCount
+        rootPn = self._search.root.proofNumber
+        rootDn = self._search.root.disproofNumber
+        
+        self._searchProgressDlg.showPosCount(posCount=posCount, posPerSec=posPerSec)
+        self._searchProgressDlg.showRootPnDn(rootPn, rootDn)
         self._searchProgressDlg.updateGui()
         
         self._sNow = time.clock()
@@ -1310,6 +1368,17 @@ class SearchProgressController(object):
       tkMessageBox.showerror('Error', 'Not enough memory to expand the tree')
     
     self._searchProgressDlg.close()
+    
+    stats = { 'timeElapsed': self._sElapsedTime,
+              'posPerSec': posPerSec,
+              'memUsed': memAllocated,
+              'ttSize': mbTransTblSize,
+              'ttHits': hits,
+              'ttMisses': misses,
+              'vertexCount': posCount,
+              'rootPn': rootPn,
+              'rootDn': rootDn }
+    return stats
   
   
   def update(self, source):
@@ -1348,6 +1417,49 @@ class SearchProgressController(object):
       return '%.2f kB' % (float(alloc) / float(KBYTE))
     else:
       return '%.2f MB' % (float(alloc) / float(MBYTE))
+
+
+class SearchStatsController(object):
+  '''Another controller for SearchProgressDialog -- this one, however, doesn't run the search, but merely displays the stats.'''
+  
+  def __init__(self, searchProgressDlg, stats):
+    '''Stats is a dict, with keys:
+    
+      timeElapsed:   elapsed time in seconds
+      posPerSec:     number of new positions per second
+      memUsed:       total memory used (str)
+      ttSize:        transposition table size
+      ttHits:        transposition table hits
+      ttMisses:      transposition table misses
+      vertexCount:   number of vertices in the tree
+      rootPn:        root PN value
+      rootDn:        root DN value
+    '''
+    
+    posCnt    = int(stats['vertexCount'])
+    time      = int(stats['timeElapsed'])
+    posPerSec = int(stats['posPerSec'])
+    mem       = stats['memUsed']
+    rootPn    = stats['rootPn']
+    rootDn    = stats['rootDn']
+    ttSize = stats['ttSize']
+    ttHits = stats['ttHits']
+    ttMisses = stats['ttMisses']
+    
+    searchProgressDlg.showTimeElapsed(time)
+    searchProgressDlg.showMemoryAllocated(mem)
+    searchProgressDlg.showPosCount(posCount=posCnt, posPerSec=posPerSec)
+    searchProgressDlg.showRootPnDn(rootPn, rootDn)
+    searchProgressDlg.showTransTblStats(memUsed=ttSize, hits=ttHits, misses=ttMisses)
+    
+    searchProgressDlg.addObserver(self)
+    searchProgressDlg.run()
+  
+  
+  def update(self, source):
+    '''The dialog has fired up an event. The only event is the OK button, so dismiss the dialog.'''
+    
+    source.close()
 
 
 class PositionEditorDialog(object):
