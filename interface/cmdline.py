@@ -39,6 +39,8 @@ def strFromMem(mem):
     
 
 def main():
+  is64Bit = sys.maxsize > 2**32  # Trick straight from the docs.
+  
   parser = argparse.ArgumentParser(description='Execute the Proof-Number Search algorithm and save the result')
   parser.add_argument('-p', '--position', type=str, dest='position',
                       help='File containing the initial search position')
@@ -50,6 +52,8 @@ def main():
                       help='Maximum running time of the algorithm, excluding any I/O operations, in seconds')
   parser.add_argument('-n', '--positions', type=int, default=0, metavar='position limit', dest='posLimit',
                       help='Maximum number of unique positions examined')
+  parser.add_argument('-m', '--memory', type=int, default=0 if is64Bit else 1500, metavar='memory limit', dest='memLimit',
+                      help='Maximum amount of memory to be used by the computation')
   parser.add_argument('-r', '--trans-tbl-size', type=int, default=32, metavar='trans tbl size', dest='transTblSize',
                       help='Size of the transposition table to use, in megabytes. If set to 0, don\'t use transposition table'
                       'at all')
@@ -79,6 +83,9 @@ def main():
     raise SystemExit(1)
   if args.posLimit < 0:
     print >> sys.stderr, 'Error: Position limit must be a nonnegative integer'
+    raise SystemExit(1)
+  if args.memLimit < 0:
+    print >> sys.stderr, 'Error: Memory limit must be a nonnegative integer'
     raise SystemExit(1)
   
   if args.position is not None:
@@ -123,6 +130,7 @@ def main():
     try:
       if args.timeLimit > 0 and timeElapsed >= args.timeLimit \
          or args.posLimit > 0 and search.positionCount >= args.posLimit \
+         or args.memLimit > 0 and (memoryUsedTotal() / (1024 ** 2)) >= args.memLimit \
          or search.finished:
         break
       
@@ -166,6 +174,8 @@ def main():
       print 'Time limit exceeded'
     elif args.posLimit > 0 and search.positionCount >= args.posLimit:
       print 'Position limit exceeded'
+    elif args.memLimit > 0 and (memoryUsedTotal() / (1024 ** 2)) >= args.memLimit:
+      print 'Memory limit exceeded'
     elif interrupted:
       print 'User interrupted'
     
