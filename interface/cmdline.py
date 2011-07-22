@@ -53,7 +53,7 @@ def main():
   parser.add_argument('-n', '--positions', type=int, default=0, metavar='position limit', dest='posLimit',
                       help='Maximum number of unique positions examined')
   parser.add_argument('-m', '--memory', type=int, default=0 if is64Bit else 1500, metavar='memory limit', dest='memLimit',
-                      help='Maximum amount of memory to be used by the computation')
+                      help='Maximum amount of memory to be used by the computation, in megabytes')
   parser.add_argument('-r', '--trans-tbl-size', type=int, default=32, metavar='trans tbl size', dest='transTblSize',
                       help='Size of the transposition table to use, in megabytes. If set to 0, don\'t use transposition table'
                       'at all')
