@@ -1109,10 +1109,7 @@ class SearchProgressDialog(Observable):
     
     infoLabel = ttk.Label(self._dialog.content, text='Computation is now in progress. Please wait.')
     
-    if showTimeLeft: self._timeLeftLabel = ttk.Label(self._dialog.content)
-    self._timeElapsedLabel = ttk.Label(self._dialog.content)
-    
-    stats = ttk.Labelframe(self._dialog.content, text='Statistics:', padding=5)
+    stats = ttk.Labelframe(self._dialog.content, text='Statistics:', padding=3)
     
     memoryAllocLbl = ttk.Label(stats, text='Search memory usage:')
     transTblSizeLbl = ttk.Label(stats, text='Transposition table size:')
@@ -1131,11 +1128,32 @@ class SearchProgressDialog(Observable):
     self._cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel', command=self._cancel)
     self._dialog.setDeleteAction(lambda: self._cancelBtn.invoke())
     
+    progress = ttk.Labelframe(self._dialog.content, text='Progress:', padding=3)
+    
+    rootPnLabel = ttk.Label(progress, text='Root PN:')
+    rootDnLabel = ttk.Label(progress, text='Root DN:')
+    self._rootPn = ttk.Label(progress)
+    self._rootDn = ttk.Label(progress)
+    
+    timeElapsedLabel = ttk.Label(progress, text='Time elapsed:')
+    self._timeElapsed = ttk.Label(progress)
+    
+    rootPnLabel.grid(row=0, column=0, sticky='E')
+    rootDnLabel.grid(row=1, column=0, sticky='E')
+    self._rootPn.grid(row=0, column=1, sticky='W', padx=(5, 0))
+    self._rootDn.grid(row=1, column=1, sticky='W', padx=(5, 0))
+    timeElapsedLabel.grid(row=2, column=0, sticky='E')
+    self._timeElapsed.grid(row=2, column=1, sticky='W', padx=(5, 0))
+    
+    if showTimeLeft: 
+      timeLeftLabel = ttk.Label(progress, text='Time left:')
+      self._timeLeft = ttk.Label(progress)
+      timeLeftLabel.grid(row=3, column=0, sticky='E')
+      self._timeLeft.grid(row=3, column=1, sticky='W', padx=(5, 0))
+    
     infoLabel.grid(row=0, column=0, sticky='W', pady=5)
     stats.grid(row=1, column=0, sticky='WE', pady=5)
-    
-    self._timeElapsedLabel.grid(row=2, column=0, sticky='W', pady=(5, 0))
-    if showTimeLeft: self._timeLeftLabel.grid(row=3, column=0, sticky='W', pady=(0, 5))
+    progress.grid(row=2, column=0, sticky='WE', pady=5)
     
     memoryAllocLbl.grid(row=0, column=0, sticky='E')
     transTblSizeLbl.grid(row=1, column=0, sticky='E')
@@ -1184,13 +1202,13 @@ class SearchProgressDialog(Observable):
   def showTimeLeft(self, sTime):
     '''Show how long is the search still going to take, in seconds.'''
     
-    self._timeLeftLabel['text'] = 'Time remaining: %d seconds' % sTime
+    self._timeLeft['text'] = '%d seconds' % sTime
   
   
   def showTimeElapsed(self, sTime):
     '''Show how much time has passed since the start of the calculation, in seconds.'''
     
-    self._timeElapsedLabel['text'] = 'Time elapsed: %d seconds' % sTime
+    self._timeElapsed['text'] = '%d seconds' % sTime
   
   
   def showMemoryAllocated(self, allocated):
@@ -1212,6 +1230,12 @@ class SearchProgressDialog(Observable):
     
     self._posCount['text'] = '%s' % posCount
     self._posPerSec['text'] = '%s' % posPerSec
+  
+  
+  def showRootPnDn(self, pn, dn):
+    
+    self._rootPn['text'] = '%d' % pn
+    self._rootDn['text'] = '%d' % dn
   
   
   def _cancel(self):
@@ -1272,6 +1296,7 @@ class SearchProgressController(object):
           
         self._searchProgressDlg.showTransTblStats(memUsed='%.2f MB' % mbTransTblSize, hits=hits, misses=misses)
         self._searchProgressDlg.showPosCount(posCount=self._search.positionCount, posPerSec=posPerSec)
+        self._searchProgressDlg.showRootPnDn(self._search.root.proofNumber, self._search.root.disproofNumber)
         self._searchProgressDlg.updateGui()
         
         self._sNow = time.clock()
