@@ -183,7 +183,7 @@ class MainWindowController(object):
         
         self._search.useTranspositionTable(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
         dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
-        searchProgressCtrl = SearchProgressController(self._search, dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit)
+        searchProgressCtrl = SearchProgressController(self._search, dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit, runSearchCtrl.memLimit)
         self._runStats = searchProgressCtrl.run()
         self._resultsCtrl.updateTree()
         
@@ -880,11 +880,15 @@ class RunSearchDialog(Observable):
                            lambda self, val: self.setPositionLimit(val))
   positionLimitCheck = property(lambda self: self._positionLimitCheckVar.get() == '1',
                                 lambda self, val: self.enablePositionLimit(val))
+  memLimit = property(lambda self: self._memLimitVar.get(),
+                      lambda self, val: self.setMemLimit(val))
+  memLimitCheck = property(lambda self: self._memLimitCheckVar.get() == '1',
+                           lambda self, val: self.enableMemLimit(val))
   transTblSize = property(lambda self: self._memorySpinVar.get(),
                           lambda self, val: self.setTransTblSize(val))
   
   class Command:
-    timeLimitCheck, positionLimitCheck, start = range(3)
+    timeLimitCheck, positionLimitCheck, memLimitCheck, start = range(4)
   
   def __init__(self, parent):
     '''Create the dialog.'''
@@ -917,6 +921,15 @@ class RunSearchDialog(Observable):
                                               textvariable=self._positionLimitVar)
     positionLimitUnits = ttk.Label(limitsFrame, text='positions')
     
+    self._memLimitCheckVar = Tkinter.StringVar(value='0')
+    self._memLimitCheck = ttk.Checkbutton(limitsFrame, text='Memory limit:',
+                                          variable=self._memLimitCheckVar,
+                                          command=lambda: self.notifyObservers(command=RunSearchDialog.Command.memLimitCheck))
+    self._memLimitVar = Tkinter.StringVar(value='0')
+    self._memLimitSpin = Tkinter.Spinbox(limitsFrame, from_=1, to=99999999999999999,
+                                         textvariable=self._memLimitVar)
+    memLimitUnits = ttk.Label(limitsFrame, text='MB')
+    
     transTblFrame = ttk.Labelframe(self._dialog.content, text='Transposition table size', padding=5)
     sizeLabel = ttk.Label(transTblFrame, text='Size: ')
     sizeUnits = ttk.Label(transTblFrame, text='MB')
@@ -936,6 +949,10 @@ class RunSearchDialog(Observable):
     self._positionLimitCheck.grid(row=1, column=0, sticky='W')
     self._positionLimitSpin.grid(row=1, column=1, sticky='WE', padx=5)
     positionLimitUnits.grid(row=1, column=2, sticky='W')
+    
+    self._memLimitCheck.grid(row=2, column=0, sticky='W')
+    self._memLimitSpin.grid(row=2, column=1, sticky='WE', padx=5)
+    memLimitUnits.grid(row=2, column=2, sticky='W')
     
     limitsFrame.columnconfigure(1, weight=1)
     
@@ -1003,6 +1020,23 @@ class RunSearchDialog(Observable):
     self._positionLimitVar.set(int(value))
   
   
+  def enableMemLimit(self, enable):
+    '''Enable or disable the memory limit spinbox.'''
+    
+    if enable:
+      self._memLimitSpin['state'] = ['normal']
+      self._memLimitCheckVar.set('1')
+    else:
+      self._memLimitSpin['state'] = ['disabled']
+      self._memLimitCheckVar.set('0')
+  
+  
+  def setMemLimit(self, value):
+    '''Set the memory limit to a value.'''
+    
+    self._memLimitVar.set(int(value))
+  
+  
   def setTransTblSize(self, value):
     '''Set the transposition table size spinbox to the given value.'''
     
@@ -1021,6 +1055,7 @@ class RunSearchController(object):
   
   timeLimit = property(lambda self: self._timeLimit)
   posLimit = property(lambda self: self._posLimit)
+  memLimit = property(lambda self: self._memLimit)
   transTblSize = property(lambda self: self._transTblSize)
   showTimeLeft = property(lambda self: self._showTimeLeft)
   
@@ -1034,11 +1069,16 @@ class RunSearchController(object):
     self._runSearchDlg = runSearchDlg
     self._search = search
     
+    # Only enable the memory limit by default on 32-bit systems
+    is64Bit = sys.maxsize > 2**32  # Trick straight from the docs.
+    
     self._runSearchDlg.addObserver(self)
     self._runSearchDlg.timeLimit = lastValues.get('timeLimit', 60)
     self._runSearchDlg.timeLimitCheck = lastValues.get('timeLimitCheck', True)
     self._runSearchDlg.positionLimit = lastValues.get('positionLimit', 10000)
     self._runSearchDlg.positionLimitCheck = lastValues.get('positionLimitCheck', False)
+    self._runSearchDlg.memLimit = lastValues.get('memLimit', 1500)
+    self._runSearchDlg.memLimitCheck = lastValues.get('memLimitCheck', not is64Bit)
     self._runSearchDlg.transTblSize = lastValues.get('transTblSize', 32)
     
     self._doRun = False
@@ -1075,10 +1115,16 @@ class RunSearchController(object):
           posLimit = int(self._runSearchDlg.positionLimit)
         else:
           posLimit = None
+        
+        if self._runSearchDlg.memLimitCheck:
+          memLimit = int(self._runSearchDlg.memLimit)
+        else:
+          memLimit = None
           
         self._transTblSize = (int(self._runSearchDlg.transTblSize) * MB) / self._search.sizeOfTransTblElement
         self._timeLimit = sTimeLimit
         self._posLimit = posLimit
+        self._memLimit = memLimit
         self._showTimeLeft = showTimeLeft
         
         self._lastSetValues = dict()
@@ -1088,6 +1134,8 @@ class RunSearchController(object):
         last['timeLimit'] = self._runSearchDlg.timeLimit
         last['positionLimit'] = self._runSearchDlg.positionLimit
         last['positionLimitCheck'] = self._runSearchDlg.positionLimitCheck
+        last['memLimit'] = self._runSearchDlg.memLimit
+        last['memLimitCheck'] = self._runSearchDlg.memLimitCheck
         last['transTblSize'] = self._runSearchDlg.transTblSize
         
         self._doRun = True
@@ -1098,6 +1146,9 @@ class RunSearchController(object):
     
     elif command == RunSearchDialog.Command.positionLimitCheck:
       self._runSearchDlg.enablePositionLimit(self._runSearchDlg.positionLimitCheck)
+    
+    elif command == RunSearchDialog.Command.memLimitCheck:
+      self._runSearchDlg.enableMemLimit(self._runSearchDlg.memLimitCheck)
   
   
   def _validateInput(self):
@@ -1119,6 +1170,7 @@ class RunSearchController(object):
     
     return (checkVar(dlg.timeLimitCheck, dlg.timeLimit, 'Time limit')
             and checkVar(dlg.positionLimitCheck, dlg.positionLimit, 'Position limit')
+            and checkVar(dlg.memLimitCheck, dlg.memLimit, 'Memory limit')
             and checkVar(True, dlg.transTblSize, 'Size of transposition table'))
     
 
@@ -1288,7 +1340,7 @@ class SearchProgressController(object):
   
   _MS_BURST_TIME = 100  # How long should the search bursts take, in milliseconds.
   
-  def __init__(self, search, searchProgressDlg, timeLimit, posLimit):
+  def __init__(self, search, searchProgressDlg, timeLimit, posLimit, memLimit):
     object.__init__(self)
     
     self._search = search
@@ -1296,6 +1348,7 @@ class SearchProgressController(object):
     
     self._timeLimit = timeLimit
     self._posLimit = posLimit
+    self._memLimit = memLimit
     self._cancel = False
     
     self._searchProgressDlg.addObserver(self)
@@ -1312,11 +1365,12 @@ class SearchProgressController(object):
     self._sStart = time.clock()
     self._sNow = time.clock()
     self._sElapsedTime = 0
+    memAllocatedStr = 0
+    self._memAllocated = 0
     
     lastPosCount = 0
     lastPosPerSecMeasure = self._sNow
     
-    memAllocated = 0
     mbTransTblSize = '0.0'
     hits = 0
     misses = 0
@@ -1334,8 +1388,9 @@ class SearchProgressController(object):
           self._searchProgressDlg.showTimeLeft(self._timeLimit - self._sElapsedTime)
         
         self._searchProgressDlg.showTimeElapsed(self._sElapsedTime)
-        memAllocated = self._memoryAllocated()
-        self._searchProgressDlg.showMemoryAllocated(memAllocated)
+        self._memAllocated = int(float(memoryUsedTotal()) / float(1024 ** 2))
+        memAllocatedStr = self._memoryAllocated()
+        self._searchProgressDlg.showMemoryAllocated(memAllocatedStr)
         
         tt = self._search.getTranspositionTable()
         if tt is not None:
@@ -1371,7 +1426,7 @@ class SearchProgressController(object):
     
     stats = { 'timeElapsed': self._sElapsedTime,
               'posPerSec': posPerSec,
-              'memUsed': memAllocated,
+              'memUsed': memAllocatedStr,
               'ttSize': mbTransTblSize,
               'ttHits': hits,
               'ttMisses': misses,
@@ -1398,6 +1453,10 @@ class SearchProgressController(object):
     
     if self._posLimit is not None:
       if self._search.positionCount >= self._posLimit:
+        return True
+    
+    if self._memLimit is not None:
+      if self._memAllocated >= self._memLimit:
         return True
     
     return self._search.finished or self._cancel
