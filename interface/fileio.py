@@ -366,7 +366,7 @@ def loadSearch(filename, operationController):
   tree = loadTree(filename, 2, operationController, positionCount)
   if tree is not None:
     import apnsmod
-    search = apnsmod.PnSearchAlgo_WinStrategy_ZobristHash(board, tree, player, apnsmod.WinStrategy(), positionCount)
+    search = apnsmod.PnSearchAlgo_WinStrategy(board, tree, player, apnsmod.WinStrategy(), positionCount)
     return search
   else:
     return None  
