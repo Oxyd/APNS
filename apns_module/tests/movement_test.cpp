@@ -60,7 +60,8 @@ TEST(movement, simple_move_test) {
       board b;
       b.put(p, piece(piece::silver, piece::cat));
 
-      for (direction dir = north; dir <= west; ++(int&)dir) {
+      for (int d = north; d <= west; ++d) {
+        direction dir = static_cast<direction>(d);
         elementary_step el_step = elementary_step::displacement(p, dir);
 
         if ((dir == north && row == board::MAX_ROW)
@@ -104,8 +105,11 @@ TEST(movement, simple_move_capture_test) {
 
   std::size_t const moves_count = sizeof(moves) / sizeof(*moves);
 
-  for (piece::type_t type = piece::elephant; type <= piece::cat; ++(int&)type) {
-    for (piece::color_t color = piece::gold; color <= piece::silver; ++(int&)color) {
+  for (int t = piece::elephant; t <= piece::cat; ++t) {
+    for (int c = piece::gold; c <= piece::silver; ++c) {
+      piece::type_t type = static_cast<piece::type_t>(t);
+      piece::color_t color = static_cast<piece::color_t>(c);
+
       for (std::pair<position, direction> const* move = moves; move != moves + moves_count; ++move) {
         position const p = move->first;
         direction const d = move->second;

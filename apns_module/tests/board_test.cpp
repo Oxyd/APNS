@@ -153,7 +153,7 @@ TEST_F(board_test, put_get_remove_test) {
   EXPECT_EQ(p.get_color(), piece::gold);
   EXPECT_EQ(p.get_type(), piece::horse);
 
-  for (piece::type_t t = piece::elephant; t <= piece::rabbit; ++(int&)t) {
+  for (int t = piece::elephant; t <= piece::rabbit; ++t) {
     if (t != piece::horse) {
       EXPECT_TRUE(p.get_type() != t);
     }
