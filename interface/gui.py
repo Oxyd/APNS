@@ -232,15 +232,17 @@ class ResultsDisplay(Observable):
     self._content = ttk.Frame(parent, padding=5)
     
     self._tree = ttk.Treeview(self._content)
-    self._tree['columns'] = ('type', 'pn', 'dn')
+    self._tree['columns'] = ('best', 'type', 'pn', 'dn')
     self._tree['selectmode'] = 'browse'
-    self._tree.column(0, stretch=False, width=60)
-    self._tree.column(1, stretch=False, width=40)
+    self._tree.column(0, stretch=False, width=10)
+    self._tree.column(1, stretch=True, width=60)
     self._tree.column(2, stretch=False, width=40)
+    self._tree.column(3, stretch=False, width=40)
     self._tree.heading('#0', text='Step')
-    self._tree.heading(0, text='Type')
-    self._tree.heading(1, text='PN')
-    self._tree.heading(2, text='DN')
+    self._tree.heading(0, text='*')
+    self._tree.heading(1, text='Type')
+    self._tree.heading(2, text='PN')
+    self._tree.heading(3, text='DN')
     
     verticalScrollBar = ttk.Scrollbar(self._content, orient=Tkinter.VERTICAL, command=self._tree.yview)
     horizontalScrollBar = ttk.Scrollbar(self._content, orient=Tkinter.HORIZONTAL, command=self._tree.xview)
@@ -262,7 +264,7 @@ class ResultsDisplay(Observable):
     self._content.columnconfigure(0, weight=1)
     
   
-  def addNode(self, parent, name, type, pn, dn, bold=False):
+  def addNode(self, parent, name, type, pn, dn, best=False):
     '''Add a node to the tree. Return a handle of the node, which can later be used to remove the node, or attach a child
     to it.
     
@@ -271,13 +273,8 @@ class ResultsDisplay(Observable):
     
     if parent is None:
       parent = ''
-      
-    if bold:
-      tags = ('bold',)
-    else:
-      tags = ()
     
-    handle = self._tree.insert(parent, 'end', text=name, values=(type, pn, dn), tags=tags)
+    handle = self._tree.insert(parent, 'end', text=name, values=('*' if best else '', type, pn, dn))
     return handle
 
 
@@ -287,15 +284,10 @@ class ResultsDisplay(Observable):
     self._tree.delete(handle)
   
   
-  def updateNode(self, handle, type, pn, dn, bold=False):
+  def updateNode(self, handle, type, pn, dn, best=False):
     '''Change the PN and DN values of a node.'''
     
-    if bold:
-      tags = ('bold',)
-    else:
-      tags = ()
-    
-    self._tree.item(handle, values=(type, pn, dn), tags=tags)
+    self._tree.item(handle, values=('*' if best else '', type, pn, dn))
   
   
   def selectNode(self, handle):
@@ -381,7 +373,7 @@ class ResultsController(object):
       ResultsController._DisplayNode._handleToNode = {}
       
     
-    def __init__(self, parent, vertex, display):
+    def __init__(self, parent, vertex, display, best):
       '''Create a node and attach it to the display.'''
       
       object.__init__(self)
@@ -389,13 +381,19 @@ class ResultsController(object):
       self.vertex = vertex  # The vertex in the search tree
       self.children = []    # _DisplayNode children of this node.
       self.parent = parent  # _DisplayNode parent of this node.
+      self._best = best
+      self.bestVertex = None
       
       name = 'root' if self.vertex.leadingStep is None else self.vertex.leadingStep.toString()
       parent = self.parent.handle if self.parent is not None else None
       self.handle = display.addNode(parent, name, self._getType(), 
                                     strFromNum(self.vertex.proofNumber),
-                                    strFromNum(self.vertex.disproofNumber))
+                                    strFromNum(self.vertex.disproofNumber),
+                                    best)
       ResultsController._DisplayNode._handleToNode[self.handle] = self
+    
+    
+    best = property(lambda self: self._best)
     
     
     @staticmethod
@@ -410,7 +408,15 @@ class ResultsController(object):
       
       display.updateNode(self.handle, self._getType(), 
                          strFromNum(self.vertex.proofNumber), 
-                         strFromNum(self.vertex.disproofNumber))
+                         strFromNum(self.vertex.disproofNumber),
+                         self.best)
+    
+    
+    def setBest(self, newBest, display):
+      '''Toggle the 'best' flag of this vertex.'''
+      
+      self._best = newBest
+      self.updateDisplay(display)
     
     
     def expand(self, display):
@@ -423,7 +429,7 @@ class ResultsController(object):
       otherTypeChildren = (c for c in vertexChildren if c.type_ != self.vertex.type_)
       
       for child in itertools.chain(sameTypeChildren, otherTypeChildren):
-        self.children.append(ResultsController._DisplayNode(self, child, display))
+        self.children.append(ResultsController._DisplayNode(self, child, display, False))
       
     
     def _getType(self):
@@ -453,8 +459,9 @@ class ResultsController(object):
     ResultsController._DisplayNode.release()
     
     if self._search is not None:
-      self._tree = ResultsController._DisplayNode(None, self._search.root, self._resultsDsply)
+      self._tree = ResultsController._DisplayNode(None, self._search.root, self._resultsDsply, True)
       self._tree.expand(self._resultsDsply)
+      self._updateBest(self._tree)
       self._resultsDsply.selectNode(self._tree.handle)
     else:
       self._resultsDsply.showBoard(None)
@@ -511,9 +518,11 @@ class ResultsController(object):
       if len(node.children) == 0 and node.vertex.childrenCount > 0:
         # The real vertex has been expanded, but the display vertex hasn't.
         node.expand(self._resultsDsply)
+        self._updateBest(node)
         
         continue  # But do not process the children recursively.
       
+      self._updateBest(node)
       stack.extend(node.children)
   
   
@@ -528,6 +537,15 @@ class ResultsController(object):
     for child in node.children:
       if len(child.children) == 0 and len(list(child.vertex.children)) > 0:
         child.expand(self._resultsDsply)
+        self._updateBest(child)
+  
+  
+  def _updateBest(self, vertex):
+    '''Go through all of vertex's children and mark the best one.'''
+    
+    best = self._search.strategy.successor(vertex.vertex)
+    for child in vertex.children:
+      child.setBest(hash(child.vertex) == hash(best), self._resultsDsply)
     
   
   def _getDisplayedBoard(self, vertex):
