@@ -130,8 +130,11 @@ def main():
       
       if not args.quiet:
         print 'Still working:'
+        print '  -- {0} seconds elapsed'.format(int(timeElapsed))
         if args.timeLimit:
           print '  -- {0} seconds left'.format(int(args.timeLimit - timeElapsed))
+        print '  -- Root vertex PN: {0}'.format(search.root.proofNumber)
+        print '  -- Root vertex DN: {0}'.format(search.root.disproofNumber)
         print '  -- {0} Search memory used'.format(strFromMem(memoryUsedTotal()))
         print '  -- {0} unique positions total'.format(search.positionCount)
         print '  -- {0} new positions per second'.format(posPerSec)
