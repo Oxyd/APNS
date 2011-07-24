@@ -5,7 +5,7 @@
 
 from interface.search import makeSearch
 from interface.fileio import loadBoard, loadSearch, saveSearch
-from apnsmod import WinStrategy, OperationController, memoryUsedTotal
+from apnsmod import WinStrategy, OperationController, Vertex, memoryUsedTotal
 import argparse
 import sys
 import os
@@ -36,6 +36,15 @@ def strFromMem(mem):
   if mem < KB:      return '%.2f B' % mem
   elif mem < MB:    return '%.2f kB' % (mem / KB)
   else:             return '%.2f MB' % (mem / MB)
+
+
+def strFromNum(num):
+  '''Get the string representation of a proof or disproof number.'''
+  
+  if num < Vertex.infty:
+    return str(num)
+  else:
+    return 'inf'
     
 
 def main():
@@ -141,8 +150,8 @@ def main():
         print '  -- {0} seconds elapsed'.format(int(timeElapsed))
         if args.timeLimit:
           print '  -- {0} seconds left'.format(int(args.timeLimit - timeElapsed))
-        print '  -- Root vertex PN: {0}'.format(search.root.proofNumber)
-        print '  -- Root vertex DN: {0}'.format(search.root.disproofNumber)
+        print '  -- Root vertex PN: {0}'.format(strFromNum(search.root.proofNumber))
+        print '  -- Root vertex DN: {0}'.format(strFromNum(search.root.disproofNumber))
         print '  -- {0} Search memory used'.format(strFromMem(memoryUsedTotal()))
         print '  -- {0} unique positions total'.format(search.positionCount)
         print '  -- {0} new positions per second'.format(posPerSec)
