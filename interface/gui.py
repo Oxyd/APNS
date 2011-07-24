@@ -1695,7 +1695,7 @@ class PositionController(object):
       
       if len(filename) > 0:
         try:
-          saveBoard(self._boardController._board, 1, 'g', filename)
+          saveBoard(self._boardController._board, 1, 'g' if self._positionDisplay.color == Piece.Color.gold else 's', filename)
         except RuntimeError, e:
           tkMessageBox.showerror('Could not write to file: %s' % e.what())
           
