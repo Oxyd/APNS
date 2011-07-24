@@ -1212,7 +1212,7 @@ class SearchProgressDialog(Observable):
     self._posCount = ttk.Label(stats)
     self._posPerSec = ttk.Label(stats)
     
-    self._cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel', command=self._cancel)
+    self._cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel' if running else 'OK', command=self._cancel)
     self._dialog.setDeleteAction(lambda: self._cancelBtn.invoke())
     
     progress = ttk.Labelframe(self._dialog.content, 
@@ -1485,7 +1485,7 @@ class SearchStatsController(object):
     '''Stats is a dict, with keys:
     
       timeElapsed:   elapsed time in seconds
-      posPerSec:     number of new positions per second
+      posPerSec:     number of new positions per second (last measured value)
       memUsed:       total memory used (str)
       ttSize:        transposition table size
       ttHits:        transposition table hits
@@ -1497,7 +1497,10 @@ class SearchStatsController(object):
     
     posCnt    = int(stats['vertexCount'])
     time      = int(stats['timeElapsed'])
-    posPerSec = int(stats['posPerSec'])
+    if time > 0:
+      posPerSec = int(float(posCnt) / float(time))
+    else:
+      posPerSec = int(stats['posPerSec'])
     mem       = stats['memUsed']
     rootPn    = stats['rootPn']
     rootDn    = stats['rootDn']
@@ -2117,10 +2120,13 @@ class BoardController(object):
     return (8 - row, c)
 
 
-if __name__ == '__main__':
+def runGui():
   mainWindowDsply = MainWindow()
   mainWindowCtrl = MainWindowController(mainWindowDsply)
   mainWindowCtrl.runApplication()
   del mainWindowCtrl
   del mainWindowDsply
   gc.collect()
+  
+if __name__ == '__main__':
+  runGui()
