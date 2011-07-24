@@ -2,6 +2,7 @@
 
 from sys import platform, stderr
 from build_config import buildConfig
+from os import popen
 
 bits = int(ARGUMENTS.get('bits', 64))
 
@@ -35,7 +36,8 @@ for name, target in subTargets.items():
 
 # Windows binary distribution targets.
 
-distribName = 'apns-windows-{0}bit{1}.zip'.format(bits, '-debug' if debug else '')
+ver = popen('git describe').read().rstrip()
+distribName = 'apns-windows-{0}bit-{2}{1}.zip'.format(bits, '-debug' if debug else '', ver)
 distr = Zip(distribName,
   [ 'apnsmod.pyd',
     'batch.py',
