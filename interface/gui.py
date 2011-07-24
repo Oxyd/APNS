@@ -1500,7 +1500,7 @@ class SearchStatsController(object):
     if time > 0:
       posPerSec = int(float(posCnt) / float(time))
     else:
-      posPerSec = int(stats['posPerSec'])
+      posPerSec = posCnt
     mem       = stats['memUsed']
     rootPn    = stats['rootPn']
     rootDn    = stats['rootDn']
