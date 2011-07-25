@@ -29,9 +29,10 @@ Python verze 2.7 (pro Windows ke stažení na \url{http://python.org/download/})
 
 Pro Windows je připraven zip soubor obsahující vše potřebné pro spuštění programu -- ten lze získat na adrese
 \url{https://github.com/Oxyd/APNS} kliknutím na tlačítko \emph{Download} a následně stažením souboru
-\texttt{apns-windows-32bit.zip} pro 32bitové Windows či \texttt{apns-windows-64bit.zip} pro 64bitový systém.
+\texttt{apns-windows-32bit-\textit{verze}.zip} pro 32bitové Windows či \texttt{apns-windows-64bit-\textit{verze}.zip} pro 
+64bitový systém.
 
- Na platformě FreeBSD je potřeba prvně program přeložit -- o tom více v části \ref{sec:compiling}.
+Na platformě FreeBSD je potřeba prvně program přeložit -- o tom více v části \ref{sec:compiling}.
 
 \section{Běh programu}
 \label{sec:running}
@@ -48,15 +49,18 @@ předchozího výpočtu z disku, uložení výpočtu na disk a uložení vybran�
 
 Po skončení výpočtu je možné procházet výsledný strom, který je zobrazený v levé části okna programu. Sloupec
 \emph{Step} určuje krok vedoucí do příslušného vrcholu; \emph{Type} říká, jakého typu je příslušný vrchol -- buď
-\emph{OR} pro vrchol, ze kterého táhne původní hráč, či \emph{AND}, což je stav, ze kterého táhne protivník.
+\emph{OR} pro vrchol, ze kterého táhne útočník, či \emph{AND}, což je stav, ze kterého táhne obránce.
 
 Vybráním některého vrcholu se v pravé části zobrazí pozice odpovídající stavu hry po provedení kroku v sloupci
 \emph{Step}.
 
 Nulová hodnota \emph{PN} znamená, že příslušný uzel stromu je \emph{dokázaný} -- tedy pokud se hra dostane do stavu
-představovaného tímto vrcholem, pak začínající hráč může zaručeně vyhrát. Podobně, je-li hodnota \emph{DN} nulová,
-znamená to, že dostane-li se hra do tohoto stavu, nemůže původní hráč vyhrát, protože tato pozice zaručuje vítězství
-protivníkovi. Takový vrchol se nazývá \emph{vyvrácený}.
+představovaného tímto vrcholem, pak útočník může zaručeně vyhrát. Podobně, je-li hodnota \emph{DN} nulová,
+znamená to, že dostane-li se hra do tohoto stavu, nemůže útočník vyhrát, protože tato pozice zaručuje vítězství
+obránci. Takový vrchol se nazývá \emph{vyvrácený}.
+
+V každé úrovni stromu -- tedy v možných krocích z jedné pozice -- je vždy jeden krok označen hvězdičkou -- ta označuje nejlepší
+možný tah (vzhledem k číslům \emph{PN} a \emph{DN}) na této úrovni.
 
 \subsubsection{Příklad 1: Prozkoumání stavového prostoru vedoucího z jednoduché pozice}
 \paragraph{Spuštění výpočtu}
@@ -68,9 +72,9 @@ disku. Jelikož zmíněná pozice je již připravena v souboru, stačí z adres
 \texttt{puzzle1-{}one-{}move.txt}. Načtená pozice se pak zobrazí na obrazovce a je možné ji dále upravovat. Stiskem
 \texttt{Ok} se pozice načte jako kořenová pozice stromu.
 
-Nyní je možné spustit výpočet. Po stisku \emph{Run Search} se zobrazí dialog umožňující nastavit dobu trvání výpočtu
-a velikost použité transpoziční tabulky. Pro zmíněnou pozici, která je velmi jednoduchá, jsou výchozí parametry naprosto
-postačující. Stiskem \emph{Run} se zahájí výpočet.
+Nyní je možné spustit výpočet. Po stisku \emph{Run Search} se zobrazí dialog umožňující nastavit dobu trvání výpočtu, maximální
+využití paměti a velikost použité transpoziční tabulky. Pro zmíněnou pozici, která je velmi jednoduchá, jsou výchozí parametry 
+naprosto postačující. Stiskem \emph{Run} se zahájí výpočet.
 
 \paragraph{Výsledky}
 V tomto příkladě se velmi rychle povede dokázat kořen stromu -- hodnota \emph{PN} kořene je nulová. To znamená, že se
@@ -116,13 +120,17 @@ vyvolat parametrem \texttt{--help}, tedy příkazem \texttt{python batch.py --he
 
 Důležité parametry jsou:\begin{description}
   \item[\texttt{-p} \textit{pozice}] Udává cestu k souboru s počáteční pozicí. Jeho funkce je analogická funkci
-  \emph{New Initial Position} z grafického rozhraní.
+    \emph{New Initial Position} z grafického rozhraní.
   \item[\texttt{-d} \textit{výstup}] Udává cestu k souboru, do kterého se uloží spočtený strom. Tato funkce je analogem
-  tlačítka \emph{Save Search} z grafického rozhraní.
+    tlačítka \emph{Save Search} z grafického rozhraní.
   \item[\texttt{-s} \textit{strom}] Udává cestu k souboru, ve kterém je částečně spočtený vyhledávací strom, ve kterém
-  se má pokračovat ve výpočtu. Tedy stejná funkce, kterou v grafickém rozhraní zastává tlačítko \emph{Load Search}.
+    se má pokračovat ve výpočtu. Tedy stejná funkce, kterou v grafickém rozhraní zastává tlačítko \emph{Load Search}.
   \item[\texttt{-t} \textit{sekundy}] Umožňuje nastavit časový limit (v sekundách) pro vyhledávání (výchozí hodnota je
-  60 sekund)
+    60 sekund)
+  \item[\texttt{-r} \textit{velikost v MB}] Nastavuje velikost použité transpoziční tabulky. Nastavením na hodnotu 0 se zabrání
+    jakémukoliv použití transpoziční tabulky. Výchozí hodnota je 32 MB.
+  \item[\texttt{-m} \textit{velikost v MB}] Omezení maximální použité paměti při výpočtu. Hodnota 0 znamená, že výpočet nemá
+    být omezen velikostí použité paměti. Výchozí hodnota je na 64bitových systémech 0, na 32bitových systémech 1500 MB.
 \end{description}
 
 Parametr \texttt{-d} je povinný. Dále uživatel musí zadat buď parametr \texttt{-p} nebo parametr \texttt{-s}.
@@ -130,7 +138,8 @@ Parametr \texttt{-d} je povinný. Dále uživatel musí zadat buď parametr \tex
 \subsubsection{Příklad 1: Prozkoumávání stavového stromu z dané pozice}
 Opět jako v prvním příkladu u grafického rozhraní budeme chtít spočítat příslušný strom, máme-li v souboru uloženou
 počáteční pozici. Pro tento příklad zvolme třeba pozici \texttt{puzzle3-one-move.txt}, pro kterou program dokáže vydat
-kladný výsledek (zlatý hráč vítězí) na mém PC po přibližně 7 sekundách. Řekněme, že výsledek chceme uložit do souboru
+kladný výsledek (zlatý hráč vítězí) na mém PC\footnote{Procesor: AMD Athlon 64 X2 5400+ na 2,8 GHz, paměť: 3 GB DDR2 533,
+systém: FreeBSD 8.2 64-bit}  po přibližně 3 sekundách. Řekněme, že výsledek chceme uložit do souboru
 \texttt{search-2.txt}.
 
 Příslušný příkaz včetně parametrů tedy bude vypadat takto:
@@ -159,15 +168,16 @@ stejnou pozici vyhodnocovat vícekrát.
 
 Do transpoziční tabulky se však nemohou vejít všechny záznamy. Počet záznamů, které se do tabulky vejdou, je přímo určen
 její velikostí v paměti. Velikost transpoziční tabulky lze nastavit v grafickém rozhraní volbou \emph{Transposition
-Table Size}, v řádkovém rozhraní pak parametrem \texttt{-r \textit{velikost v MB}}.
+Table Size}, v řádkovém rozhraní pak parametrem \texttt{-r}.
 
 \subsection{Zobrazované informace během výpočtu}
 Během prohledávání stavového prostoru program vypisuje některé informace. Mezi ně patří \begin{description}
-\item[\emph{Search Memory Usage}] Přibližné množství paměti používané programem. Tato hodnota nezahrnuje všech\-nu
+\item[\emph{Search Memory Usage}] Přibližné množství paměti používané programem. Tato hodnota nezahrnuje všechnu
 použitou paměť, a tedy zobrazená hodnota bude vždy nižší než hodnota skutečná. Přesto však může sloužit jako dobrý
 ukazatel paměťové náročnosti programu.
 \item[\emph{Unique Positions Total}] Celkový počet pozic.
 \item[\emph{New Positions per Second}] Navýšení hodnoty \emph{Unique Positions Total} za poslední sekundu.
+\item[\emph{Root PN} a \emph{Root DN}] Okamžité hodnoty \emph{PN} a \emph{DN} kořenového vrcholu.
 \item[\emph{Transposition Table Size}] Paměť použitá transpoziční tabulkou. Tato hodnota je též započítána do
 \emph{Search Memory Usage}.
 \item[\emph{Transposition Table Hits}] Počet úspěšných vyhledání v transpoziční tabulce.
@@ -225,7 +235,8 @@ zda má výsledný program být přeložen pro 32bitovou nebo 64bitovou verzi sy
 \section{Vstupní a výstupní data}
 \subsection{Pozice}
 Vstupní pozice je textový soubor ve formátu popsaném na adrese \url{http://arimaa.com/arimaa/learn/notation.html} v
-části \emph{Notation for Recording Arimaa Positions}. Program ale ignoruje číslo tahu a předešlé kroky.
+části \emph{Notation for Recording Arimaa Positions}. Program ale ignoruje číslo tahu a předešlé kroky. Konkrétní příklady pozic
+jsou v adresáři \texttt{example-positions}.
 
 \subsection{Strom}
 Stavový strom je ukládán v textovém formátu. Struktura souboru je \begin{itemize}
@@ -244,8 +255,8 @@ Stavový strom je ukládán v textovém formátu. Struktura souboru je \begin{it
   následovně: \begin{center}\texttt{\textit{tah} : \textit{typ} \textit{kroky} \textit{PN}
   \textit{DN} \textit{děti}}\end{center}
   Kde jednotlivé položky jsou:\begin{description}
-	  \item[\textit{tah}] Textový pozic tahu vedoucího do této pozice. Používá se oficiální notace pro zápis tahů hry
-	  Arimaa. Kořen má místo tahu řetězec \texttt{root}.
+	  \item[\textit{tah}] Textový popis tahu vedoucího do této pozice z rodičovského vrcholu. Používá se oficiální notace pro 
+        zápis tahů hry Arimaa. Kořen má místo tahu řetězec \texttt{root}.
 	  \item[\textit{typ}] Řetězec \texttt{or} nebo řetězec \texttt{and}. Udává typ vrcholu.
 	  \item[\textit{kroky}] Číslo v dekadickém zápisu udávající počet kroků, které ještě může hráč učinit v rámci svého
 	  tahu.
@@ -269,27 +280,27 @@ postupným rozšiřováním stavového prostoru dokud nedojde k výsledku. Přit
 a ten \emph{expanduje} -- vygeneruje všechny možné platné kroky z listu a každý jako nový potomek listu připojí ke
 stromu.
 
-Jeden vrchol stromu se nazývá \emph{dokázaný}, pokud má původní hráč zaručené vítězství, dostane-li se hra do tohoto
-vrcholu. Pokud tento vrchol zaručuje vítězství protivníka, pak je vrchol \emph{vyvrácený}. Cílem algoritmu je dokázat či
+Jeden vrchol stromu se nazývá \emph{dokázaný}, pokud má útočník zaručené vítězství, dostane-li se hra do tohoto
+vrcholu. Pokud tento vrchol zaručuje vítězství obránce, pak je vrchol \emph{vyvrácený}. Cílem algoritmu je dokázat či
 vyvrátit kořenový vrchol.
 
 Kvůli velikosti celého stavového prostoru hry je vhodné snažit se prozkoumávat nejdříve ty části stavového prostoru, u
 kterých je nejvyšší šance, že v nich algoritmus nalezne řešení celého problému -- tedy že buď najde způsob, jakým může
-počáteční hráč zvítězit nebo prokáže, že tento hráč nikdy zvítězit nemůže. K tomuto účelu má každý vrchol přiřazena dvě
-čísla: \emph{PN} (\emph{proof number}) a \emph{DN} (\emph{disproof number}). Číslo \emph{PN} udává přibližný počet
-vrcholů, které je potřeba dokázat na dokázání tohoto vrcholu; \emph{DN} zase udává přibližný počet vrcholů potřebných na
+útočník zvítězit nebo prokáže, že tento hráč nikdy zvítězit nemůže. K tomuto účelu má každý vrchol přiřazena dvě
+čísla: \emph{PN} (\emph{proof number}) a \emph{DN} (\emph{disproof number}). Číslo \emph{PN} udává minimální počet
+vrcholů, které je potřeba dokázat na dokázání tohoto vrcholu; \emph{DN} zase udává minimální počet vrcholů potřebných na
 vyvrácení tohoto vrcholu.
 
 \subsection{Proof-number a disproof-number}
 Každý vrchol má dále přiřazen typ -- ten je buď \emph{AND} nebo \emph{OR}. Typ \emph{OR} znamená, že z tohoto vrcholu
-táhne původní hráč. Typ \emph{AND} zase, že hraje protivník. Kořen je vždy typu \emph{OR}.
+táhne útočník. Typ \emph{AND} zase, že hraje obránce. Kořen je vždy typu \emph{OR}.
 
-Pro dokázání vrcholu typu \emph{OR} stačí dokázat jednoho potomka -- původní hráč vybírá svůj tah a může si tedy vybrat
+Pro dokázání vrcholu typu \emph{OR} stačí dokázat jednoho potomka -- útočník vybírá svůj tah a může si tedy vybrat
 ten nejlepší. Naopak pro vyvrácení takového vrcholu je nutné vyvrátit úplně všechny potomky -- neboli dokázat, že
-původní hráč vždy prohraje, ať zvolí jakýkoliv tah.
+útočník vždy prohraje, ať zvolí jakýkoliv tah.
 
-U vrcholu typu \emph{AND} je situace opačná. Dokázat takový vrchol znamená, že ať soupeř zvolí jakýkoliv tah, původní
-hráč vyhrává. Je tedy nutné dokázat všechny potomky. Pro jeho vyvrácení stačí vyvrátit jediného potomka.
+U vrcholu typu \emph{AND} je situace opačná. Dokázat takový vrchol znamená, že ať soupeř zvolí jakýkoliv tah, útočník
+vyhrává. Je tedy nutné dokázat všechny potomky. Pro jeho vyvrácení stačí vyvrátit jediného potomka.
 
 Pro vrchol $v$ typu \emph{OR} jsou tedy čísla $v.PN$ a $v.DN$ určena následovně:
 \begin{align*}
@@ -309,10 +320,10 @@ nejméně práce. Vybírání listu probíhá následovně:
 	\IF{$\text{leaf}(v)$}
 		\STATE {\bf return} v
 	\ELSIF{$\text{type}(v) = OR$}
-		\STATE $u \gets \min_{PN} \text{children}(v)$
+		\STATE $u \gets \mathrm{arg\, min}_{c \in \mathrm{children}(v)} c.PN$
 		\STATE {\bf return} $\text{findLeaf}(u)$
 	\ELSE
-		\STATE $u \gets \min_{DN} \text{children}(v)$
+		\STATE $u \gets \mathrm{arg\, min}_{c \in \mathrm{children}(v)} c.DN$
 		\STATE {\bf return} $\text{findLeaf}(u)$
 	\ENDIF
 \end{algorithmic}
@@ -412,9 +423,9 @@ programu.
 
 \subsection{Reprezentace dat}
 \subsubsection{Hrací plocha}
-Hrací plocha je reprezentována jednoduše jako 64-prvkové pole, kde každý prvek obsahuje, zda na té pozici je figurka,
-jakého je typu a jaké barvy. Dohromady tedy aspoň 3 B na jednu možnou pozici. Tato reprezentace, ač se zdá neefektivní
-(teoreticky by stačil 1 B na jednu pozici, či dokonce jen 4 bity), se mi prakticky projevila jako nejlepší, neboť
+Hrací plocha je reprezentována jednoduše jako 64-prvkové pole, kde každý prvek obsahuje záznam, zda na tom poli je figurka,
+jakého je typu a jaké barvy. Dohromady tedy aspoň 3 B na jedno možné pole. Tato reprezentace, ač se zdá neefektivní
+(teoreticky by stačil 1 B na jedno pole, či dokonce jen 4 bity), se mi prakticky projevila jako nejlepší, neboť
 nevyžaduje žádnou další interpretaci dat -- každý bajt je možné bez další konverze přímo interpretovat jako správnou
 informaci. Implementace se navíc snaží nevytvářet zbytečné kopie hrací plochy.
 
@@ -455,8 +466,9 @@ pravidla explicitně znemožňují opakování stále těch samých pozic dokola
 
 Nakonec jsem od tohoto záměru upustil a rozhodl se pro jednodušší, i když méně efektivní reprezentaci obyčejným
 stromem. Transpoziční tabulka pouze dodává ,,lepší`` počáteční hodnoty \emph{PN}, \emph{DN}. I zde vzniká problém s
-\emph{graph history interaction} -- vyzvednuté hodnoty mohou být nesprávné, to však neovlivňuje správnost algoritmu --
-pouze jeho efektivitu. Program však nemůže použít vyzvednuté hodnoty, pokud značí dokázaný či vyvrácený vrchol (neboť
-hodnoty nemusí být správné).
+\emph{graph history interaction} -- vyzvednuté hodnoty mohou být nesprávné. Pokud jsou to hodnoty, kde \emph{PN} i \emph{DN}
+jsou nenulové, pak nesprávné hodnoty ovlivní pouze efektivitu algoritmu, nikoliv jeho správnost. Program však do transpoziční
+tabulky nemůže ukládat záznamy, které říkají, že vrchol je dokázaný či vyvrácený -- tedy ty, které mají \emph{PN} nebo \emph{DN}
+nulové.
 \end{document}
 % vim:textwidth=120
