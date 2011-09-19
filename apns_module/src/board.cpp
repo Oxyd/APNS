@@ -58,6 +58,16 @@ bool operator != (piece lhs, piece rhs) {
   return !operator == (lhs, rhs);
 }
 
+piece::color_t opponent_color(piece::color_t player) {
+  switch (player) {
+  case piece::gold:   return piece::silver;
+  case piece::silver: return piece::gold;
+  default:            assert(!"Doesn't get here.");
+  }
+
+  return piece::silver;  // Shut up, compiler.
+}
+
 char letter_from_piece(piece p) {
   char letter = '?';
   switch (p.get_type()) {
@@ -261,7 +271,7 @@ void board::pieces_iterator::decrement() {
   --pos;
   --base_reference();
 
-  backward_to_nonempty();
+  reverse_to_nonempty();
 }
 
 void board::pieces_iterator::forward_to_nonempty() {
@@ -277,7 +287,7 @@ void board::pieces_iterator::forward_to_nonempty() {
   // There are no more nonempty positions. Furthermore, base and pos contain their one-past-the-end values.
 }
 
-void board::pieces_iterator::backward_to_nonempty() {
+void board::pieces_iterator::reverse_to_nonempty() {
   // Once it gets down to pos == 0, then we don't have to do anything more: either there's really something here or we got
   // here by decrementing a begin() iterator which results in undefined behaviour.
   while (pos > 0) {

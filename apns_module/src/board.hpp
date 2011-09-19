@@ -62,6 +62,9 @@ bool operator == (piece lhs, piece rhs);
 //! Returns the negation of operator ==.
 bool operator != (piece lhs, piece rhs);
 
+//! Return the opponent's color if the player's one is 'player'.
+piece::color_t opponent_color(piece::color_t player);
+
 //! Return the letter representing given piece according to the Arimaa notation rules.
 char letter_from_piece(piece p);
 
@@ -232,7 +235,7 @@ public:
     void forward_to_nonempty();
 
     //! Iterate to the first non-empty position at or before the current one.
-    void backward_to_nonempty();
+    void reverse_to_nonempty();
 
     std::size_t pos;  //!< Index into board::pieces that this iterator is currently pointing to.
   };

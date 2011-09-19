@@ -795,13 +795,3 @@ all_steps_iter all_steps_begin(board const& board, piece::color_t player) {
 all_steps_iter all_steps_end() {
   return all_steps_iter();
 }
-
-piece::color_t opponent_color(piece::color_t player) {
-  switch (player) {
-  case piece::gold:   return piece::silver;
-  case piece::silver: return piece::gold;
-  default:            assert(!"Doesn't get here.");
-  }
-
-  return piece::silver;  // Shut up, compiler.
-}

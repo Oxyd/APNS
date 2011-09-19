@@ -288,7 +288,4 @@ private:
 all_steps_iter all_steps_begin(board const& board, piece::color_t player);
 all_steps_iter all_steps_end();
 
-//! Return the opponent's color if the player's one is 'player'.
-piece::color_t opponent_color(piece::color_t player);
-
 #endif
