@@ -32,25 +32,31 @@ TEST(movement, is_frozen_test) {
   b.put(silver_dog_pos, silver_dog);
 
   EXPECT_TRUE(!frozen(silver_dog_pos, b));
+  EXPECT_TRUE(mobile(silver_dog_pos, b));
 
   b.put(position(4, 'e'), piece(piece::gold, piece::elephant));
   EXPECT_TRUE(frozen(silver_dog_pos, b));
+  EXPECT_FALSE(mobile(silver_dog_pos, b));
 
   b.put(position(3, 'd'), piece(piece::silver, piece::rabbit));
   EXPECT_TRUE(!frozen(silver_dog_pos, b));
+  EXPECT_TRUE(mobile(silver_dog_pos, b));
 
   b.remove(position(4, 'e'));
   b.remove(position(3, 'd'));
 
   b.put(position(4, 'e'), piece(piece::gold, piece::dog));
   EXPECT_TRUE(!frozen(silver_dog_pos, b));
+  EXPECT_TRUE(mobile(silver_dog_pos, b));
 
   b.remove(position(4, 'e'));
   b.put(position(4, 'e'), piece(piece::gold, piece::rabbit));
   EXPECT_TRUE(!frozen(silver_dog_pos, b));
+  EXPECT_TRUE(mobile(silver_dog_pos, b));
 
   b.put(position(8, 'a'), piece(piece::gold, piece::elephant));
   EXPECT_TRUE(!frozen(position(8, 'a'), b));
+  EXPECT_TRUE(mobile(position(8, 'a'), b));
 }
 
 TEST(movement, simple_move_test) {

@@ -249,9 +249,19 @@ pn_dn_pair_t win_strategy::updated_numbers(vertex_ptr vertex) const {
 
 pn_dn_pair_t win_strategy::initial_numbers(board const& board,
     piece::color_t initial_player, piece::color_t from_player, piece::color_t to_player) const {
-  boost::optional<piece::color_t> winner;
+  boost::optional<piece::color_t> winner(piece::gold);  // Initialize winner to something to work-around a compiler bug
+  winner = boost::none;                                 // which causes it to produce a superfluous warning otherwise.
+
   if (from_player != to_player) {
     winner = ::winner(board, from_player);
+  }
+
+  piece::color_t opponent = opponent_color(to_player);
+  vertex::number_t opponent_steps = std::distance(all_steps_begin(board, opponent), all_steps_end());
+
+  if (opponent_steps == 0) {
+    // The opponent has no valid step: They lose.
+    winner = to_player;
   }
 
   if (winner && *winner == initial_player) {
@@ -259,7 +269,11 @@ pn_dn_pair_t win_strategy::initial_numbers(board const& board,
   } else if (winner) {
     return std::make_pair(vertex::infty, 0);
   } else {
-    return std::make_pair(1, 1);
+    if (initial_player == to_player) {
+      return std::make_pair(1, opponent_steps);
+    } else {
+      return std::make_pair(opponent_steps, 1);
+    }
   }
 }
 

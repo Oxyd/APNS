@@ -33,14 +33,14 @@ def buildConfig(platform, bits):
     config.GTEST_LIBS = 'C:/Users/Oxyd/Development/gtest-1.5.0/lib'
   
   else:  # FreeBSD, both 32-bit and 64-bit.
-    config.BOOST_HEADERS = '/usr/local/include'
-    config.BOOST_LIBS = '/usr/local/include'
+    config.BOOST_HEADERS = '/usr/include'
+    config.BOOST_LIBS = '/usr/include'
   
-    config.PYTHON_HEADERS = '/usr/local/include/python2.7/'
-    config.PYTHON_LIBS = '/usr/local/lib/python2.7/'
+    config.PYTHON_HEADERS = '/usr/include/python2.7/'
+    config.PYTHON_LIBS = '/usr/lib/python2.7/'
   
-    config.GTEST_HEADERS = '/usr/local/include/'
-    config.GTEST_LIBS = '/usr/local/lib/'
+    config.GTEST_HEADERS = '/usr/include/'
+    config.GTEST_LIBS = '/usr/lib/'
   
   
   #
@@ -88,7 +88,7 @@ def buildConfig(platform, bits):
     config.RPATH = None     # Makes no sense for MSVS.
   
   else:
-    config.COMPILER = '/usr/local/bin/g++46'  # Use G++ 4.6 which is not in base by default.
-    config.RPATH = '/usr/local/lib/gcc46/'
+    config.COMPILER = None
+    config.RPATH = None
 
   return config

@@ -189,6 +189,9 @@ void unapply(step const& step, board& board);
 //! Is given piece frozen on the given board?
 bool frozen(position position, board const& board);
 
+//! Is the given piece mobile on the given board?
+bool mobile(position position, board const& board);
+
 /**
  * Iterator over an abstract sequence of all possible steps. Given a position of a piece and a board, it goes through
  * all possible steps of the specified piece.

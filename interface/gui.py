@@ -375,7 +375,7 @@ def strFromNum(n):
     return unicode(n)
   else:
     return u'∞'
-    
+  
 
 class ResultsController(object):
   '''Controller of ResultsDisplay.'''

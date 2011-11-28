@@ -520,6 +520,10 @@ bool frozen(position position, board const& board) {
   }
 }
 
+bool mobile(position position, board const& board) {
+  return !frozen(position, board);
+}
+
 steps_iter::steps_iter()
   : board(0)
   , piece_pos(1, 'a')  // Need to init piece_pos somehow.
