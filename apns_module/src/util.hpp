@@ -1,14 +1,9 @@
 #ifndef UTIL_HPP
 #define UTIL_HPP
 
-#include <boost/random/mersenne_twister.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/utility.hpp>
 #include <boost/timer.hpp>
-
-typedef boost::mt19937 prng_t;
-
-extern prng_t prng;
 
 //! Get the total memory usage by this module.
 std::size_t get_memory_usage();

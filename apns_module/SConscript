@@ -1,6 +1,36 @@
 from sys import platform
+from os import environ
 
-Import(['debug', 'config', 'bits', 'toolchain', 'env'])
+Import(['debug', 'config', 'bits', 'toolchain'])
+
+envArgs = dict()
+envArgs['ENV'] = environ
+if 'scons-tool' in config:    envArgs['tools'] = [config['scons-tool']]
+if 'target-arch' in config:   envArgs['TARGET_ARCH'] = config['target-arch']
+
+env = Environment(**envArgs)
+  
+env.Append(CPPPATH=[
+  config['includedirs']['boost-python'],
+  config['includedirs']['python']
+])
+env.Append(LIBPATH=[
+  config['libdirs']['boost-python'],
+  config['libdirs']['python']
+])
+env.Append(LIBS=[
+  config['libs']['boost-python'],
+  config['libs']['python']
+])
+
+if 'scons-tool' in config:    Tool(config['scons-tool'])(env)
+if 'compiler' in config:      env.Replace(CXX=config['compiler'])
+if 'defines' in config:       env.Append(CPPDEFINES=config['defines'])
+if 'compile-flags' in config: env.Append(CCFLAGS=config['compile-flags'])
+if 'link-flags' in config:    env.Append(LINKFLAGS=config['link-flags'])
+
+# Process any extra configuration that needs to be done for this platform.
+if 'extra' in config: config['extra'](env)
 
 sources = Glob('src/*.cpp')
 results = dict()
@@ -18,7 +48,8 @@ results['apnslib'] = apnslib
 testEnv = env.Clone()
 
 testEnv.VariantDir('test-build', 'src', duplicate=0)
-testEnv.Append(CPPPATH='src/')
+testEnv.Append(CPPPATH=['src/', config['includedirs']['gtest']])
+testEnv.Append(LIBPATH=config['libdirs']['gtest'])
 testEnv.Append(LIBS=config['libs']['gtest'])
 
 test_sources = [

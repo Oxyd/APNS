@@ -18,8 +18,16 @@ def config(conf, bits, debug):
         '_GLIBCXX_DEBUG' if debug else '',
         '_GLIBCXX_DEBUG_PEDANTIC' if debug else ''
       ],
-      'includedirs':      ['/usr/include/', '/usr/include/python2.7/'],
-      'libdirs':          ['/usr/lib/', '/usr/lib/python2.7/'],
+      'includedirs': {
+        'boost-python':   '',  # These two are already found in the standard include locations.
+        'gtest':          '',
+        'python':         '/usr/include/python2.7/'
+      },
+      'libdirs': {
+        'boost-python':   '',  # Same as above.
+        'gtest':          '',
+        'python':         '/usr/lib/python2.7/'
+      },
       'libs': {
         'python':         'python2.7',
         'boost-python':   'boost_python',

@@ -3,46 +3,67 @@
 def config(conf, bits, debug):
   if bits == 64:
     boostBase   = 'C:/Users/Oxyd/Development/boost_1_48_0/'
-    pythonBase  = 'C:/Users/Python27/'
+    pythonBase  = 'C:/Python27/'
   else:
     boostBase   = 'C:/Users/Oxyd/Development/boost_1_48_0-32/'
-    pythonBase  = 'C:/Users/Python27-32/'
+    pythonBase  = 'C:/Python27-32/'
 
   conf['win32'] = {
-    'default-toolchain':  'mingw',
-    'mingw': {
+    'default-toolchain':  'msvc',
+    
+    'msvc': {
+      'target-arch': 'x86_64' if bits == 64 else 'x86',
+      
       'compile-flags': [
-        '-Wall',
-        '-Wextra',
-        '-ansi',
-        '-pedantic',
-        '-O3' if not debug else '',
-        '-ggdb' if debug else '',
-        '-fstack-protector-all' if debug else ''
+        '/EHsc',                    # Enable C++ exception handling.                                                                                                                                                            
+        '/Za',                      # Disable langauge extensions.                                                                                                                                                              
+        '/Zc:forScope',             # Standard C++ scoping rules.                                                                                                                                                               
+        '/wd4224',                  # Disable an annoying warning. (I believe MSVS is being wrong here.)                                                                                                                        
+        '/wd4180',                  # Disable the "C4180: qualifier applied to function type has no meaning; ignored" warning.                                                                                    
+                                    # It looks like MSVC likes to warn about this even though it really shouldn't.
+        '/Zi' if debug else '',     # Enable debugging information.
+        
+        '/Ot' if not debug else '', # Favor code speed.                                                                                                                                                                               
+        '/Ox' if not debug else '', # Maximum optimisations.
+        
+        # Choose the apropriate version of the run-time library -- debugging or release one.
+        '/MT' if not debug else '/MTd'
       ],
-
-      'defines': [
+      'defines': [                                                                                                                                                                                                
+        'NOMINMAX',                 # MSVS defines min and max names as macros otherwise. Evil, sad, but true.                                                                                                       
+        '_SCL_SECURE_NO_WARNINGS',  # Reduce the number of warnings from the standard library implementation.                                                                                                        
+        'BOOST_PYTHON_STATIC_LIB',  # I want to link against Boost.Python statically on Windows.                                                                                                                     
+        '_MBCS',
         'NDEBUG' if not debug else '',
-        '_GLIBCXX_DEBUG' if debug else '',
-        '_GLIBCXX_DEBUG_PEDANTIC' if debug else ''
+        
+        # Boost libraries are apparantely compiled with this flag in debug mode. Client app needs to have the same flag then.        
+        '_ITERATOR_DEBUG_LEVEL=2' if debug else '',
       ],
-
-      'includedirs':      [boostBase,
-                           pythonBase + 'include/',
-                           'C:/Users/Oxyd/Development/gtest-1.5.0/include'],
-      'libdirs':          [boostBase + 'stage/lib/',
-                           pythonBase + 'libs/',
-                           'C:/Users/Oxyd/Development/gtest-1.5.0/lib'],
+      
+      'includedirs': {
+        'boost-python':   boostBase,
+        'boost-random':   boostBase,
+        'python':         pythonBase + 'include/',
+        'gtest':          'C:/Users/Oxyd/Development/gtest-1.5.0/include'
+      },
+      'libdirs': {
+        'boost-python':   boostBase + 'stage/lib/',
+        'boost-random':   boostBase + 'stage/lib/',
+        'python':         pythonBase + 'libs/',
+        'gtest':          'C:/Users/Oxyd/Development/gtest-1.5.0/lib'
+      },
       'libs': {
         'python':         'python27',
-        'boost-python':   'boost_python-mgw64-mt%s-1_48.a' % ('-d' if debug else ''),
+        #'boost-python':   'libboost_python-vc100-mt{0}-1_48'.format('-gd' if debug else ''),
+        'boost-python':   '',  # Use the auto-linking feature of MSVC.
+        'boost-random':   'libboost_random-vc100-mt-{0}-1_48.lib'.format('s' if not debug else 'sgd'),
         'gtest':          'gtest' if not debug else 'gtestd'
       },
-      'extra':            _setupPrefix
+      'extra':            lambda env: _extraSetup(env, bits)     
     }
   }
 
-def _setupPrefix(env):
+def _extraSetup(env, bits):
   # Set the shared library suffix to .pyd, which is the Python extension suffix for Windows systems.
   env.Replace(SHLIBSUFFIX='.pyd')
   env.Replace(LIBSUFFIXES=['.pyd'])

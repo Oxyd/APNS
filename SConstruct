@@ -32,6 +32,7 @@ if toolchain not in config[platform]:
   raise SystemExit(1)
 
 conf = config[platform][toolchain]
+print 'SConstruct: Selected toolchain {0} for platform {1}'.format(toolchain, platform)
 
 # Use pdflatex on Windows and let the user build the documentation manually on FreeBSD.
 if platform == 'win32':
@@ -42,19 +43,7 @@ if platform == 'win32':
 
   Alias('doc', doc)
 
-# Make a build environment here.
-env = Environment()
-env.Append(CPPPATH=conf['includedirs'])
-env.Append(LIBPATH=conf['libdirs'])
-env.Append(LIBS=[conf['libs']['python'], conf['libs']['boost-python']])
-if 'compiler' in conf:      env.Replace(CXX=conf['compiler'])
-if 'defines' in conf:       env.Append(CPPDEFINES=conf['defines'])
-if 'compile-flags' in conf: env.Append(CCFLAGS=conf['compile-flags'])
-
-# Process any extra configuration that needs to be done for this platform.
-if 'extra' in conf: conf['extra'](env)
-
-Export('debug', 'bits', 'env', 'toolchain', config=config[platform][toolchain])
+Export('debug', 'bits', 'toolchain', config=config[platform][toolchain])
 
 subTargets = SConscript('apns_module/SConscript')
 apnslib = subTargets['apnslib']

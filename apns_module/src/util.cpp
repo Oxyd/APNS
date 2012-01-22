@@ -22,8 +22,6 @@ std::size_t memory_usage = 0;                     //!< Total memory usage of thi
 
 }
 
-prng_t prng;
-
 void* operator new (std::size_t size) throw (std::bad_alloc) {
   std::size_t const total_size = size + sizeof(std::size_t);
   char* storage = static_cast<char*>(std::malloc(total_size));

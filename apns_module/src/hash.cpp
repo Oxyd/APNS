@@ -2,15 +2,16 @@
 #include "board.hpp"
 #include "util.hpp"
 
-#include <boost/random/uniform_int.hpp>
-
 #include <cstdlib>
 #include <limits>
 
 namespace {
 
-typedef boost::uniform_int<zobrist_hasher::hash_t> zobrist_uniform_distrib_t;
 typedef boost::multi_array_types::index_range range;
+
+double uniform_deviate(int seed) {
+  return seed * (1.0 / (RAND_MAX + 1.0));
+}
 
 } // anonymous namespace
 
@@ -18,7 +19,6 @@ zobrist_hasher::zobrist_hasher()
   : codes(boost::extents[piece::type_count][piece::color_count][board::ROWS][board::COLUMNS])
 {
   hash_t const MAX_VALUE = std::numeric_limits<hash_t>::max();
-  zobrist_uniform_distrib_t prng_distrib(0, MAX_VALUE);
 
   for (std::size_t type = 0; type < piece::type_count; ++type) {
     for (std::size_t color = 0; color < piece::color_count; ++color) {
@@ -27,14 +27,14 @@ zobrist_hasher::zobrist_hasher()
           codes[type]
                [color]
                [row - board::MIN_ROW]
-               [column - board::MIN_COLUMN] = prng_distrib(prng);
+               [column - board::MIN_COLUMN] = static_cast<hash_t>(uniform_deviate(rand()) * MAX_VALUE);
         }
       }
     }
   }
 
   for (std::size_t player = 0; player < piece::color_count; ++player) {
-    players[player] = prng_distrib(prng);
+    players[player] = static_cast<hash_t>(uniform_deviate(rand()) * MAX_VALUE);
   }
 }
 
