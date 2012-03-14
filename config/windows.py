@@ -10,10 +10,10 @@ def config(conf, bits, debug):
 
   conf['win32'] = {
     'default-toolchain':  'msvc',
-    
+
     'msvc': {
       'target-arch': 'x86_64' if bits == 64 else 'x86',
-      
+
       'compile-flags': [
         '/EHsc',                    # Enable C++ exception handling.                                                                                                                                                            
         '/Za',                      # Disable langauge extensions.                                                                                                                                                              
@@ -22,24 +22,24 @@ def config(conf, bits, debug):
         '/wd4180',                  # Disable the "C4180: qualifier applied to function type has no meaning; ignored" warning.                                                                                    
                                     # It looks like MSVC likes to warn about this even though it really shouldn't.
         '/Zi' if debug else '',     # Enable debugging information.
-        
+
         '/Ot' if not debug else '', # Favor code speed.                                                                                                                                                                               
         '/Ox' if not debug else '', # Maximum optimisations.
-        
+
         # Choose the apropriate version of the run-time library -- debugging or release one.
         '/MT' if not debug else '/MTd'
       ],
-      'defines': [                                                                                                                                                                                                
+      'defines': [
         'NOMINMAX',                 # MSVS defines min and max names as macros otherwise. Evil, sad, but true.                                                                                                       
         '_SCL_SECURE_NO_WARNINGS',  # Reduce the number of warnings from the standard library implementation.                                                                                                        
         'BOOST_PYTHON_STATIC_LIB',  # I want to link against Boost.Python statically on Windows.                                                                                                                     
         '_MBCS',
         'NDEBUG' if not debug else '',
-        
+
         # Boost libraries are apparantely compiled with this flag in debug mode. Client app needs to have the same flag then.        
         '_ITERATOR_DEBUG_LEVEL=2' if debug else '',
       ],
-      
+
       'includedirs': {
         'boost-python':   boostBase,
         'boost-random':   boostBase,
@@ -59,7 +59,7 @@ def config(conf, bits, debug):
         'boost-random':   'libboost_random-vc100-mt-{0}-1_48.lib'.format('s' if not debug else 'sgd'),
         'gtest':          'gtest' if not debug else 'gtestd'
       },
-      'extra':            lambda env: _extraSetup(env, bits)     
+      'extra':            lambda env: _extraSetup(env, bits)
     }
   }
 

@@ -1,5 +1,5 @@
 #include "util.hpp"
-#include "search.hpp"
+#include "tree.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -22,6 +22,7 @@ std::size_t memory_usage = 0;                     //!< Total memory usage of thi
 
 }
 
+#if 0
 void* operator new (std::size_t size) throw (std::bad_alloc) {
   std::size_t const total_size = size + sizeof(std::size_t);
   char* storage = static_cast<char*>(std::malloc(total_size));
@@ -50,6 +51,8 @@ void operator delete (void* storage) throw () {
 void operator delete [] (void* storage) throw () {
   ::operator delete (storage);
 }
+
+#endif
 
 std::size_t get_memory_usage() {
   return memory_usage;
@@ -99,6 +102,7 @@ unsigned operation_controller::get_work_total() const {
   return work_total;
 }
 
+#if 0
 void dump_tree(std::string const& filename, vertex_ptr root, bool append, operation_controller& op_ctrl, unsigned tree_size) {
   std::ofstream output(filename.c_str(), append ? std::ios_base::out | std::ios_base::app : std::ios_base::out);
   output.exceptions(std::ios_base::badbit | std::ios_base::failbit);
@@ -239,4 +243,5 @@ vertex_ptr load_tree(std::string const& filename, unsigned skip_lines, operation
 
   return root.release();
 }
+#endif
 

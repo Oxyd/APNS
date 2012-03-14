@@ -1,6 +1,6 @@
 # -*- Encoding: utf-8 -*-
 
-from apnsmod import Board, Vertex, Piece, Position, WinStrategy, OperationController, Step, empty, apply, opponentColor,\
+from apnsmod import Board, Vertex, Piece, Position, OperationController, Step, empty, apply, opponentColor,\
                     memoryUsedTotal
 from interface.fileio import loadBoard, saveBoard, saveSearch, loadSearch
 from interface.observable import Observable
@@ -49,7 +49,7 @@ class MainWindow(Observable):
     self._imageManager = ImageManager()
 
     self._toolbar = ttk.Frame(self._window, padding=5)
-    self._newSearchBtn = ttk.Button(self._toolbar, text='New Initial Position', 
+    self._newSearchBtn = ttk.Button(self._toolbar, text='New Initial Position',
                                     command=lambda: self.notifyObservers(command=MainWindow.Command.newSearch))
     self._runBtn = ttk.Button(self._toolbar, text='Run Search',
                               command=lambda: self.notifyObservers(command=MainWindow.Command.runSearch))
@@ -162,7 +162,7 @@ class MainWindowController(object):
         self._resetSearch(None)
         gc.collect()
 
-        search = makeSearch(positionEditorDlg.board, positionEditorDlg.player, WinStrategy())
+        search = makeSearch(positionEditorDlg.board, positionEditorDlg.player)
         self._resetSearch(search)
         self._mainWindowDsply.disableStats()
 
@@ -183,7 +183,8 @@ class MainWindowController(object):
 
         self._search.useTranspositionTable(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
         dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
-        searchProgressCtrl = SearchProgressController(self._search, dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit, runSearchCtrl.memLimit)
+        searchProgressCtrl = SearchProgressController(self._search, dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit,
+                                                      runSearchCtrl.memLimit)
         self._runStats = searchProgressCtrl.run()
         self._resultsCtrl.updateTree()
 
@@ -407,7 +408,7 @@ class ResultsController(object):
       self._best = best
       self.bestVertex = None
 
-      name = 'root' if self.vertex.leadingStep is None else self.vertex.leadingStep.toString()
+      name = 'root' if self.vertex.step is None else self.vertex.step.toString()
       parent = self.parent.handle if self.parent is not None else None
       self.handle = display.addNode(parent, name, self._getType(), 
                                     strFromNum(self.vertex.proofNumber),
@@ -429,8 +430,8 @@ class ResultsController(object):
     def updateDisplay(self, display):
       '''Update the values in the display.'''
 
-      display.updateNode(self.handle, self._getType(), 
-                         strFromNum(self.vertex.proofNumber), 
+      display.updateNode(self.handle, self._getType(),
+                         strFromNum(self.vertex.proofNumber),
                          strFromNum(self.vertex.disproofNumber),
                          self.best)
 
@@ -482,7 +483,7 @@ class ResultsController(object):
     ResultsController._DisplayNode.release()
 
     if self._search is not None:
-      self._tree = ResultsController._DisplayNode(None, self._search.root, self._resultsDsply, True)
+      self._tree = ResultsController._DisplayNode(None, self._search.game.root, self._resultsDsply, True)
       self._tree.expand(self._resultsDsply)
       self._updateBest(self._tree)
       self._resultsDsply.selectNode(self._tree.handle)
@@ -566,7 +567,7 @@ class ResultsController(object):
   def _updateBest(self, vertex):
     '''Go through all of vertex's children and mark the best one.'''
 
-    best = self._search.strategy.successor(vertex.vertex)
+    best = self._search.successor(vertex.vertex)
     for child in vertex.children:
       child.setBest(hash(child.vertex) == hash(best), self._resultsDsply)
 

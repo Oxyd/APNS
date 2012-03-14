@@ -56,7 +56,7 @@ public:
    * \param old_hash Previous value of the hash.
    * \param steps_begin Beginning of a sequence of elementary steps that describe the movement of the pieces on the board.
    * \param steps_end End of the sequence of elementary steps.
-   * \param current_player Whose made the steps described?
+   * \param current_player Who made the steps described?
    * \param next_player Whose turn is it now?
    */
   hash_t update(hash_t old_hash,

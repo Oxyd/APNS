@@ -9,7 +9,7 @@ if 'scons-tool' in config:    envArgs['tools'] = [config['scons-tool']]
 if 'target-arch' in config:   envArgs['TARGET_ARCH'] = config['target-arch']
 
 env = Environment(**envArgs)
-  
+
 env.Append(CPPPATH=[
   config['includedirs']['boost-python'],
   config['includedirs']['python']
@@ -32,13 +32,14 @@ if 'link-flags' in config:    env.Append(LINKFLAGS=config['link-flags'])
 # Process any extra configuration that needs to be done for this platform.
 if 'extra' in config: config['extra'](env)
 
-sources = Glob('src/*.cpp')
+sources = Glob('src/*.cpp') + Glob('src/py-bindings/*.cpp')
 results = dict()
 
 buildEnv = env.Clone()
+buildEnv.Append(CPPPATH=['src/'])
 buildEnv.VariantDir('build', 'src', duplicate=0)
 
-apnslib = buildEnv.SharedLibrary(target='apnsmod', source=sources)
+apnslib = buildEnv.SharedLibrary(target='_apnsmod', source=sources)
 results['apnslib'] = apnslib
 
 #
@@ -56,6 +57,8 @@ test_sources = [
   'hash_test',
   'board_test',
   'movement_test',
+  'search-algos_test',
+  'tree_test',
   'util_test'
 ]
 
@@ -63,12 +66,18 @@ tests = list()
 
 objList = testEnv.Glob('test-build/*.cpp')
 
+def runTest(env, target, source):
+  import subprocess
+  app = str(source[0].abspath)
+  if not subprocess.call(app):
+    file(str(target[0]), 'w').write('OK\n')
+
 for test in test_sources:
   program = testEnv.Program(target='tests/%s' % test, source=['tests/%s.cpp' % test, objList])
-  command = testEnv.Command(test, [program], program[0].abspath)
-  tests.append(command)
-  results[test] = command
-  AlwaysBuild(command)
+  stamp = testEnv.Command('tests/%s.passed' % test, program, runTest)
+
+  tests.append(stamp)
+  results[test] = stamp
 
 t = Alias('tests_', tests)  # 'tests_' because without the underscore we have a cyclic dependency tests -> tests here.
 results['tests'] = t

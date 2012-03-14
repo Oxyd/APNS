@@ -3,7 +3,7 @@
 import re
 import sys
 import os
-from apnsmod import Board, Piece, Position, Vertex, Step, dumpTree, loadTree
+from apnsmod import Board, Piece, Position, Vertex, Step #, dumpTree, loadTree
 
 def _pieceFromLetter(letter):
   '''Given a letter representing a piece, return the piece. The conversion between letters and pieces is done according
@@ -366,7 +366,7 @@ def loadSearch(filename, operationController):
   tree = loadTree(filename, 2, operationController, positionCount)
   if tree is not None:
     import apnsmod
-    search = apnsmod.PnSearchAlgo_WinStrategy(board, tree, player, apnsmod.WinStrategy(), positionCount)
+    search = apnsmod.PNS(board, tree, player, positionCount)
     return search
   else:
     return None

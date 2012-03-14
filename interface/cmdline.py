@@ -100,7 +100,7 @@ def main():
   if args.position is not None:
     try:
       (board, player) = loadBoard(args.position)
-      search = makeSearch(board, player, WinStrategy())
+      search = makeSearch(board, player)
     except Exception, e:
       print >> sys.stderr, 'Error loading specified initial position from specified file: {0}'.format(e)
       raise SystemExit(1)

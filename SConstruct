@@ -45,14 +45,14 @@ if platform == 'win32':
 
 Export('debug', 'bits', 'toolchain', config=config[platform][toolchain])
 
-subTargets = SConscript('apns_module/SConscript')
+subTargets = SConscript('apnsmod_src/SConscript')
 apnslib = subTargets['apnslib']
 
-install = Install('.', apnslib)  # Copy the Python extension module to the toplevel directory.
-Default(install)  # This merely ensures that the 'install' target gets invoked on 'scons'.
+apnslib = Install('apnsmod/', apnslib)
+Default(apnslib)
 
 # Alias all sub-targets here so that this script can be invoked using the more convenient syntax of 'scons board_test' instead
-# of 'scons apns_module/board_test'.
+# of 'scons apnsmod/board_test'.
 
 for name, target in subTargets.items():
   Alias(name, target)
@@ -62,7 +62,7 @@ for name, target in subTargets.items():
 ver = popen('git describe').read().rstrip()
 distribName = 'apns-windows-{0}bit-{2}{1}.zip'.format(bits, '-debug' if debug else '', ver)
 distr = Zip(distribName,
-  [ 'apnsmod.pyd',
+  [ 'apnsmod/',
     'batch.py',
     'gui.pyw',
     'interface/',

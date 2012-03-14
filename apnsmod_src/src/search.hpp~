@@ -1,0 +1,59 @@
+#ifndef SEARCH_HPP
+#define SEARCH_HPP
+
+#include "hash.hpp"
+#include "board.hpp"
+
+#include <boost/optional.hpp>
+#include <boost/utility.hpp>
+
+#include <list>
+
+class node {
+  std::list<node>       children_cont;
+  
+public:
+  typedef unsigned number_t;
+  
+  static number_t       max_num;
+  static number_t       infty;
+  
+  number_t              proof_number;
+  number_t              disproof_number;
+  boost::optional<step> leading_step;
+  int                   steps_remaining;
+  
+  enum e_type {
+    type_and,
+    type_or
+  } type;
+  
+  typedef children_cont::iterator       children_iterator;
+  typedef children_cont::const_iterator const_children_iterator;
+  
+  void add_child(node child);
+  void prune_child(children_iterator child);
+  
+  children_iterator             children_begin()        { return children.begin(); }
+  children_iterator             children_end()          { return children.end(); }
+  
+  const_children_iterator       children_begin() const  { return children.begin(); }
+  const_children_iterator       children_end() const    { return children.end(); }
+  
+private:
+  children_cont children;
+};
+
+class game : boost::noncopyable {
+public:
+  node                  root;
+  piece::color_t        attacker;
+  board                 initial_state;
+};
+
+class searcher {
+public:
+//   
+};
+  
+#endif

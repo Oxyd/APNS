@@ -88,6 +88,7 @@ private:
   virtual void do_update() { }
 };
 
+#if 0
 class vertex;
 typedef vertex* vertex_ptr;
 
@@ -110,6 +111,8 @@ void dump_tree(std::string const& filename, vertex_ptr root, bool append, operat
  * \param tree_size Expected number of vertices in the tree.
  */
 vertex_ptr load_tree(std::string const& filename, unsigned skip_lines, operation_controller& op_ctrl, unsigned tree_size);
+
+#endif
 
 #endif
 
