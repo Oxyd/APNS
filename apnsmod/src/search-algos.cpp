@@ -225,11 +225,11 @@ void proof_number_search::expand(vertex::children_iterator leaf, ::board& leaf_s
   typedef std::vector<std::pair<step, vertex::e_type> > steps_seq;
   steps_seq steps;
 
-  for (all_steps_iter step = all_steps_begin(leaf_state, player); step != all_steps_end(); ++step)
-    if (leaf->steps_remaining - static_cast<signed>(step->steps_used()) >= 0) {
-      steps.push_back(std::make_pair(*step, opposite_type(leaf->type)));
-      if (leaf->steps_remaining - static_cast<signed>(step->steps_used()) >= 1)
-        steps.push_back(std::make_pair(*step, leaf->type));
+  for (all_steps_iter new_step = all_steps_begin(leaf_state, player); new_step != all_steps_end(); ++new_step)
+    if (leaf->steps_remaining - static_cast<signed>(new_step->steps_used()) >= 0) {
+      steps.push_back(std::make_pair(*new_step, opposite_type(leaf->type)));
+      if (leaf->steps_remaining - static_cast<signed>(new_step->steps_used()) >= 1)
+        steps.push_back(std::make_pair(*new_step, leaf->type));
     }
 
   // Attach them to the leaf now.

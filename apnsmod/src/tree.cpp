@@ -303,7 +303,16 @@ void delete_file(std::string const& filename) {
 } // anonymous namespace
 
 #elif defined(_WIN32)
-# error "Not yet implemented"
+#include <windows.h>
+
+namespace {
+
+void delete_file(std::string const& filename) {
+  ::DeleteFile(filename.c_str());
+}
+
+} // anonymous namespace
+
 #else
 # error "Unsupported platform"
 #endif
