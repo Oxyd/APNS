@@ -5,11 +5,13 @@
 
 from interface.search import makeSearch
 from interface.fileio import loadBoard, loadSearch, saveSearch
+from interface.controller import Controller, SearchParameters
 import apnsmod
 import argparse
 import sys
 import os
 import time
+import signal
 
 KB = 1024         # One kilobyte
 MB = 1024 * 1024  # One megabyte
@@ -93,116 +95,117 @@ def main():
     print >> sys.stderr, 'Error: Memory limit must be a nonnegative integer'
     raise SystemExit(1)
 
+  params = SearchParameters()
+  params.timeLimit = args.timeLimit
+  params.positionLimit = args.posLimit
+  params.memoryLimit = args.memLimit
+  params.transTblSize = args.transTblSize
+  params.transTblKeepTime = args.transTblKeepTime
+
+  controller = Controller()
+  controller.searchParameters = params
+
+  class InterruptHandler:
+    def __init__(self):
+      self.interrupted = False
+      signal.signal(signal.SIGINT, self.handle)
+
+    def handle(self, signum, frame):
+      self.interrupted = True
+      controller.cancel()
+
+    def reset(self):
+      self.interrupted = False
+
+  interruptHandler = InterruptHandler()
+
+  def show(s):
+    if not args.quiet: print s
+
+  def cancelCallback(ctrl):
+    if interruptHandler.interrupted:
+      ctrl.cancel()
+
+  controller.loadGameCallbacks.add(cancelCallback)
+  controller.saveGameCallbacks.add(cancelCallback)
+
   if args.position is not None:
     try:
-      (board, attacker) = loadBoard(args.position)
-      search = apnsmod.ProofNumberSearch(apnsmod.Game(board, attacker))
+      controller.newGame(args.position)
     except Exception, e:
       print >> sys.stderr, 'Error loading specified initial position from specified file: {0}'.format(e)
       raise SystemExit(1)
 
   else:
-    progress = SaveLoadProgress(args.quiet)
-    if not args.quiet: print 'Loading previous search tree from {0}:'.format(args.searchFile)
+    show('Loading previous search tree from {0}:'.format(args.searchFile))
 
     try:
-      (game, vertexCount) = apnsmod.loadGame(args.searchFile, progress)
-      search = apnsmod.ProofNumberSearch(game, vertexCount)
-    except KeyboardInterrupt:
-      if not args.quiet: print 'Cancelled'
-      raise SystemExit(0)
+      controller.loadGame(args.searchFile)
     except Exception, e:
       print >> sys.stderr, 'Error loading specified search tree from specified file: {0}'.format(e)
       raise SystemExit(1)
 
-    if not args.quiet: print 'Done'
-
+    if not interruptHandler.interrupted:
+      show('Done')
+    else:
+      show('Cancelled')
+      raise SystemExit(0)
 
   transTblElements = args.transTblSize * MB / apnsmod.TranspositionTable.sizeOfElement
   #search.useTranspositionTable(transTblElements, args.transTblKeepTime)
 
-  BURST_TIME = 1000  # How long should search bursts be.
+  class ProgressPrinter:
+    def __init__(self):
+      self.lastMeasurement = time.clock()
+      self.posPerSec = 0
+      self.lastPosCount = controller.positionCount
 
-  start = time.clock()
-  timeElapsed = 0
-  lastMeasurement = start
-  posPerSec = 0
-  lastPosCount = 0
+    def __call__(self, ctrl, progress):
+      show('Still working:')
+      show('  -- {0} seconds elapsed'.format(int(progress.timeElapsed)))
+      if progress.timeLeft:
+        show('  -- {0} seconds left'.format(int(progress.timeLeft)))
+      show('  -- Root vertex PN: {0}'.format(strFromNum(progress.rootPN)))
+      show('  -- Root vertex DN: {0}'.format(strFromNum(progress.rootDN)))
+      #show('  -- {0} Search memory used'.format(strFromMem(memoryUsedTotal())))
+      show('  -- {0} unique positions total'.format(progress.positionCount))
+      show('  -- {0} new positions per second'.format(self.posPerSec))
 
-  interrupted = False
-  if not args.quiet: print 'Starting search. Pres Control-C to stop the search at any time.'
+      if progress.transTblSize:
+        show('  -- Transposition table:')
+        show('    -- Size: {0:.2f} MB'.format(float(progress.transTblSize) / MB))
+        show('    -- Hits: {0}'.format(progress.transTblHits))
+        show('    -- Misses: {0}'.format(progress.transTblMisses))
 
-  while True:
-    try:
-      if args.timeLimit > 0 and timeElapsed >= args.timeLimit \
-         or args.posLimit > 0 and search.positionCount >= args.posLimit \
-         or args.memLimit > 0 and (memoryUsedTotal() / (1024 ** 2)) >= args.memLimit \
-         or search.finished:
-        break
+      if time.clock() - self.lastMeasurement >= 1.0:
+        self.posPerSec = progress.positionCount - self.lastPosCount
+        self.lastPosCount = progress.positionCount
 
-      search.run(BURST_TIME)
+  controller.searchProgressCallbacks.add(ProgressPrinter())
+  show('Starting search. Pres Control-C to stop the search at any time.')
 
-      if not args.quiet:
-        print 'Still working:'
-        print '  -- {0} seconds elapsed'.format(int(timeElapsed))
-        if args.timeLimit:
-          print '  -- {0} seconds left'.format(int(args.timeLimit - timeElapsed))
-        print '  -- Root vertex PN: {0}'.format(strFromNum(search.game.root.proofNumber))
-        print '  -- Root vertex DN: {0}'.format(strFromNum(search.game.root.disproofNumber))
-        #print '  -- {0} Search memory used'.format(strFromMem(memoryUsedTotal()))
-        print '  -- {0} unique positions total'.format(search.positionCount)
-        print '  -- {0} new positions per second'.format(posPerSec)
-
-        if search.transpositionTable is not None:
-          tbl = search.getTranspositionTable()
-          print '  -- Transposition table:'
-          print '    -- Size: {0:.2f} MB'.format(float(tbl.memoryUsage) / MB)
-          print '    -- Hits: {0}'.format(tbl.hits)
-          print '    -- Misses: {0}'.format(tbl.misses)
-
-      now = time.clock()
-      timeElapsed = now - start
-
-      if now - lastMeasurement >= 1.0:
-        posPerSec = search.positionCount - lastPosCount
-        lastPosCount = search.positionCount
-        lastMeasurement = now
-
-    except KeyboardInterrupt:
-      interrupted = True
-      break
+  controller.runSearch(burst=1000)
 
   if not args.quiet:
     print 'Search finished:',
-    if search.game.root.proofNumber == 0:        print 'Root vertex is proved'
-    elif search.game.root.disproofNumber == 0:   print 'Root vertex is disproved'
-    elif args.timeLimit > 0 and timeElapsed >= args.timeLimit:
+    if controller.root.proofNumber == 0:        print 'Root vertex is proved'
+    elif controller.root.disproofNumber == 0:   print 'Root vertex is disproved'
+    elif params.timeLimit > 0 and controller.stats.timeElapsed >= params.timeLimit:
       print 'Time limit exceeded'
-    elif args.posLimit > 0 and search.positionCount >= args.posLimit:
+    elif params.positionLimit > 0 and controller.stats.positionCount >= params.positionLimit:
       print 'Position limit exceeded'
-    elif args.memLimit > 0 and (memoryUsedTotal() / (1024 ** 2)) >= args.memLimit:
+    elif params.memoryLimit > 0 and (memoryUsedTotal() / (1024 ** 2)) >= params.memoryLimit:
       print 'Memory limit exceeded'
-    elif interrupted:
+    elif interruptHandler.interrupted:
       print 'User interrupted'
+      interruptHandler.reset()
 
-    print 'Saving result to {0}'.format(args.destination)
-
-  progress = SaveLoadProgress(args.quiet)
-
-  try:
-    apnsmod.saveGame(search.game, args.destination, progress)
-  except KeyboardInterrupt:
-    if not args.quiet:  print 'Cancelled. No output file will be generated'
-    os.remove(args.destination)
-    raise SystemExit(0)
-
-  if not args.quiet:
-    print 'Done'
-    print 'Cleaning up...'
-
-  del search
-
-  if not args.quiet: print 'Finished'
+  show('Saving result to {0}'.format(args.destination))
+  controller.saveGame(args.destination)
+  if not interruptHandler.interrupted:
+    show('Done')
+  else:
+    show('Cancelled')
 
 if __name__ == '__main__':
   main()

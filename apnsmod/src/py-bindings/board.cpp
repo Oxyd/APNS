@@ -37,6 +37,17 @@ unsigned position_hash(position const& p) {
   return p.get_column() + std::numeric_limits<position::col_t>::max() + p.get_row();
 }
 
+boost::optional<piece> py_piece_from_letter(std::string const& letter) {
+  if (letter.length() == 1)
+    return piece_from_letter(letter[0]);
+  else
+    throw std::logic_error("Expected one-letter string");
+}
+
+std::string py_letter_from_piece(piece const& p) {
+  return std::string(1, letter_from_piece(p));
+}
+
 } // anonymous namespace
 
 /**
@@ -73,6 +84,11 @@ void export_board() {
       .value("rabbit", piece::rabbit)
       ;
   }
+
+  def("pieceFromLetter", &py_piece_from_letter,
+      "pieceFromLetter(letter) -> Piece\n\nConstruct a piece from its Arimaa letter.");
+  def("letterFromPiece", &py_letter_from_piece,
+      "letterFromPiece(Piece) -> str\n\nGet the letter corresponding a to a piece.");
 
   enum_<direction>("Direction",
     "The four cardinal directions")
