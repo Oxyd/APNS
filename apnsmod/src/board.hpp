@@ -18,6 +18,7 @@
 #include <map>
 #include <list>
 #include <string>
+#include <ostream>
 
 /**
  * One game piece.
@@ -285,6 +286,11 @@ std::string string_from_board(board const& board);
 //!
 //! \throws std::runtime_error Thrown if the string is not a valid representation of a board.
 void board_from_string(std::string const& string, ::board& board);
+
+//! Output a board object to an output string. This uses string_from_board to format the board.
+inline std::ostream& operator << (std::ostream& out, board const& board) {
+  return out << string_from_board(board);
+}
 
 //! Is the given position on a given board empty?
 bool empty(position pos, board const& board);

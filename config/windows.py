@@ -15,8 +15,7 @@ def config(conf, bits, debug):
       'target-arch': 'x86_64' if bits == 64 else 'x86',
 
       'compile-flags': [
-        '/EHsc',                    # Enable C++ exception handling.                                                                                                                                                            
-        '/Za',                      # Disable langauge extensions.                                                                                                                                                              
+        '/EHsc',                    # Enable C++ exception handling.
         '/Zc:forScope',             # Standard C++ scoping rules.                                                                                                                                                               
         '/wd4224',                  # Disable an annoying warning. (I believe MSVS is being wrong here.)                                                                                                                        
         '/wd4180',                  # Disable the "C4180: qualifier applied to function type has no meaning; ignored" warning.                                                                                    
