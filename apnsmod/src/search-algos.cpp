@@ -12,10 +12,8 @@ namespace {
 
 //! Check whether the game would be lost if the given player made the given step from the given position assuming the passed-in
 //! game history.
-bool repetition(board& board, step const& step, piece::color_t player, history_visitor::history_cont const& history) {
+bool repetition(board& board, piece::color_t player, history_visitor::history_cont const& history) {
   bool lose = false;
-
-  apply(step, board);
 
   if (!history.empty()) {
     if (history.back().position == board && history.back().player == player)
@@ -32,11 +30,73 @@ bool repetition(board& board, step const& step, piece::color_t player, history_v
     }
   }
 
-  unapply(step, board);
   return lose;
 }
 
 } // anonymous namespace
+
+/**
+ * Did any player win?
+ *
+ * \param board The game situation.
+ * \param player Last player to have made a move.
+ * \return If any player has won, return their color; otherwise return nothing.
+ */
+boost::optional<piece::color_t> winner(board const& board, piece::color_t player) {
+  piece::color_t const opponent = opponent_color(player);
+
+  position::row_t players_target_row;
+  position::row_t opponents_target_row;
+
+  if (player == piece::gold) {
+    players_target_row = board::MAX_ROW;
+    opponents_target_row = board::MIN_ROW;
+  } else {
+    players_target_row = board::MIN_ROW;
+    opponents_target_row = board::MAX_ROW;
+  }
+
+  bool player_goal = false;
+  bool opponent_goal = false;
+  bool player_has_rabbits = false;
+  bool opponent_has_rabbits = false;
+
+  for (board::pieces_iterator pos_piece = board.pieces_begin(); pos_piece != board.pieces_end(); ++pos_piece) {
+    position const& position = pos_piece->first;
+    piece const& piece = pos_piece->second;
+
+    if (piece.get_type() == piece::rabbit) {
+      if (piece.get_color() == player) {
+        player_has_rabbits = true;
+
+        if (position.get_row() == players_target_row) {
+          player_goal = true;
+          break;
+        }
+
+      } else {
+        opponent_has_rabbits = true;
+
+        if (position.get_row() == opponents_target_row) {
+          opponent_goal = true;
+        }
+      }
+    }
+  }
+
+  if (player_goal) {
+    return player;
+  } else if (opponent_goal) {
+    return opponent;
+  } else if (!opponent_has_rabbits) {
+    return player;
+  } else if (!player_has_rabbits) {
+    return opponent;
+  }
+
+  return boost::optional<piece::color_t>();
+}
+
 
 vertex::children_iterator best_successor(vertex& parent) {
   vertex::number_t vertex::* number = parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
@@ -57,14 +117,16 @@ history_visitor::history_visitor(piece::color_t attacker) :
   attacker(attacker)
 { }
 
-void history_visitor::operator () (vertex const& v, board const& board) {
+bool history_visitor::operator () (vertex const& v, board const& board) {
   if (v.type != last_visited_type)
     history.push_back(history_record(board, v.type == vertex::type_or ? attacker : opponent_color(attacker)));
 
   last_visited_type = v.type;
+
+  return false;
 }
 
-void hash_visitor::operator () (vertex const& v) {
+bool hash_visitor::operator () (vertex const& v) {
   if (v.step) {  // Unless this is the root.
     piece::color_t const next_player = v.type == last_visited_type ? last_visited_player : opponent_color(last_visited_player);
     hash = hasher->update(hash, v.step->step_sequence_begin(), v.step->step_sequence_end(),
@@ -73,6 +135,8 @@ void hash_visitor::operator () (vertex const& v) {
     last_visited_player = next_player;
     last_visited_type   = v.type;
   }
+
+  return false;
 }
 
 void update_numbers(vertex& v) {
@@ -90,7 +154,7 @@ void update_numbers(vertex& v) {
   // A number type that can hold values as large as 2 * vertex::max. This will be used to detect overflows.
   typedef boost::uint_value_t<8589934590>::fast sum_num_t;  // This magic constant sucks. But C++03 lacks constexpr...
 
-  vertex::number_t  min = vertex::max_num;
+  vertex::number_t  min = vertex::infty;
   sum_num_t         sum = 0;
 
   for (vertex::children_iterator child = v.children_begin(); child != v.children_end(); ++child) {
@@ -112,21 +176,38 @@ void update_numbers(vertex& v) {
     v.disproof_number = min;
   }
 
+  if (v.proof_number == 0)
+    v.disproof_number = vertex::infty;
+  else if (v.disproof_number == 0)
+    v.proof_number = vertex::infty;
+
   assert(v.proof_number <= vertex::infty);
   assert(v.disproof_number <= vertex::infty);
 }
 
 void proof_number_search::do_iterate() {
-  ::traverser<fun_tp, leaf_visitors> traverser(
-    &best_successor, 
-    leaf_visitors(game->initial_state, hasher, initial_hash, game->attacker)
-  );
-  vertex::children_iterator leaf = traverser.traverse(game->root);
+  assert(game);
+  assert(!game->root.step);
 
-  expand(leaf, traverser.visitor.get_board(), traverser.visitor.get_hash(), traverser.visitor.get_history());
+  hash_visitor    hash_v(hasher, initial_hash, game->attacker);
+  path_visitor    path_v;
+  history_visitor history_v(game->attacker);
+  board_visitor<
+    boost::reference_wrapper<history_visitor>
+  > board_v(game->initial_state, boost::ref(history_v));
+  vertex::children_iterator leaf = traverse(
+    game->root,
+    &best_successor,
+    make_composite_visitor(
+      boost::ref(hash_v),
+      make_composite_visitor(
+        boost::ref(path_v),
+        boost::ref(board_v))));
 
-  for (path_visitor::path_cont::iterator vertex = traverser.visitor.get_path().begin();
-       vertex != traverser.visitor.get_path().end();
+  expand(leaf, board_v.board, hash_v.hash, history_v.history);
+
+  for (path_visitor::path_cont::reverse_iterator vertex = path_v.path.rbegin();
+       vertex != path_v.path.rend();
        ++vertex)
     update_numbers(**vertex);
 }
@@ -158,6 +239,7 @@ void proof_number_search::expand(vertex::children_iterator leaf, ::board& leaf_s
     vertex::e_type const  type = s->second;
 
     vertex::children_iterator child = leaf->add_child();
+    ++position_count;
     child->step = step;
     child->type = type;
 
@@ -168,14 +250,29 @@ void proof_number_search::expand(vertex::children_iterator leaf, ::board& leaf_s
 
     // TODO: Use trans tbl. here
     
-    // Check for repetitions.
-    if (type != leaf->type && repetition(leaf_state, step, player, history)) {
-      leaf->proof_number    = 1;
-      leaf->disproof_number = 1;
+    apply(step, leaf_state);
+    
+    boost::optional<piece::color_t> winner = ::winner(leaf_state, player);
+    if (winner) {
+      if (*winner == game->attacker) {
+        child->proof_number     = 0;
+        child->disproof_number  = vertex::infty;
+      } else {
+        child->proof_number     = vertex::infty;
+        child->disproof_number  = 0;
+      }
     } else {
-      leaf->proof_number    = player == game->attacker ? vertex::infty : 0;
-      leaf->disproof_number = player == game->attacker ? 0 : vertex::infty;
+      // Check for repetitions.
+      if (type == leaf->type || !repetition(leaf_state, player, history)) {
+        child->proof_number    = 1;
+        child->disproof_number = 1;
+      } else {
+        child->proof_number    = player == game->attacker ? vertex::infty : 0;
+        child->disproof_number = player == game->attacker ? 0 : vertex::infty;
+      }
     }
+
+    unapply(step, leaf_state);
   }
 }
 

@@ -228,6 +228,14 @@ TEST_F(board_test, is_trap_test) {
   }
 }
 
+TEST_F(board_test, string_serialization_test) {
+  std::string const s = string_from_board(b);
+  board new_board;
+  board_from_string(s, new_board);
+
+  EXPECT_EQ(b, new_board);
+}
+
 TEST(neighbourhood_iter, interior_iteration_test) {
   position center(3, 'c');
 

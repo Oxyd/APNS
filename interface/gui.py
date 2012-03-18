@@ -1,8 +1,9 @@
 # -*- Encoding: utf-8 -*-
 
 from apnsmod import Board, Vertex, Piece, Position, OperationController, Step, empty, apply, opponentColor,\
-                    memoryUsedTotal
-from interface.fileio import loadBoard, saveBoard, saveSearch, loadSearch
+                    memoryUsedTotal, TranspositionTable, saveGame, loadGame
+import apnsmod
+from interface.fileio import loadBoard, saveBoard
 from interface.observable import Observable
 from interface.search import makeSearch
 
@@ -57,8 +58,8 @@ class MainWindow(Observable):
                                      command=lambda: self.notifyObservers(command=MainWindow.Command.loadSearch))
     self._saveSearchBtn = ttk.Button(self._toolbar, text='Save Search',
                                      command=lambda: self.notifyObservers(command=MainWindow.Command.saveSearch))
-    #self._iterateBtn = ttk.Button(self._toolbar, text='Iterate',
-    #                              command=lambda: self.notifyObservers(command=MainWindow.Command.iterate))
+    self._iterateBtn = ttk.Button(self._toolbar, text='Iterate',
+                                  command=lambda: self.notifyObservers(command=MainWindow.Command.iterate))
     self._saveBtn = ttk.Button(self._toolbar, text='Save Position',
                                command=lambda: self.notifyObservers(command=MainWindow.Command.savePosition))
     self._statsBtn = ttk.Button(self._toolbar, text='Search Stats',
@@ -78,7 +79,7 @@ class MainWindow(Observable):
     self._saveSearchBtn.grid(row=0, column=3, padx=(3, 3))
     self._saveBtn.grid(row=0, column=4, padx=(3, 3))
     self._statsBtn.grid(row=0, column=5, padx=(3, 0))
-    #self._iterateBtn.grid(row=0, column=6, padx=(3, 0))
+    self._iterateBtn.grid(row=0, column=6, padx=(3, 0))
 
     self._toolbar.grid(row=0, column=0, sticky='W')
     self._resultsDisplay.widget.grid(row=1, column=0, sticky='NSEW')
@@ -97,7 +98,7 @@ class MainWindow(Observable):
 
     self._runBtn['state'] = ['!disabled']
     self._saveSearchBtn['state'] = ['!disabled']
-    #self._iterateBtn['state'] = ['!disabled']
+    self._iterateBtn['state'] = ['!disabled']
     self._saveBtn['state'] = ['!disabled']
 
 
@@ -106,7 +107,7 @@ class MainWindow(Observable):
 
     self._runBtn['state'] = ['disabled']
     self._saveSearchBtn['state'] = ['disabled']
-    #self._iterateBtn['state'] = ['disabled']
+    self._iterateBtn['state'] = ['disabled']
     self._saveBtn['state'] = ['disabled']
 
 
@@ -167,8 +168,8 @@ class MainWindowController(object):
         self._mainWindowDsply.disableStats()
 
     elif command == MainWindow.Command.iterate:
-      if self._search.getTranspositionTable() is None:
-        self._search.useTranspositionTable(100 * 1024 * 1024 / self._search.sizeOfTransTblElement, 16)
+      if self._search.transpositionTable is None:
+        self._search.useTransTbl(100 * 1024 * 1024 / TranspositionTable.sizeOfElement, 16)
       self._search.iterate()
       self._resultsCtrl.updateTree()
 
@@ -181,7 +182,7 @@ class MainWindowController(object):
         if newPrefs is not None:
           self._runPreferences = newPrefs
 
-        self._search.useTranspositionTable(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
+        self._search.useTransTbl(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
         dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
         searchProgressCtrl = SearchProgressController(self._search, dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit,
                                                       runSearchCtrl.memLimit)
@@ -410,7 +411,7 @@ class ResultsController(object):
 
       name = 'root' if self.vertex.step is None else self.vertex.step.toString()
       parent = self.parent.handle if self.parent is not None else None
-      self.handle = display.addNode(parent, name, self._getType(), 
+      self.handle = display.addNode(parent, name, self._getType(),
                                     strFromNum(self.vertex.proofNumber),
                                     strFromNum(self.vertex.disproofNumber),
                                     best)
@@ -448,9 +449,8 @@ class ResultsController(object):
 
       assert len(self.children) == 0
 
-      vertexChildren = self.vertex.children
-      sameTypeChildren  = (c for c in vertexChildren if c.type_ == self.vertex.type_)
-      otherTypeChildren = (c for c in vertexChildren if c.type_ != self.vertex.type_)
+      sameTypeChildren  = (c for c in self.vertex.children if c.type_ == self.vertex.type_)
+      otherTypeChildren = (c for c in self.vertex.children if c.type_ != self.vertex.type_)
 
       for child in itertools.chain(sameTypeChildren, otherTypeChildren):
         self.children.append(ResultsController._DisplayNode(self, child, display, False))
@@ -567,7 +567,7 @@ class ResultsController(object):
   def _updateBest(self, vertex):
     '''Go through all of vertex's children and mark the best one.'''
 
-    best = self._search.successor(vertex.vertex)
+    best = apnsmod.bestSuccessor(vertex.vertex)
     for child in vertex.children:
       child.setBest(hash(child.vertex) == hash(best), self._resultsDsply)
 
@@ -582,7 +582,7 @@ class ResultsController(object):
       vertex = self._resultsDsply.getParent(vertex)
 
     # Now, having the path on the stack, go back down, transforming the initial board into the final result.
-    result = self._search.initialBoard.copy()
+    result = self._search.game.initialState.copy()
     while len(stack) > 0:
       step = Step.fromString(stack.pop())
       if step is not None:
@@ -753,7 +753,10 @@ class SaveProgressController(object):
 
       def doUpdate(self):
         '''Update of the algorithm progress.'''
-        dialog.showProgress(100.0 * float(self.workDone) / float(self.workTotal))
+        if self.workTotal > 0.0:
+          dialog.showProgress(100.0 * float(self.workDone) / float(self.workTotal))
+        else:
+          dialog.showProgress(0.0)
         dialog.window.update()
 
       def update(self, source):
@@ -765,7 +768,7 @@ class SaveProgressController(object):
     dialog.run()
 
     try:
-      saveSearch(search, filename, opCtrl)
+      saveGame(search.game, filename, opCtrl)
     except RuntimeError, e:
       tkMessageBox.showerror('Could not savePosition search', 'Saving search to {0} failed:\n{1}'.format(filename, e))
       os.remove(filename)
@@ -860,9 +863,11 @@ class LoadProgressController(object):
     dlg.run()
 
     try:
-      self._search = loadSearch(filename, ctrl)
+      (game, vertexCount) = loadGame(filename, ctrl)
+      if game:
+        self._search = ProofNumberSearch(game, vertexCount)
     except RuntimeError, e:
-      tkMessageBox.showerror('Could not load search', 
+      tkMessageBox.showerror('Could not load search',
                              'Loading of the search tree from {0} failed:\n{1}'.format(filename, e))
       self._search = None
 
@@ -1122,7 +1127,7 @@ class RunSearchController(object):
         else:
           memLimit = None
 
-        self._transTblSize = (int(self._runSearchDlg.transTblSize) * MB) / self._search.sizeOfTransTblElement
+        self._transTblSize = (int(self._runSearchDlg.transTblSize) * MB) / TranspositionTable.sizeOfElement
         self._timeLimit = sTimeLimit
         self._posLimit = posLimit
         self._memLimit = memLimit
@@ -1393,9 +1398,9 @@ class SearchProgressController(object):
         memAllocatedStr = self._memoryAllocated()
         self._searchProgressDlg.showMemoryAllocated(memAllocatedStr)
 
-        tt = self._search.getTranspositionTable()
+        tt = self._search.transpositionTable
         if tt is not None:
-          mbTransTblSize  = '%.2f MB' % (float(self._search.getTranspositionTable().memoryUsage) / float(1024 ** 2))
+          mbTransTblSize  = '%.2f MB' % (float(self._search.transpositionTable.memoryUsage) / float(1024 ** 2))
           hits            = tt.hits
           misses          = tt.misses
         else:
@@ -1406,8 +1411,8 @@ class SearchProgressController(object):
         self._searchProgressDlg.showTransTblStats(memUsed=mbTransTblSize, hits=hits, misses=misses)
 
         posCount = self._search.positionCount
-        rootPn = self._search.root.proofNumber
-        rootDn = self._search.root.disproofNumber
+        rootPn = self._search.game.root.proofNumber
+        rootDn = self._search.game.root.disproofNumber
 
         self._searchProgressDlg.showPosCount(posCount=posCount, posPerSec=posPerSec)
         self._searchProgressDlg.showRootPnDn(rootPn, rootDn)

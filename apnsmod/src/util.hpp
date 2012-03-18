@@ -1,9 +1,13 @@
 #ifndef UTIL_HPP
 #define UTIL_HPP
 
-#include <boost/shared_ptr.hpp>
 #include <boost/utility.hpp>
 #include <boost/timer.hpp>
+#include <boost/shared_ptr.hpp>
+
+#include <memory>
+
+class vertex;
 
 //! Get the total memory usage by this module.
 std::size_t get_memory_usage();
@@ -87,32 +91,6 @@ public:
 private:
   virtual void do_update() { }
 };
-
-#if 0
-class vertex;
-typedef vertex* vertex_ptr;
-
-/**
- * Dump the search tree into a file specified by filename.
- * \param filename Name of file to write the output to.
- * \param root Root of the tree.
- * \param append If true, the tree will be appended to the file; the file will be overwritten otherwise.
- * \param op_ctrl Operation controller for keeping the interface updated about the progress.
- * \param tree_size Number of vertices in the tree.
- */
-void dump_tree(std::string const& filename, vertex_ptr root, bool append, operation_controller& op_ctrl,
-    unsigned tree_size);
-
-/**
- * Load the search tree from a specified file.
- * \param filename Name of the file to read.
- * \param skip_lines How many lines to skip from the start of the file?
- * \param op_ctrl Operation controller for keeping the interface updated about the progress.
- * \param tree_size Expected number of vertices in the tree.
- */
-vertex_ptr load_tree(std::string const& filename, unsigned skip_lines, operation_controller& op_ctrl, unsigned tree_size);
-
-#endif
 
 #endif
 

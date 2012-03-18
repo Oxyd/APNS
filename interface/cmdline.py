@@ -5,7 +5,7 @@
 
 from interface.search import makeSearch
 from interface.fileio import loadBoard, loadSearch, saveSearch
-from apnsmod import WinStrategy, OperationController, Vertex, memoryUsedTotal
+import apnsmod
 import argparse
 import sys
 import os
@@ -14,18 +14,14 @@ import time
 KB = 1024         # One kilobyte
 MB = 1024 * 1024  # One megabyte
 
-class SaveLoadProgress(OperationController):
+class SaveLoadProgress(apnsmod.OperationController):
   def __init__(self, quiet):
     '''If quiet is True, don't print any progress.'''
-    OperationController.__init__(self, 1000)
+    apnsmod.OperationController.__init__(self, 1000)
     self._quiet = quiet
 
   def doUpdate(self):
-    if not self._quiet:
-      print '{0}/{1} {2}%'.format(self.workDone, self.workTotal,
-                                  int(100.0 * float(self.workDone) / float(self.workTotal)))
-      sys.stdout.flush()
-
+    pass
 
 def strFromMem(mem):
   '''strFromMem(m) -> str
@@ -41,7 +37,7 @@ def strFromMem(mem):
 def strFromNum(num):
   '''Get the string representation of a proof or disproof number.'''
 
-  if num < Vertex.infty:
+  if num < apnsmod.Vertex.infty:
     return str(num)
   else:
     return 'inf'
@@ -99,8 +95,8 @@ def main():
 
   if args.position is not None:
     try:
-      (board, player) = loadBoard(args.position)
-      search = makeSearch(board, player)
+      (board, attacker) = loadBoard(args.position)
+      search = apnsmod.ProofNumberSearch(apnsmod.Game(board, attacker))
     except Exception, e:
       print >> sys.stderr, 'Error loading specified initial position from specified file: {0}'.format(e)
       raise SystemExit(1)
@@ -110,7 +106,8 @@ def main():
     if not args.quiet: print 'Loading previous search tree from {0}:'.format(args.searchFile)
 
     try:
-      search = loadSearch(args.searchFile, progress)
+      (game, vertexCount) = apnsmod.loadGame(args.searchFile, progress)
+      search = apnsmod.ProofNumberSearch(game, vertexCount)
     except KeyboardInterrupt:
       if not args.quiet: print 'Cancelled'
       raise SystemExit(0)
@@ -121,8 +118,8 @@ def main():
     if not args.quiet: print 'Done'
 
 
-  transTblElements = args.transTblSize * MB / search.sizeOfTransTblElement
-  search.useTranspositionTable(transTblElements, args.transTblKeepTime)
+  transTblElements = args.transTblSize * MB / apnsmod.TranspositionTable.sizeOfElement
+  #search.useTranspositionTable(transTblElements, args.transTblKeepTime)
 
   BURST_TIME = 1000  # How long should search bursts be.
 
@@ -150,13 +147,13 @@ def main():
         print '  -- {0} seconds elapsed'.format(int(timeElapsed))
         if args.timeLimit:
           print '  -- {0} seconds left'.format(int(args.timeLimit - timeElapsed))
-        print '  -- Root vertex PN: {0}'.format(strFromNum(search.root.proofNumber))
-        print '  -- Root vertex DN: {0}'.format(strFromNum(search.root.disproofNumber))
-        print '  -- {0} Search memory used'.format(strFromMem(memoryUsedTotal()))
+        print '  -- Root vertex PN: {0}'.format(strFromNum(search.game.root.proofNumber))
+        print '  -- Root vertex DN: {0}'.format(strFromNum(search.game.root.disproofNumber))
+        #print '  -- {0} Search memory used'.format(strFromMem(memoryUsedTotal()))
         print '  -- {0} unique positions total'.format(search.positionCount)
         print '  -- {0} new positions per second'.format(posPerSec)
 
-        if search.getTranspositionTable() is not None:
+        if search.transpositionTable is not None:
           tbl = search.getTranspositionTable()
           print '  -- Transposition table:'
           print '    -- Size: {0:.2f} MB'.format(float(tbl.memoryUsage) / MB)
@@ -177,8 +174,8 @@ def main():
 
   if not args.quiet:
     print 'Search finished:',
-    if search.root.proofNumber == 0:        print 'Root vertex is proved'
-    elif search.root.disproofNumber == 0:   print 'Root vertex is disproved'
+    if search.game.root.proofNumber == 0:        print 'Root vertex is proved'
+    elif search.game.root.disproofNumber == 0:   print 'Root vertex is disproved'
     elif args.timeLimit > 0 and timeElapsed >= args.timeLimit:
       print 'Time limit exceeded'
     elif args.posLimit > 0 and search.positionCount >= args.posLimit:
@@ -193,7 +190,7 @@ def main():
   progress = SaveLoadProgress(args.quiet)
 
   try:
-    saveSearch(search, args.destination, progress)
+    apnsmod.saveGame(search.game, args.destination, progress)
   except KeyboardInterrupt:
     if not args.quiet:  print 'Cancelled. No output file will be generated'
     os.remove(args.destination)

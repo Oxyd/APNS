@@ -4,6 +4,7 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/ref.hpp>
 
 #include <queue>
 
@@ -81,7 +82,9 @@ private:
 };
 
 struct summing_visitor {
-  summing_visitor() : sum(0) { }
+  summing_visitor() : 
+    sum(0) 
+  { }
 
   void operator () (vertex const& n) {
     sum += n.proof_number;
@@ -236,56 +239,61 @@ TEST(vertex, pack_test) {
 // Basic test of tree traversal.
 TEST(traverser, traversal_test) {
   boost::shared_ptr<vertex> tree = make_tree();
-  traverser<bfs_traversal, bfs_checker_visitor>().traverse(*tree);
+  traverse(*tree, bfs_traversal(), bfs_checker_visitor());
 }
 
 // Test whether stateful visitors work and that we can query their state after the traversal.
 TEST(traverser, stateful_visiting_test) {
   boost::shared_ptr<vertex> tree = make_tree();
-  traverser<bfs_traversal, summing_visitor> t;
-  t.traverse(*tree.get());
-  EXPECT_EQ(13, t.visitor.sum);
+  summing_visitor sum;
+  traverse(*tree, bfs_traversal(), boost::ref(sum));
+  EXPECT_EQ(13, sum.sum);
 }
 
 // Test that ordinary functions can be used as visitors too.
 TEST(traverser, simple_function_visitor_test) {
   boost::shared_ptr<vertex> tree = make_tree();
-  traverser<bfs_traversal, void (*)(vertex&)>(&simple_visitor).traverse(*tree.get());
+  traverse(*tree, bfs_traversal(), &simple_visitor);
 }
 
 TEST(traverser, two_visitors) {
   boost::shared_ptr<vertex> tree = make_tree();
-  traverser<
-    bfs_traversal,
-    composite_visitor<bfs_checker_visitor, summing_visitor>
-  > t;
-  t.traverse(*tree.get());
-  EXPECT_EQ(13, t.visitor.second.sum);
+  summing_visitor s;
+  traverse(*tree, bfs_traversal(),
+           make_composite_visitor(bfs_checker_visitor(), boost::ref(s)));
+  EXPECT_EQ(13, s.sum);
 }
 
 TEST(traverser, three_visitors) {
   boost::shared_ptr<vertex> tree = make_tree();
-  traverser<
-    bfs_traversal,
-    composite_visitor<
-      bfs_checker_visitor, composite_visitor<
-      summing_visitor,
-      void (*)(vertex&)
-    > >
-  > t(make_composite_visitor(
-        bfs_checker_visitor(),
-        make_composite_visitor(
-          summing_visitor(),
-          &simple_visitor
-        )));
-  t.traverse(*tree.get());
-  EXPECT_EQ(13, t.visitor.second.first.sum);
+  summing_visitor s;
+  traverse(
+    *tree,
+    bfs_traversal(),
+    make_composite_visitor(
+      bfs_checker_visitor(),
+      make_composite_visitor(
+        boost::ref(s),
+        &simple_visitor
+      )
+    )
+  );
+  EXPECT_EQ(13, s.sum);
 }
 
 TEST(traverser, virtual_visitor) {
   boost::shared_ptr<vertex> tree = make_tree();
-  traverser<bfs_traversal, virtual_visitor> t(virtual_visitor(boost::make_shared<poly_visitor>()));
-  t.traverse(*tree.get());
+  traverse(*tree, bfs_traversal(), virtual_visitor(boost::make_shared<poly_visitor>()));
+}
+
+bool find_two(vertex& v) {
+  return v.proof_number == 2;
+}
+
+TEST(traverser, stop_condition) {
+  boost::shared_ptr<vertex> tree = make_tree();
+  vertex::children_iterator found = traverse(*tree, bfs_traversal(), null_visitor(), &find_two);
+  EXPECT_EQ(2, found->proof_number);
 }
 
 int main(int argc, char** argv) {

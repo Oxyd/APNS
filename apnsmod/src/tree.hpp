@@ -3,23 +3,27 @@
 
 #include "hash.hpp"
 #include "board.hpp"
+#include "movement.hpp"
+#include "util.hpp"
 
 #include <boost/optional.hpp>
 #include <boost/utility.hpp>
 #include <boost/scoped_array.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/make_shared.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/type_traits.hpp>
+#include <boost/ref.hpp>
 
 #include <cstddef>
 #include <cassert>
+#include <iterator>
 
 //! A vertex of the game tree.
 //!
 //! Vertices are non-copyable to prevent costly copies of large subtrees. Internally, they are implemented via resizeable
 //! array -- as such, their allocated size may be larger than the number of children. The pack() member function can be used
 //! to make the vertex only take up as much free-store space as required.
-//!
-//! \note This class does some intricate memory management stuff to improve performance of the search algorithm. This requires
-//! that this class be a POD type.
 //!
 //! \note This class behaves like a container of children. The children are always sorted in the order in which they were
 //! inserted.
@@ -30,8 +34,11 @@ class vertex {
 public:
   typedef boost::uint32_t number_t;  //!< Type of the proof and disproof numbers.
 
-  typedef vertex*         children_iterator;
-  typedef vertex const*   const_children_iterator;
+  typedef vertex*                               children_iterator;
+  typedef vertex const*                         const_children_iterator;
+
+  typedef std::reverse_iterator<vertex*>        reverse_children_iterator;
+  typedef std::reverse_iterator<vertex const*>  const_reverse_children_iterator;
   
   static number_t const max_num;  //!< Maximum value of a proof- or disproof number.
   static number_t const infty;    //!< Infinity value used in the algorithm.
@@ -63,6 +70,22 @@ public:
   const_children_iterator children_begin() const    { return reinterpret_cast<vertex const*>(storage.get()); }
   const_children_iterator children_end() const      { return children_begin() + size; }
 
+  reverse_children_iterator children_rbegin() {
+    return reverse_children_iterator(children_end());
+  }
+
+  reverse_children_iterator children_rend() {
+    return reverse_children_iterator(children_begin());
+  }
+
+  const_reverse_children_iterator children_rbegin() const {
+    return const_reverse_children_iterator(children_end());
+  }
+
+  const_reverse_children_iterator children_rend() const {
+    return const_reverse_children_iterator(children_begin());
+  }
+
   std::size_t             children_count() const    { return children_end() - children_begin(); }
 
   //! Make this vertex allocate enough memory to hold new_size children, but don't really create the children yet. This may
@@ -81,6 +104,9 @@ public:
   //! Make this vertex use only as much memory as required to hold all its children. This may invalidate all existing iterator
   //! to children of this vertex.
   void pack();
+
+  //! Swap the subtree rooted in this vertex with a subtree rooted in the other vertex.
+  void swap(vertex& other);
   
 private:
   //! Memory allocation interface. It is here so that it can be changed easily, but also so that a change of the allocator
@@ -165,9 +191,41 @@ public:
   }
 };
 
+//! Save a game object to a file.
+//!
+//! \param game The game object to be saved.
+//! \param filename Name of the file to save to. This will be opened by an ofstream.
+//! \param op_ctrl OperationController for this operation. This algorithm does not provide information about its progress.
+//!
+//! \throws std::runtime_error Thrown if the file could not be written successfully.
+void save_game(boost::shared_ptr<game> const& game, std::string const& filename, operation_controller& op_ctrl);
+inline void save_game(boost::shared_ptr<game> const& game, std::string const& filename) {
+  null_operation_controller op_ctrl;
+  save_game(game, filename, op_ctrl);
+}
+
+//! Load a game from a file.
+//!
+//! \param filename File to be read. This will be opened by an ifstream.
+//! \param op_ctrl OperationController for this operation. This algorithm does not provide information about its progress.
+//!
+//! \returns A new Game instance and total number of vertices in the tree.
+//!
+//! \throws std::runtime_error Thrown if the file could not be read successfully, or if its format is not valid.
+std::pair<boost::shared_ptr<game>, std::size_t> load_game(std::string const& filename, operation_controller& op_ctrl);
+inline std::pair<boost::shared_ptr<game>, std::size_t> load_game(std::string const& filename) {
+  null_operation_controller op_ctrl;
+  return load_game(filename, op_ctrl);
+}
+
 //! A no-op visitor for traverser.
 struct null_visitor {
   void operator () (vertex const&) { }
+};
+
+//! A stop condition that always returns false.
+struct null_stop_condition {
+  bool operator () (vertex const&) { return false; }
 };
 
 //! Convenience typedef so that users don't have to type out the function signature each time they want to use a traverser
@@ -179,38 +237,37 @@ typedef vertex* (*fun_tp)(vertex&);
 //!
 //! \tparam TraversalPolicy Specifies how the tree will be traversed.
 //! \tparam Visitor Will be called on each node that is traversed.
-template <typename TraversalPolicy, typename Visitor = null_visitor>
-struct traverser {
-  TraversalPolicy traversal_policy;
-  Visitor         visitor;
+//! \tparam StopCondition Will be called on each node that is traversed (after Visitor) and if it returns true, the traversal
+//! will be stopped and the last visited vertex returned.
+template <typename TraversalPolicy, typename Visitor, typename StopCondition>
+vertex::children_iterator traverse(vertex& root, TraversalPolicy traversal_policy,
+                                   Visitor visitor, StopCondition stop_condition) {
+  // This internally assumes that vertex::children_iterator is vertex*. If that changes, this function will have to be
+  // rewritten.
+  vertex* previous = &root;
+  vertex* current = &root;
 
-  explicit traverser(TraversalPolicy traversal_policy = TraversalPolicy(), Visitor visitor = Visitor()) :
-    traversal_policy(traversal_policy),
-    visitor(visitor)
-  { }
+  while (current) {
+    boost::unwrap_ref(visitor)(*current);
+    if (boost::unwrap_ref(stop_condition)(*current))
+      return current;
 
-  explicit traverser(Visitor visitor) :
-    visitor(visitor)
-  { }
-
-  //! Traverse the tree rooted at root.
-  //!
-  //! \returns The last visited vertex.
-  vertex::children_iterator traverse(vertex& root) {
-    // This internally assumes that vertex::children_iterator is vertex*. If that changes, this function will have to be
-    // rewritten.
-    vertex* previous = &root;
-    vertex* current = &root;
-
-    while (current) {
-      visitor(*current);
-      previous = current;
-      current = traversal_policy(*current);
-    }
-
-    return previous;
+    previous = current;
+    current = boost::unwrap_ref(traversal_policy)(*current);
   }
-};
+
+  return previous;
+}
+
+template <typename TraversalPolicy, typename Visitor>
+vertex::children_iterator traverse(vertex& root, TraversalPolicy traversal_policy, Visitor visitor) {
+  return traverse(root, traversal_policy, visitor, null_stop_condition());
+}
+
+template <typename TraversalPolicy>
+vertex::children_iterator traverse(vertex& root, TraversalPolicy traversal_policy) {
+  return traverse(root, traversal_policy, null_visitor(), null_stop_condition());
+}
 
 //! Holds an instance of a concrete traversal policy object and delegates the traversal to it.
 struct virtual_traversal_policy {
@@ -232,28 +289,30 @@ struct virtual_traversal_policy {
   }
 };
 
-//! Helper to compose two visitors. This allows to use an arbitrary number of visitors with a single traverser.
-//! Visitors are applied in specified order.
+//! A visitor that holds two other visitors.
 template <typename First, typename Second>
 struct composite_visitor {
   First   first;
   Second  second;
 
-  explicit composite_visitor(First f = First(), Second s = Second()) :
-    first(f),
-    second(s)
+  composite_visitor(First first = First(), Second second = Second()) :
+    first(first),
+    second(second)
+  { }
+
+  composite_visitor(Second second) :
+    second(second)
   { }
 
   void operator () (vertex& v) {
-    first(v);
-    second(v);
+    boost::unwrap_ref(first)(v);
+    boost::unwrap_ref(second)(v);
   }
 };
 
-//! Helper function to create a composite visitor.
+//! Helper to make a composite_visitor without having to type out the full template parameter list.
 template <typename First, typename Second>
-composite_visitor<First, Second>
-make_composite_visitor(First f, Second s) {
+composite_visitor<First, Second> make_composite_visitor(First f, Second s) {
   return composite_visitor<First, Second>(f, s);
 }
 
@@ -275,6 +334,27 @@ struct virtual_visitor {
   void operator () (vertex& v) {
     assert(visitor.get() != 0);
     visitor->visit(v);
+  }
+};
+
+//! Holds an instance of a concrete StopCondition (derived from virtual_stop_condition::base) and delegates the stop decision
+//! to it.
+struct virtual_stop_condition {
+  //! Virtual stop condition interface.
+  struct base {
+    virtual ~base() { }
+    virtual bool stop(vertex&) = 0;
+  };
+
+  boost::shared_ptr<base> condition;  //!< Concrete stop condition.
+
+  explicit virtual_stop_condition(boost::shared_ptr<base> const& condition) :
+    condition(condition)
+  { }
+
+  bool operator () (vertex& v) {
+    assert(condition);
+    return condition->stop(v);
   }
 };
 

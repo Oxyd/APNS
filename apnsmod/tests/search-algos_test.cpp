@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <boost/shared_ptr.hpp>
+#include <boost/make_shared.hpp>
 
 namespace {
 
@@ -11,7 +12,7 @@ boost::shared_ptr<game> make_game(board& best_board) {
   initial_board.put(position(2, 'd'), piece(piece::gold, piece::elephant));
   initial_board.put(position(8, 'e'), piece(piece::silver, piece::elephant));
 
-  boost::shared_ptr<game> g(new game(initial_board, piece::gold));
+  boost::shared_ptr<game> g = boost::make_shared<game>(initial_board, piece::gold);
 
   g->root.disproof_number = 4;
 
@@ -63,7 +64,7 @@ boost::shared_ptr<game> make_game() {
 
 TEST(traversing, find_best_vertex_test) {
   boost::shared_ptr<game> g = make_game();
-  vertex::children_iterator found = traverser<fun_tp>(&best_successor).traverse(g->root);
+  vertex::children_iterator found = traverse(g->root, &best_successor);
 
   ASSERT_TRUE(found);
   EXPECT_EQ(1, found->proof_number);
@@ -79,39 +80,31 @@ TEST(traversing, hash_test) {
   zobrist_hasher hasher;
   zobrist_hasher::hash_t initial_hash = hasher.generate_initial(g->initial_state, g->attacker);
 
-  traverser<fun_tp, hash_visitor> t(&best_successor, hash_visitor(hasher, initial_hash, g->attacker));
-  t.traverse(g->root);
+  hash_visitor hash_v(hasher, initial_hash, g->attacker);
+  traverse(g->root, &best_successor, boost::ref(hash_v));
 
-  EXPECT_EQ(hasher.generate_initial(target, piece::silver), t.visitor.hash);
+  EXPECT_EQ(hasher.generate_initial(target, piece::silver), hash_v.hash);
 }
 
 TEST(traversing, board_test) {
   board target;
   boost::shared_ptr<game> g = make_game(target);
 
-  traverser<fun_tp, board_visitor<> > t(&best_successor, board_visitor<>(g->initial_state));
-  t.traverse(g->root);
+  board_visitor<> board_v(g->initial_state);
+  traverse(g->root, &best_successor, boost::ref(board_v));
 
-  EXPECT_EQ(target, t.visitor.board);
+  EXPECT_EQ(target, board_v.board);
 }
 
 TEST(traversing, history_test) {
   board target;
   boost::shared_ptr<game> g = make_game(target);
 
-  traverser<
-    fun_tp,
-    board_visitor<
-      history_visitor
-    >
-  > t(
-    &best_successor,
-    board_visitor<history_visitor>(g->initial_state, history_visitor(g->attacker))
-  );
+  history_visitor history_v(g->attacker);
+  board_visitor<boost::reference_wrapper<history_visitor> > board_v(g->initial_state, boost::ref(history_v));
+  traverse(g->root, &best_successor, boost::ref(board_v));
 
-  t.traverse(g->root);
-
-  history_visitor::history_cont& h = t.visitor.sub_visitor.history;
+  history_visitor::history_cont& h = history_v.history;
 
   ASSERT_EQ(2, h.size());
   EXPECT_EQ(g->initial_state, h[0].position);
@@ -124,13 +117,44 @@ TEST(traversing, history_test) {
 TEST(traversing, path_test) {
   boost::shared_ptr<game> g = make_game();
 
-  traverser<fun_tp, path_visitor> t(&best_successor);
-  t.traverse(g->root);
+  path_visitor path_v;
+  traverse(g->root, &best_successor, boost::ref(path_v));
 
-  EXPECT_EQ(4, t.visitor.path.size());
+  EXPECT_EQ(4, path_v.path.size());
   vertex::number_t dn = 3;
-  for (path_visitor::path_cont::iterator it = t.visitor.path.begin(); it != t.visitor.path.end(); ++it)
+  for (path_visitor::path_cont::iterator it = path_v.path.begin(); it != path_v.path.end(); ++it)
     EXPECT_EQ(++dn, (*it)->disproof_number);
+}
+
+TEST(algorithm, update_numbers_test) {
+  vertex v;
+  v.proof_number = 1;
+  v.disproof_number = 1;
+  v.type = vertex::type_or;
+
+  vertex::children_iterator child = v.add_child();
+  child->proof_number = 3;
+  child->disproof_number = 5;
+  child->type = vertex::type_or;
+
+  child = v.add_child();
+  child->proof_number = 8;
+  child->disproof_number = 2;
+  child->type = vertex::type_or;
+
+  child = v.add_child();
+  child->proof_number = 5;
+  child->disproof_number = 3;
+  child->type = vertex::type_and;
+
+  update_numbers(v);
+  EXPECT_EQ(3, v.proof_number);
+  EXPECT_EQ(10, v.disproof_number);
+
+  v.type = vertex::type_and;
+  update_numbers(v);
+  EXPECT_EQ(16, v.proof_number);
+  EXPECT_EQ(2, v.disproof_number);
 }
 
 int main(int argc, char** argv) {

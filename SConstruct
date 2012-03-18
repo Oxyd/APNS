@@ -45,10 +45,8 @@ if platform == 'win32':
 
 Export('debug', 'bits', 'toolchain', config=config[platform][toolchain])
 
-subTargets = SConscript('apnsmod_src/SConscript')
+subTargets = SConscript('apnsmod/SConscript')
 apnslib = subTargets['apnslib']
-
-apnslib = Install('apnsmod/', apnslib)
 Default(apnslib)
 
 # Alias all sub-targets here so that this script can be invoked using the more convenient syntax of 'scons board_test' instead

@@ -14,6 +14,7 @@ def config(conf, bits, debug):
         '-fstack-protector-all' if debug else ''
       ],
       'defines': [
+        'POSIX',
         'NDEBUG' if not debug else '',
         '_GLIBCXX_DEBUG' if debug else '',
         '_GLIBCXX_DEBUG_PEDANTIC' if debug else ''

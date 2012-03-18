@@ -3,7 +3,7 @@
 import re
 import sys
 import os
-from apnsmod import Board, Piece, Position, Vertex, Step #, dumpTree, loadTree
+from apnsmod import Board, Piece, Position, Vertex, Step, ProofNumberSearch, Game
 
 def _pieceFromLetter(letter):
   '''Given a letter representing a piece, return the piece. The conversion between letters and pieces is done according
@@ -331,13 +331,13 @@ def saveSearch(search, filename, operationController):
   '''Save the specified search to the given file-like object.'''
 
   with open(filename, 'w') as output:
-    _dumpBoardCompact(output, search.initialBoard)
+    _dumpBoardCompact(output, search.game.initialState)
 
-    if search.player == Piece.Color.gold: player = 'gold'
-    else:                                 player = 'silver'
-    output.write('{0} {1}\n'.format(player, search.positionCount))
+    if search.game.attacker == Piece.Color.gold: attacker = 'gold'
+    else: attacker = 'silver'
+    output.write('{0} {1}\n'.format(attacker, search.positionCount))
 
-  dumpTree(filename, search.root, True, operationController, search.positionCount)
+  dumpTree(filename, search.game.root, True, operationController, search.positionCount)
 
   if operationController.stop:
     # The operation was cancelled. The file is only partially written. Delete it.
@@ -365,8 +365,7 @@ def loadSearch(filename, operationController):
 
   tree = loadTree(filename, 2, operationController, positionCount)
   if tree is not None:
-    import apnsmod
-    search = apnsmod.PNS(board, tree, player, positionCount)
+    search = ProofNumberSearch(Game(board, player, tree), positionCount)
     return search
   else:
     return None

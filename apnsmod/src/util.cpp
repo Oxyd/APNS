@@ -102,21 +102,20 @@ unsigned operation_controller::get_work_total() const {
   return work_total;
 }
 
-#if 0
-void dump_tree(std::string const& filename, vertex_ptr root, bool append, operation_controller& op_ctrl, unsigned tree_size) {
+void dump_tree(std::string const& filename, vertex const& root, bool append, operation_controller& op_ctrl, unsigned tree_size) {
   std::ofstream output(filename.c_str(), append ? std::ios_base::out | std::ios_base::app : std::ios_base::out);
   output.exceptions(std::ios_base::badbit | std::ios_base::failbit);
 
   op_ctrl.update(0, tree_size);
 
   std::stack<vertex const*> stack;
-  stack.push(root);
+  stack.push(&root);
 
   while (!stack.empty() && !op_ctrl.stop()) {
     vertex const* v = stack.top();
     stack.pop();
 
-    std::string const step = v->leading_step ? v->leading_step->to_string() : "root";
+    std::string const step = v->step ? v->step->to_string() : "root";
     std::string const type = v->type == vertex::type_and ? "and" : "or";
 
     output << step << " : " << type << ' ' << v->steps_remaining << ' '
@@ -124,7 +123,7 @@ void dump_tree(std::string const& filename, vertex_ptr root, bool append, operat
            << ' '
            << (v->disproof_number < vertex::infty ? boost::lexical_cast<std::string>(v->disproof_number) : std::string("infty"))
            << ' '
-           << std::distance(v->children_begin(), v->children_end())
+           << v->children_count()
            << '\n';
 
     for (vertex::const_reverse_children_iterator child = v->children_rbegin(); child != v->children_rend(); ++child) {
@@ -137,7 +136,7 @@ void dump_tree(std::string const& filename, vertex_ptr root, bool append, operat
   op_ctrl.finished();
 }
 
-vertex_ptr load_tree(std::string const& filename, unsigned skip_lines, operation_controller& op_ctrl, unsigned tree_size) {
+vertex* load_tree(std::string const& filename, unsigned skip_lines, operation_controller& op_ctrl, unsigned tree_size) {
   op_ctrl.update(0, tree_size);
 
   std::ifstream input(filename.c_str());
@@ -180,7 +179,7 @@ vertex_ptr load_tree(std::string const& filename, unsigned skip_lines, operation
     if (step_str != "root") {
       boost::optional<step> maybe_step = step::from_string(step_str);
       if (!maybe_step) throw_loading_failed();
-      v->leading_step = *maybe_step;
+      v->step = *maybe_step;
     }
 
     std::string type_str;
@@ -230,12 +229,8 @@ vertex_ptr load_tree(std::string const& filename, unsigned skip_lines, operation
     if (!input) throw_loading_failed();
 
     if (children_count > 0) {
-      v->alloc_children(children_count);
+      v->resize(children_count);
       stack.push(std::make_pair(v->children_begin(), v->children_end()));
-
-      for (vertex::children_iterator child = v->children_begin(); child != v->children_end(); ++child) {
-        child->set_parent(v);
-      }
     }
 
     op_ctrl.update(op_ctrl.get_work_done() + 1, op_ctrl.get_work_total());
@@ -243,5 +238,4 @@ vertex_ptr load_tree(std::string const& filename, unsigned skip_lines, operation
 
   return root.release();
 }
-#endif
 

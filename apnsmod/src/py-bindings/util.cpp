@@ -1,4 +1,5 @@
 #include "util.hpp"
+#include "tree.hpp"
 
 #include <boost/python.hpp>
 
@@ -42,9 +43,7 @@ void export_util() {
       .def("doUpdate", pure_virtual(&operation_controller::do_update))
       ;
 
-#if 0
-  def("dumpTree", &dump_tree);
-  def("loadTree", &load_tree, return_internal_reference<>());
-#endif
+  //def("dumpTree", &dump_tree);
+  //def("loadTree", &load_tree, return_value_policy<manage_new_object>());
 }
 

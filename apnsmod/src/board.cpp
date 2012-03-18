@@ -356,9 +356,8 @@ std::string string_from_board(board const& board) {
   std::ostringstream output;
 
   for (board::pieces_iterator pos_piece = board.pieces_begin(); pos_piece != board.pieces_end(); ++pos_piece) {
-    if (pos_piece != board.pieces_begin()) {
+    if (pos_piece != board.pieces_begin())
       output << ' ';
-    }
 
     position const& pos = pos_piece->first;
     piece const& piece = pos_piece->second;
@@ -367,6 +366,26 @@ std::string string_from_board(board const& board) {
   }
 
   return output.str();
+}
+
+void board_from_string(std::string const& string, board& board) {
+  board.clear();
+
+  std::istringstream input(string);
+  std::string piece_and_position;
+  while (std::getline(input, piece_and_position, ' ')) {
+    if (piece_and_position.length() != 3)
+      throw std::runtime_error("Invalid board string");
+
+    unsigned const row = boost::lexical_cast<unsigned>(piece_and_position[0]);
+    char const     col = boost::lexical_cast<char>(piece_and_position[1]);
+
+    boost::optional<piece> maybe_piece = piece_from_letter(piece_and_position[2]);
+    if (maybe_piece)
+      board.put(position(row, col), *maybe_piece);
+    else
+      throw std::runtime_error("Invalid board string");
+  }
 }
 
 bool empty(position pos, board const& board) {

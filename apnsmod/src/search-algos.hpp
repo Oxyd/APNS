@@ -4,11 +4,23 @@
 #include "movement.hpp"
 #include "tree.hpp"
 
-#include <vector>
-
 #include <boost/shared_ptr.hpp>
+#include <boost/make_shared.hpp>
 #include <boost/utility.hpp>
 #include <boost/timer.hpp>
+#include <boost/ref.hpp>
+
+#include <vector>
+#include <cassert>
+
+/**
+ * Did any player win?
+ *
+ * \param board The game situation.
+ * \param player Last player to have made a move.
+ * \return If any player has won, return their color; otherwise return nothing.
+ */
+boost::optional<piece::color_t> winner(board const& board, piece::color_t player);
 
 //! Return the best successor of a vertex. Can be used as a traversal policy.
 vertex::children_iterator best_successor(vertex& parent);
@@ -34,9 +46,19 @@ struct board_visitor {
     if (v.step)
       apply(*v.step, board);
 
-    sub_visitor(v, board);
+    boost::unwrap_ref(sub_visitor)(v, board);
   }
 };
+
+//! Helper to make a board_visitor.
+template <typename SubVisitor>
+board_visitor<SubVisitor> make_board_visitor(::board const& initial_board, SubVisitor sub_visitor) {
+  return board_visitor<SubVisitor>(initial_board, sub_visitor);
+}
+
+inline board_visitor<null_board_visitor> make_board_visitor(::board const& initial_board) {
+  return board_visitor<null_board_visitor>(initial_board);
+}
 
 //! A visitor that allows composition of board_visitor sub-visitors. This is analogous to composite_visitor, except
 //! it also passes the computed board to the sub-visitors.
@@ -51,8 +73,8 @@ struct board_composite_visitor {
   { }
 
   void operator () (vertex& v, board& b) {
-    first(v, b);
-    second(v, b);
+    boost::unwrap_ref(first)(v, b);
+    boost::unwrap_ref(second)(v, b);
   }
 };
 
@@ -74,7 +96,7 @@ struct history_visitor {
   history_cont history;
 
   explicit history_visitor(piece::color_t attacker);
-  void operator () (vertex const& v, board const& board);
+  bool operator () (vertex const& v, board const& board);
 
 private:
   vertex::e_type  last_visited_type;
@@ -96,7 +118,7 @@ struct hash_visitor {
     hasher(&hasher)
   { }
 
-  void operator () (vertex const& v);
+  bool operator () (vertex const& v);
 
 private:
   vertex::e_type        last_visited_type;
@@ -149,60 +171,51 @@ protected:
 //! The basic variant of the Proof-Number Search algorithm.
 class proof_number_search : public base_algo<proof_number_search> {
 public:
-  //! Make an algorithm instance for the given game instance. This algorithm takes shared ownership of the game instance.
-  explicit proof_number_search(boost::shared_ptr< ::game> const& game) :
-    initial_hash(hasher.generate_initial(game->initial_state, game->attacker))
+  //! Make an algorithm instance for the given game instance. 
+  //!
+  //! \param position_count Number of positions in the passed-in game.
+  explicit proof_number_search(boost::shared_ptr< ::game> const& game, std::size_t position_count = 1) :
+    game(game),
+    initial_hash(hasher.generate_initial(game->initial_state, game->attacker)),
+    position_count(position_count)
   { }
 
   //! Get the associated game instance.
-  boost::shared_ptr< ::game> do_get_game() const { return game; }
+  boost::shared_ptr< ::game> do_get_game() const {
+    assert(game);
+    return game; 
+  }
 
   //! Has the algorithm finished?
-  bool do_finished() const { return game->root.proof_number == 0 || game->root.disproof_number == 0; }
+  bool do_finished() const { 
+    return game->root.proof_number == 0 || game->root.disproof_number == 0; 
+  }
 
   //! Perform an iteration of the algorithm.
   void do_iterate();
 
+  //! Make the algorithm use a transposition table.
+  void use_trans_tbl(std::size_t size, std::size_t keep_time) {
+    trans_tbl.reset(new transposition_table(size, keep_time)); 
+  }
+
+  //! Get the transposition table, if any, used by this algorithm.
+  //! \returns Pointer to the transposition table or null if no table is associated with this algorithm.
+  transposition_table const* get_trans_tbl() const {
+    return trans_tbl.get(); 
+  }
+
+  //! Get the total number of vertices currently held by this algorithm.
+  std::size_t get_position_count() const {
+    return position_count;
+  }
+
 private:
-  //! Helper wrapper class for the visitors used during this algorithm.
-  struct leaf_visitors {
-    typedef composite_visitor<
-      hash_visitor,
-      composite_visitor<
-        path_visitor,
-        board_visitor<
-          history_visitor
-        >
-      >
-    > visitor;
-
-    visitor v;
-
-    leaf_visitors(::board const& initial_board, zobrist_hasher const& hasher,
-                  zobrist_hasher::hash_t initial_hash, piece::color_t attacker) :
-      v(
-        hash_visitor(hasher, initial_hash, attacker),
-        composite_visitor<path_visitor, board_visitor<history_visitor> >(
-          path_visitor(),
-          board_visitor<history_visitor>(
-            initial_board,
-            history_visitor(
-              attacker))))
-    { }
-
-    void operator () (vertex& vertex) {
-      v(vertex);
-    }
-
-    zobrist_hasher::hash_t get_hash()             { return v.first.hash; } 
-    path_visitor::path_cont& get_path()           { return v.second.first.path; }
-    ::board& get_board()                          { return v.second.second.board; }
-    history_visitor::history_cont& get_history()  { return v.second.second.sub_visitor.history; }
-  };
-
   boost::shared_ptr< ::game>  game;
+  boost::scoped_ptr<transposition_table> trans_tbl;
   zobrist_hasher              hasher;         //!< Hasher to be used during the algorithm.
   zobrist_hasher::hash_t      initial_hash;   //!< Hash corresponding to initial_state.
+  std::size_t                 position_count;
 
   //! Expand a leaf.
   //!

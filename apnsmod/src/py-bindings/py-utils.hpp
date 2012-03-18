@@ -1,6 +1,8 @@
 #ifndef PY_BINDINGS_PY_UTILS
 #define PY_BINDINGS_PY_UTILS
 
+#include <boost/python.hpp>
+
 //! Convert a C++ sequence into a Python list.
 template <typename Iterator>
 boost::python::list py_list_from_cpp_seq(Iterator begin, Iterator end) {
@@ -55,7 +57,7 @@ struct pair_to_tuple {
   static PyObject* convert(std::pair<A, B> p) {
     using namespace boost::python;
 
-    return incref(make_tuple(p.first, p.second).ptr());
+    return incref(boost::python::make_tuple(p.first, p.second).ptr());
   }
 };
 

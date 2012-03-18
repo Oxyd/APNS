@@ -1,6 +1,7 @@
 #include "movement.hpp"
 #include "py-utils.hpp"
 
+#include <boost/optional.hpp>
 #include <boost/python.hpp>
 
 /**
@@ -8,8 +9,6 @@
  */
 void export_movement() {
   using namespace boost::python;
-
-  to_python_converter<boost::optional<step>, optional_to_T<step> >();
 
   class_<elementary_step>("ElementaryStep",
     "An elementary step is a displacement of a single piece on the board or a capture of a piece."
@@ -85,5 +84,7 @@ void export_movement() {
   def("opponentColor", &opponent_color,
       "opponentColor(Color) -> Color\n\n"
       "Given a player's color, return the opponent's color.");
+
+  to_python_converter<boost::optional<step>, optional_to_T<step> >();
 }
 

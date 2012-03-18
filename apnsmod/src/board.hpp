@@ -129,8 +129,9 @@ public:
   col_t get_column() const;
 
 private:
-  row_t row;
-  col_t column;
+  // Use unsigned char for both so that position is only two chars in size.
+  unsigned char row;
+  unsigned char column;
 
   //! For Python bindings only.
   python_col_t get_column_py() const;
@@ -259,6 +260,12 @@ public:
    */
   boost::optional<piece> get(position from) const;
 
+  //! Remove all pieces from the board.
+  void clear() {
+    for (pieces_cont::iterator piece = pieces.begin(); piece != pieces.end(); ++piece)
+      *piece = boost::none;
+  }
+
   pieces_iterator pieces_begin() const;  //!< Get the start iterator of the sequence of all pieces stored within board.
   pieces_iterator pieces_end() const;    //!< Get the one-past-the-end iterator of the sequence.
 
@@ -271,6 +278,13 @@ bool operator != (board const& lhs, board const& rhs);
 
 //! Create a single-line string representation of a board.
 std::string string_from_board(board const& board);
+
+//! Re-create a board from a single-line string representation given by string_from_board.
+//!
+//! The input board will be .clear()ed before being populated with pieces.
+//!
+//! \throws std::runtime_error Thrown if the string is not a valid representation of a board.
+void board_from_string(std::string const& string, ::board& board);
 
 //! Is the given position on a given board empty?
 bool empty(position pos, board const& board);
