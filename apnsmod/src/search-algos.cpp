@@ -252,7 +252,10 @@ void proof_number_search::expand(vertex::children_iterator leaf, ::board& leaf_s
     
     apply(step, leaf_state);
     
-    boost::optional<piece::color_t> winner = ::winner(leaf_state, player);
+    boost::optional<piece::color_t> winner;
+    if (child->type != leaf->type)  // Only check for win if this is the start of a move.
+      winner = ::winner(leaf_state, player);
+
     if (winner) {
       if (*winner == game->attacker) {
         child->proof_number     = 0;

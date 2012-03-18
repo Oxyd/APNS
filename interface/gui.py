@@ -1,11 +1,12 @@
 # -*- Encoding: utf-8 -*-
 
-from apnsmod import Board, Vertex, Piece, Position, OperationController, Step, empty, apply, opponentColor,\
-                    memoryUsedTotal, TranspositionTable, saveGame, loadGame
+#from apnsmod import Board, Vertex, Piece, Position, OperationController, Step, empty, apply, opponentColor,\
+                    #memoryUsedTotal, TranspositionTable, saveGame, loadGame
 import apnsmod
 from interface.fileio import loadBoard, saveBoard
 from interface.observable import Observable
 from interface.search import makeSearch
+from interface.controller import Controller, SearchProgress, SearchParameters, loadBoard, saveBoard
 
 import time, gc, os, sys, itertools
 
@@ -18,8 +19,9 @@ except ImportError:
   print >> sys.stderr, 'Importing one of Tkinter modules has failed. Please make sure you have Tkinter installed.'
   raise SystemExit(1)
 
-_COLORS = (Piece.Color.gold, Piece.Color.silver)
-_TYPES = (Piece.Type.elephant, Piece.Type.camel, Piece.Type.horse, Piece.Type.dog, Piece.Type.cat, Piece.Type.rabbit)
+_COLORS = (apnsmod.Piece.Color.gold, apnsmod.Piece.Color.silver)
+_TYPES = (apnsmod.Piece.Type.elephant, apnsmod.Piece.Type.camel, apnsmod.Piece.Type.horse,
+          apnsmod.Piece.Type.dog, apnsmod.Piece.Type.cat, apnsmod.Piece.Type.rabbit)
 
 _BOARD_SIZE = (_BOARD_WIDTH, _BOARD_HEIGHT) = (402, 402)
 _TILE_SIZE = (_TILE_WIDTH, _TILE_HEIGHT) = (48, 48)
@@ -58,8 +60,6 @@ class MainWindow(Observable):
                                      command=lambda: self.notifyObservers(command=MainWindow.Command.loadSearch))
     self._saveSearchBtn = ttk.Button(self._toolbar, text='Save Search',
                                      command=lambda: self.notifyObservers(command=MainWindow.Command.saveSearch))
-    self._iterateBtn = ttk.Button(self._toolbar, text='Iterate',
-                                  command=lambda: self.notifyObservers(command=MainWindow.Command.iterate))
     self._saveBtn = ttk.Button(self._toolbar, text='Save Position',
                                command=lambda: self.notifyObservers(command=MainWindow.Command.savePosition))
     self._statsBtn = ttk.Button(self._toolbar, text='Search Stats',
@@ -79,7 +79,6 @@ class MainWindow(Observable):
     self._saveSearchBtn.grid(row=0, column=3, padx=(3, 3))
     self._saveBtn.grid(row=0, column=4, padx=(3, 3))
     self._statsBtn.grid(row=0, column=5, padx=(3, 0))
-    self._iterateBtn.grid(row=0, column=6, padx=(3, 0))
 
     self._toolbar.grid(row=0, column=0, sticky='W')
     self._resultsDisplay.widget.grid(row=1, column=0, sticky='NSEW')
@@ -98,7 +97,6 @@ class MainWindow(Observable):
 
     self._runBtn['state'] = ['!disabled']
     self._saveSearchBtn['state'] = ['!disabled']
-    self._iterateBtn['state'] = ['!disabled']
     self._saveBtn['state'] = ['!disabled']
 
 
@@ -107,7 +105,6 @@ class MainWindow(Observable):
 
     self._runBtn['state'] = ['disabled']
     self._saveSearchBtn['state'] = ['disabled']
-    self._iterateBtn['state'] = ['disabled']
     self._saveBtn['state'] = ['disabled']
 
 
@@ -134,9 +131,7 @@ class MainWindowController(object):
     self._mainWindowDsply = mainWindowDsply
     self._mainWindowDsply.addObserver(self)
     self._resultsCtrl = mainWindowDsply.searchResultsController
-    self._search = None
-    self._runPreferences = dict()
-    self._runStats = None
+    self._controller = Controller()
 
 
   def runApplication(self):
@@ -159,35 +154,27 @@ class MainWindowController(object):
                                                  'Specify an initial search position or load one from disk:', 
                                                  self._mainWindowDsply.imageManager)
       if positionEditorDlg.board is not None:
-        del self._search
-        self._resetSearch(None)
+        self._controller.newGame(positionEditorDlg.board, positionEditorDlg.player)
         gc.collect()
-
-        search = makeSearch(positionEditorDlg.board, positionEditorDlg.player)
-        self._resetSearch(search)
+        self._resultsCtrl.updateTree(self._controller)
         self._mainWindowDsply.disableStats()
-
-    elif command == MainWindow.Command.iterate:
-      if self._search.transpositionTable is None:
-        self._search.useTransTbl(100 * 1024 * 1024 / TranspositionTable.sizeOfElement, 16)
-      self._search.iterate()
-      self._resultsCtrl.updateTree()
+        self._mainWindowDsply.enableSearch()
 
     elif command == MainWindow.Command.runSearch:
       dlg = RunSearchDialog(self._mainWindowDsply.window)
-      runSearchCtrl = RunSearchController(dlg, self._search, self._runPreferences)
+      runSearchCtrl = RunSearchController(dlg, self._controller.searchParameters)
       (doRun, newPrefs) = runSearchCtrl.run()
 
       if doRun:
         if newPrefs is not None:
-          self._runPreferences = newPrefs
+          self._controller.searchParameters = newPrefs
 
-        self._search.useTransTbl(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
+        #self._search.useTransTbl(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
         dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
-        searchProgressCtrl = SearchProgressController(self._search, dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit,
+        searchProgressCtrl = SearchProgressController(dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit,
                                                       runSearchCtrl.memLimit)
-        self._runStats = searchProgressCtrl.run()
-        self._resultsCtrl.updateTree()
+        self._runStats = searchProgressCtrl.run(self._controller)
+        self._resultsCtrl.updateTree(self._controller)
 
         gc.collect()
 
@@ -197,35 +184,34 @@ class MainWindowController(object):
     elif command == MainWindow.Command.savePosition:
       filename = tkFileDialog.asksaveasfilename()
       if len(filename) > 0:
-        self._resultsCtrl.savePosition(str(filename))
+        self._resultsCtrl.savePosition(str(filename), self._controller)
 
     elif command == MainWindow.Command.loadSearch:
       filename = tkFileDialog.askopenfilename()
       if len(filename) > 0:
-        del self._search
-        self._resetSearch(None)
+        self._controller.dropGame()
         gc.collect()
 
         dlg = LoadProgressDialog(self._mainWindowDsply.window)
-        ctrl = LoadProgressController(dlg, str(filename))
-        if ctrl.search:
-          self._resetSearch(ctrl.search)
+        ctrl = LoadProgressController(self._controller, dlg, str(filename))
+        self._resultsCtrl.updateTree(self._controller)
+
+        if self._controller.gameLoaded:
+          self._mainWindowDsply.enableSearch()
+          self._mainWindowDsply.disableStats()
 
     elif command == MainWindow.Command.saveSearch:
       filename = tkFileDialog.asksaveasfilename()
       if len(filename) > 0:
         dlg = SaveProgressDialog(self._mainWindowDsply.window)
-        SaveProgressController(dlg, self._search, str(filename))
+        SaveProgressController(self._controller, dlg, str(filename))
 
     elif command == MainWindow.Command.searchStats:
       dlg = SearchProgressDialog(self._mainWindowDsply.window, showTimeLeft=False, running=False)
-      SearchStatsController(dlg, self._runStats)
+      SearchStatsController(dlg, self._controller.stats)
 
     elif command == MainWindow.Command.close:
-      self._resetSearch(None)
-      gc.collect()
       self._mainWindowDsply.destroy()
-
 
 
   def _resetSearch(self, newSearch):
@@ -259,12 +245,12 @@ class ResultsDisplay(Observable):
     self._tree = ttk.Treeview(self._content)
     self._tree['columns'] = ('best', 'type', 'pn', 'dn')
     self._tree['selectmode'] = 'browse'
-    self._tree.column(0, stretch=False, width=10)
+    self._tree.column(0, stretch=False, width=20)
     self._tree.column(1, stretch=True, width=60)
     self._tree.column(2, stretch=False, width=40)
     self._tree.column(3, stretch=False, width=40)
     self._tree.heading('#0', text='Step')
-    self._tree.heading(0, text='*')
+    self._tree.heading(0, text='**')
     self._tree.heading(1, text='Type')
     self._tree.heading(2, text='PN')
     self._tree.heading(3, text='DN')
@@ -289,7 +275,7 @@ class ResultsDisplay(Observable):
     self._content.columnconfigure(0, weight=1)
 
 
-  def addNode(self, parent, name, type, pn, dn, best=False):
+  def addNode(self, parent, name, type, pn, dn, best=False, principal=False):
     '''Add a node to the tree. Return a handle of the node, which can later be used to remove the node, or attach a child
     to it.
 
@@ -299,7 +285,14 @@ class ResultsDisplay(Observable):
     if parent is None:
       parent = ''
 
-    handle = self._tree.insert(parent, 'end', text=name, values=('*' if best else '', type, pn, dn))
+    if principal:
+      mark = '**'
+    elif best:
+      mark = '*'
+    else:
+      mark = ''
+
+    handle = self._tree.insert(parent, 'end', text=name, values=(mark, type, pn, dn))
     return handle
 
 
@@ -309,10 +302,17 @@ class ResultsDisplay(Observable):
     self._tree.delete(handle)
 
 
-  def updateNode(self, handle, type, pn, dn, best=False):
+  def updateNode(self, handle, type, pn, dn, best=False, principal=False):
     '''Change the PN and DN values of a node.'''
 
-    self._tree.item(handle, values=('*' if best else '', type, pn, dn))
+    if principal:
+      mark = '**'
+    elif best:
+      mark = '*'
+    else:
+      mark = ''
+
+    self._tree.item(handle, values=(mark, type, pn, dn))
 
 
   def selectNode(self, handle):
@@ -373,7 +373,7 @@ class ResultsDisplay(Observable):
 def strFromNum(n):
   '''Return the string representation of n as a proof-/disproof-number.'''
 
-  if n < Vertex.infty:
+  if n < apnsmod.Vertex.infty:
     return unicode(n)
   else:
     return u'∞'
@@ -398,7 +398,7 @@ class ResultsController(object):
       ResultsController._DisplayNode._handleToNode = {}
 
 
-    def __init__(self, parent, vertex, display, best):
+    def __init__(self, parent, vertex, display, best, principal):
       '''Create a node and attach it to the display.'''
 
       object.__init__(self)
@@ -407,14 +407,14 @@ class ResultsController(object):
       self.children = []    # _DisplayNode children of this node.
       self.parent = parent  # _DisplayNode parent of this node.
       self._best = best
-      self.bestVertex = None
+      self.principal = principal
 
       name = 'root' if self.vertex.step is None else self.vertex.step.toString()
       parent = self.parent.handle if self.parent is not None else None
       self.handle = display.addNode(parent, name, self._getType(),
                                     strFromNum(self.vertex.proofNumber),
                                     strFromNum(self.vertex.disproofNumber),
-                                    best)
+                                    best, principal)
       ResultsController._DisplayNode._handleToNode[self.handle] = self
 
 
@@ -434,7 +434,7 @@ class ResultsController(object):
       display.updateNode(self.handle, self._getType(),
                          strFromNum(self.vertex.proofNumber),
                          strFromNum(self.vertex.disproofNumber),
-                         self.best)
+                         self.best, self.principal)
 
 
     def setBest(self, newBest, display):
@@ -442,6 +442,22 @@ class ResultsController(object):
 
       self._best = newBest
       self.updateDisplay(display)
+
+
+    def setPrincipal(self, newPrincipal, display):
+      '''Toggle the 'principal' flag of this vertex.'''
+
+      if newPrincipal != self.principal:
+        self.principal = newPrincipal
+
+        if self.principal:
+          for child in self.children:
+            if child.best: child.setPrincipal(True, display)
+        else:
+          for child in self.children:
+            child.setPrincipal(False, display)
+
+        self.updateDisplay(display)
 
 
     def expand(self, display):
@@ -453,57 +469,37 @@ class ResultsController(object):
       otherTypeChildren = (c for c in self.vertex.children if c.type_ != self.vertex.type_)
 
       for child in itertools.chain(sameTypeChildren, otherTypeChildren):
-        self.children.append(ResultsController._DisplayNode(self, child, display, False))
+        self.children.append(ResultsController._DisplayNode(self, child, display, False, False))
 
 
     def _getType(self):
-      return 'AND' if self.vertex.type_ == Vertex.Type.and_ else 'OR'
+      return 'AND' if self.vertex.type_ == apnsmod.Vertex.Type.and_ else 'OR'
 
 
   def __init__(self, resultsDisplay):
     object.__init__(self)
 
-    self._search = None
-    self._tree = None
     self._resultsDsply = resultsDisplay
     self._resultsDsply.addObserver(self)
-
-
-  def attachToSearch(self, search):
-    '''Attach this controller to a new search object. The previous search (if any) will be removed from the interface, and
-    the specified new one will be presented to the user. If search is None, no search will be shown.
-    '''
-
-    if self._search is not None:
-      self._resultsDsply.removeNode(self._tree.handle)
-      del self._search
-
-    self._search = search
     self._tree = None
-    ResultsController._DisplayNode.release()
-
-    if self._search is not None:
-      self._tree = ResultsController._DisplayNode(None, self._search.game.root, self._resultsDsply, True)
-      self._tree.expand(self._resultsDsply)
-      self._updateBest(self._tree)
-      self._resultsDsply.selectNode(self._tree.handle)
-    else:
-      self._resultsDsply.showBoard(None)
+    self._initialBoard = None
 
 
-  def savePosition(self, filename):
+  def savePosition(self, filename, controller):
     '''Save the currently displayed position to the given file.'''
 
     selectedHandle = self._resultsDsply.selected()
     turn = 1  # Ignore turn numbers.
 
     if self._resultsDsply.getNodeType(selectedHandle) == 'AND':
-      player = opponentColor(self._search.player)
+      player = apnsmod.opponentColor(controller.attacker)
     else:
-      player = self._search.player
+      player = controller.attacker
 
-    if player == Piece.Color.gold:  p = 'g'
-    else:                           p = 's'
+    if player == apnsmod.Piece.Color.gold:
+      p = 'g'
+    else:
+      p = 's'
 
     saveBoard(self._resultsDsply.boardController.board, turn, p, filename)
 
@@ -513,8 +509,7 @@ class ResultsController(object):
     handle the expansion of a vertex.
     '''
 
-    if self._search is None:
-      return
+    if self._tree is None: return
 
     if command == ResultsDisplay.Command.show:
       # Display the board corresponding to the newly-selected vertex.
@@ -526,28 +521,21 @@ class ResultsController(object):
       self._expandVertex(handle)
 
 
-  def updateTree(self):
+  def updateTree(self, controller):
     '''Update the display of the search tree. This will first update the PN and DN values of all nodes already displayed,
     then it will attach new nodes -- that are not displayed yet -- to the display.
     '''
 
-    # Traverse the whole tree. For each vertex we'll first update the values. Then check whether the displayed vertex is a leaf
-    # while the real vertex has been expanded -- if that is so, we'll expand the displayed vertex as well.
+    if self._tree:
+      self._resultsDsply.removeNode(self._tree.handle)
+      ResultsController._DisplayNode.release()
 
-    stack = [self._tree]
-    while len(stack) > 0:
-      node = stack.pop()
-      node.updateDisplay(self._resultsDsply)
-
-      if len(node.children) == 0 and node.vertex.childrenCount > 0:
-        # The real vertex has been expanded, but the display vertex hasn't.
-        node.expand(self._resultsDsply)
-        self._updateBest(node)
-
-        continue  # But do not process the children recursively.
-
-      self._updateBest(node)
-      stack.extend(node.children)
+    if controller.root is not None:
+      self._tree = ResultsController._DisplayNode(None, controller.root, self._resultsDsply, True, True)
+      self._initialState = controller.initialState.copy()
+      self._tree.expand(self._resultsDsply)
+      self._updateBest(self._tree)
+      self._resultsDsply.selectNode(self._tree.handle)
 
 
   def _expandVertex(self, handle):
@@ -569,7 +557,10 @@ class ResultsController(object):
 
     best = apnsmod.bestSuccessor(vertex.vertex)
     for child in vertex.children:
-      child.setBest(hash(child.vertex) == hash(best), self._resultsDsply)
+      isBest = hash(child.vertex) == hash(best)
+      child.setBest(isBest, self._resultsDsply)
+      if vertex.principal:
+        child.setPrincipal(isBest, self._resultsDsply)
 
 
   def _getDisplayedBoard(self, vertex):
@@ -582,11 +573,11 @@ class ResultsController(object):
       vertex = self._resultsDsply.getParent(vertex)
 
     # Now, having the path on the stack, go back down, transforming the initial board into the final result.
-    result = self._search.game.initialState.copy()
+    result = self._initialState.copy()
     while len(stack) > 0:
-      step = Step.fromString(stack.pop())
+      step = apnsmod.Step.fromString(stack.pop())
       if step is not None:
-        apply(step, result)
+        apnsmod.apply(step, result)
 
     return result
 
@@ -606,7 +597,7 @@ class ResultsController(object):
     else:
       name = 'Initial Position'
 
-    h = self._resultsDsply.addNode(parentHandle, 
+    h = self._resultsDsply.addNode(parentHandle,
                                    name,
                                    self._nodeType(child),
                                    strFromNum(child.proofNumber), strFromNum(child.disproofNumber),
@@ -743,36 +734,33 @@ class SaveProgressDialog(Observable):
     self._dialog.close()
 
 
+class Canceller:
+  def __init__(self, controller, dialog):
+    self.controller = controller
+    self.dialog = dialog
+
+  def callback(self, controller):
+    self.dialog.window.update()
+
+  def update(self, source):
+    '''Update from the dialog -- this means the user wishes to cancel the operation.'''
+    self.controller.cancel()
+
+
 class SaveProgressController(object):
-  def __init__(self, dialog, search, filename):
+  def __init__(self, controller, dialog, filename):
     object.__init__(self)
 
-    class OpCtrl(OperationController):
-      def __init__(self):
-        OperationController.__init__(self, 100)
-
-      def doUpdate(self):
-        '''Update of the algorithm progress.'''
-        if self.workTotal > 0.0:
-          dialog.showProgress(100.0 * float(self.workDone) / float(self.workTotal))
-        else:
-          dialog.showProgress(0.0)
-        dialog.window.update()
-
-      def update(self, source):
-        '''Update from the dialog. It's only called when the user presses the Cancel button.'''
-        self.requestStop()
-
-    opCtrl = OpCtrl()
-    dialog.addObserver(opCtrl)
-    dialog.run()
+    canceller = Canceller(controller, dialog)
+    controller.saveGameCallbacks.add(canceller.callback)
+    dialog.addObserver(canceller)
 
     try:
-      saveGame(search.game, filename, opCtrl)
+      controller.saveGame(filename)
     except RuntimeError, e:
       tkMessageBox.showerror('Could not savePosition search', 'Saving search to {0} failed:\n{1}'.format(filename, e))
-      os.remove(filename)
 
+    controller.saveGameCallbacks.remove(canceller.callback)
     dialog.close()
 
 
@@ -828,49 +816,20 @@ class LoadProgressDialog(Observable):
 class LoadProgressController(object):
   search = property(lambda self: self._search)
 
-  def __init__(self, dlg, filename):
+  def __init__(self, controller, dlg, filename):
     object.__init__(self)
 
-    class OpCtrl(OperationController):
-      def __init__(self):
-        OperationController.__init__(self, 100)
-
-      def doUpdate(self):
-        '''Update progress information.'''
-        KB = 1024
-        MB = 1024 * KB
-
-        dlg.showProgress(100.0 * float(self.workDone) / float(self.workTotal))
-
-        memUsage = memoryUsedTotal()
-        if memUsage <= KB:
-          mem = '%.2f B' % memUsage
-        elif KB < memUsage <= MB:
-          mem = '%.2f kB' % (float(memUsage) / float(KB))
-        else:
-          mem = '%.2f MB' % (float(memUsage) / float(MB))
-
-        dlg.showMemoryUsage(mem)
-
-        dlg.window.update()
-
-      def update(self, source):
-        '''Cancel has been clicked.'''
-        self.requestStop()
-
-    ctrl = OpCtrl()
-    dlg.addObserver(ctrl)
-    dlg.run()
+    canceller = Canceller(controller, dlg)
+    controller.loadGameCallbacks.add(canceller.callback)
+    dlg.addObserver(canceller)
 
     try:
-      (game, vertexCount) = loadGame(filename, ctrl)
-      if game:
-        self._search = ProofNumberSearch(game, vertexCount)
+      controller.loadGame(filename)
     except RuntimeError, e:
       tkMessageBox.showerror('Could not load search',
                              'Loading of the search tree from {0} failed:\n{1}'.format(filename, e))
-      self._search = None
 
+    controller.loadGameCallbacks.remove(canceller.callback)
     dlg.close()
 
 
@@ -1065,27 +1024,31 @@ class RunSearchController(object):
   transTblSize = property(lambda self: self._transTblSize)
   showTimeLeft = property(lambda self: self._showTimeLeft)
 
-  def __init__(self, runSearchDlg, search, lastValues):
+  def __init__(self, runSearchDlg, parameters):
     '''Create the controller and attach it to the dialog and search.
-
-    lastValues is a dictionary specifying last set values in the dialog.
     '''
     object.__init__(self)
 
     self._runSearchDlg = runSearchDlg
-    self._search = search
 
     # Only enable the memory limit by default on 32-bit systems
     is64Bit = sys.maxsize > 2**32  # Trick straight from the docs.
 
+    def get(name, default):
+      v = parameters.__dict__.get(name, None)
+      if v is not None:
+        return v
+      else:
+        return default
+
     self._runSearchDlg.addObserver(self)
-    self._runSearchDlg.timeLimit = lastValues.get('timeLimit', 60)
-    self._runSearchDlg.timeLimitCheck = lastValues.get('timeLimitCheck', True)
-    self._runSearchDlg.positionLimit = lastValues.get('positionLimit', 10000)
-    self._runSearchDlg.positionLimitCheck = lastValues.get('positionLimitCheck', False)
-    self._runSearchDlg.memLimit = lastValues.get('memLimit', 1500)
-    self._runSearchDlg.memLimitCheck = lastValues.get('memLimitCheck', not is64Bit)
-    self._runSearchDlg.transTblSize = lastValues.get('transTblSize', 32)
+    self._runSearchDlg.timeLimit = get('timeLimit', 60)
+    self._runSearchDlg.timeLimitCheck = get('timeLimitCheck', True)
+    self._runSearchDlg.positionLimit = get('positionLimit', 10000)
+    self._runSearchDlg.positionLimitCheck = get('positionLimitCheck', False)
+    self._runSearchDlg.memLimit = get('memLimit', 1500)
+    self._runSearchDlg.memLimitCheck = get('memLimitCheck', not is64Bit)
+    self._runSearchDlg.transTblSize = get('transTblSize', 32)
 
     self._doRun = False
     self._lastSetValues = None
@@ -1127,22 +1090,22 @@ class RunSearchController(object):
         else:
           memLimit = None
 
-        self._transTblSize = (int(self._runSearchDlg.transTblSize) * MB) / TranspositionTable.sizeOfElement
+        self._transTblSize = (int(self._runSearchDlg.transTblSize) * MB) / apnsmod.TranspositionTable.sizeOfElement
         self._timeLimit = sTimeLimit
         self._posLimit = posLimit
         self._memLimit = memLimit
         self._showTimeLeft = showTimeLeft
 
-        self._lastSetValues = dict()
+        self._lastSetValues = SearchParameters()
         last = self._lastSetValues
 
-        last['timeLimitCheck'] = showTimeLeft
-        last['timeLimit'] = self._runSearchDlg.timeLimit
-        last['positionLimit'] = self._runSearchDlg.positionLimit
-        last['positionLimitCheck'] = self._runSearchDlg.positionLimitCheck
-        last['memLimit'] = self._runSearchDlg.memLimit
-        last['memLimitCheck'] = self._runSearchDlg.memLimitCheck
-        last['transTblSize'] = self._runSearchDlg.transTblSize
+        last.timeLimitCheck = bool(showTimeLeft)
+        last.timeLimit = int(self._runSearchDlg.timeLimit)
+        last.positionLimit = int(self._runSearchDlg.positionLimit)
+        last.positionLimitCheck = bool(self._runSearchDlg.positionLimitCheck)
+        last.memLimit = int(self._runSearchDlg.memLimit)
+        last.memLimitCheck = bool(self._runSearchDlg.memLimitCheck)
+        last.transTblSize = int(self._runSearchDlg.transTblSize)
 
         self._doRun = True
         self._runSearchDlg.close()
@@ -1221,8 +1184,8 @@ class SearchProgressDialog(Observable):
     self._cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel' if running else 'OK', command=self._cancel)
     self._dialog.setDeleteAction(lambda: self._cancelBtn.invoke())
 
-    progress = ttk.Labelframe(self._dialog.content, 
-                              text='Progress:' if running else 'Time:', 
+    progress = ttk.Labelframe(self._dialog.content,
+                              text='Progress:' if running else 'Time:',
                               padding=3)
 
     rootPnLabel = ttk.Label(progress, text='Root PN:')
@@ -1244,7 +1207,7 @@ class SearchProgressDialog(Observable):
       timeElapsedLabel.grid(row=0, column=0, sticky='E')
       self._timeElapsed.grid(row=0, column=1, sticky='W', padx=(5, 0))
 
-    if showTimeLeft: 
+    if showTimeLeft:
       timeLeftLabel = ttk.Label(progress, text='Time left:')
       self._timeLeft = ttk.Label(progress)
       timeLeftLabel.grid(row=3, column=0, sticky='E')
@@ -1328,7 +1291,7 @@ class SearchProgressDialog(Observable):
     '''Show statistics about the number of positions considered.'''
 
     self._posCount['text'] = '%s' % posCount
-    self._posPerSec['text'] = '%s' % posPerSec
+    self._posPerSec['text'] = '%s' % int(posPerSec)
 
 
   def showRootPnDn(self, pn, dn):
@@ -1344,12 +1307,9 @@ class SearchProgressDialog(Observable):
 class SearchProgressController(object):
   '''A controller of SearchProgressDialog.'''
 
-  _MS_BURST_TIME = 100  # How long should the search bursts take, in milliseconds.
-
-  def __init__(self, search, searchProgressDlg, timeLimit, posLimit, memLimit):
+  def __init__(self, searchProgressDlg, timeLimit, posLimit, memLimit):
     object.__init__(self)
 
-    self._search = search
     self._searchProgressDlg = searchProgressDlg
 
     self._timeLimit = timeLimit
@@ -1357,168 +1317,56 @@ class SearchProgressController(object):
     self._memLimit = memLimit
     self._cancel = False
 
-    self._searchProgressDlg.addObserver(self)
 
-
-  def run(self):
+  def run(self, controller):
     '''Run the search. This call will only return after the search is either finished or the user has decided to cancel it.
 
     Returns a dictionary with the statistics, that can later be fed into PositionStatsController.
     '''
 
+    MS_BURST_TIME = 100
+
     self._searchProgressDlg.run()
 
-    self._sStart = time.clock()
-    self._sNow = time.clock()
-    self._sElapsedTime = 0
-    memAllocatedStr = 0
-    self._memAllocated = 0
+    class Updater:
+      def __init__(self, dialog, progCtrl):
+        self.dlg = dialog
+        self.progCtrl = progCtrl
 
-    lastPosCount = 0
-    lastPosPerSecMeasure = self._sNow
+      def update(self, source):
+        '''This is an event from SearchProgressDialog -- the only event it ever fires up is the Cancel event.'''
+        controller.cancel()
 
-    mbTransTblSize = '0.0'
-    hits = 0
-    misses = 0
-    posCount = 0
-    posPerSec = 0
-    rootPn = 0
-    rootDn = 0
+      def updateDlg(self, controller, progress):
+        dlg = self.dlg
+        if self.progCtrl._timeLimit is not None:
+          dlg.showTimeLeft(progress.timeLeft)
+        dlg.showTimeElapsed(progress.timeElapsed)
+        dlg.showTransTblStats(memUsed=progress.transTblSize, hits=progress.transTblHits, misses=progress.transTblMisses)
+        dlg.showPosCount(posCount=progress.positionCount, posPerSec=progress.positionsPerSecond)
+        dlg.showRootPnDn(progress.rootPN, progress.rootDN)
+        dlg.updateGui()
 
-    try:
-      while not self._finished():
-        self._search.run(SearchProgressController._MS_BURST_TIME)
+    updater = Updater(self._searchProgressDlg, self)
+    self._searchProgressDlg.addObserver(updater)
 
-        self._sElapsedTime = self._sNow - self._sStart
-        if self._timeLimit is not None:
-          self._searchProgressDlg.showTimeLeft(self._timeLimit - self._sElapsedTime)
-
-        self._searchProgressDlg.showTimeElapsed(self._sElapsedTime)
-        self._memAllocated = int(float(memoryUsedTotal()) / float(1024 ** 2))
-        memAllocatedStr = self._memoryAllocated()
-        self._searchProgressDlg.showMemoryAllocated(memAllocatedStr)
-
-        tt = self._search.transpositionTable
-        if tt is not None:
-          mbTransTblSize  = '%.2f MB' % (float(self._search.transpositionTable.memoryUsage) / float(1024 ** 2))
-          hits            = tt.hits
-          misses          = tt.misses
-        else:
-          mbTransTblSize  = '0.0'
-          hits            = 0
-          misses          = 0
-
-        self._searchProgressDlg.showTransTblStats(memUsed=mbTransTblSize, hits=hits, misses=misses)
-
-        posCount = self._search.positionCount
-        rootPn = self._search.game.root.proofNumber
-        rootDn = self._search.game.root.disproofNumber
-
-        self._searchProgressDlg.showPosCount(posCount=posCount, posPerSec=posPerSec)
-        self._searchProgressDlg.showRootPnDn(rootPn, rootDn)
-        self._searchProgressDlg.updateGui()
-
-        self._sNow = time.clock()
-
-        if self._sNow - lastPosPerSecMeasure >= 1.0:
-          posPerSec = self._search.positionCount - lastPosCount
-          lastPosCount = self._search.positionCount
-          lastPosPerSecMeasure = self._sNow
-
-    except MemoryError:
-      tkMessageBox.showerror('Error', 'Not enough memory to expand the tree')
+    controller.searchProgressCallbacks.add(updater.updateDlg)
+    controller.runSearch(MS_BURST_TIME)
+    controller.searchProgressCallbacks.remove(updater.updateDlg)
 
     self._searchProgressDlg.close()
-
-    stats = { 'timeElapsed': self._sElapsedTime,
-              'posPerSec': posPerSec,
-              'memUsed': memAllocatedStr,
-              'ttSize': mbTransTblSize,
-              'ttHits': hits,
-              'ttMisses': misses,
-              'vertexCount': posCount,
-              'rootPn': rootPn,
-              'rootDn': rootDn }
-    return stats
-
-
-  def update(self, source):
-    '''Handle GUI updates. Since SearchProgressDialog only ever fires up an event if the user has clicked the Cancel button,
-    this merely terminates the search.
-    '''
-
-    self._cancel = True
-
-
-  def _finished(self):
-    '''Is the search finished?'''
-
-    if self._timeLimit is not None:
-      if self._sNow - self._sStart >= self._timeLimit:
-        return True
-
-    if self._posLimit is not None:
-      if self._search.positionCount >= self._posLimit:
-        return True
-
-    if self._memLimit is not None:
-      if self._memAllocated >= self._memLimit:
-        return True
-
-    return self._search.finished or self._cancel
-
-
-  def _memoryAllocated(self):
-    '''Get the amount of vertex memory allocated as a string with units.'''
-
-    KBYTE = 1024
-    MBYTE = 1024 ** 2
-
-    alloc = memoryUsedTotal()
-
-    if alloc < KBYTE:
-      return '%d B' % alloc
-    elif KBYTE <= alloc < MBYTE:
-      return '%.2f kB' % (float(alloc) / float(KBYTE))
-    else:
-      return '%.2f MB' % (float(alloc) / float(MBYTE))
 
 
 class SearchStatsController(object):
   '''Another controller for SearchProgressDialog -- this one, however, doesn't run the search, but merely displays the stats.'''
 
   def __init__(self, searchProgressDlg, stats):
-    '''Stats is a dict, with keys:
-
-      timeElapsed:   elapsed time in seconds
-      posPerSec:     number of new positions per second (last measured value)
-      memUsed:       total memory used (str)
-      ttSize:        transposition table size
-      ttHits:        transposition table hits
-      ttMisses:      transposition table misses
-      vertexCount:   number of vertices in the tree
-      rootPn:        root PN value
-      rootDn:        root DN value
-    '''
-
-    posCnt    = int(stats['vertexCount'])
-    time      = int(stats['timeElapsed'])
-    if time > 0:
-      posPerSec = int(float(posCnt) / float(time))
-    else:
-      posPerSec = posCnt
-    mem       = stats['memUsed']
-    rootPn    = stats['rootPn']
-    rootDn    = stats['rootDn']
-    ttSize = stats['ttSize']
-    ttHits = stats['ttHits']
-    ttMisses = stats['ttMisses']
-
-    searchProgressDlg.showTimeElapsed(time)
-    searchProgressDlg.showMemoryAllocated(mem)
-    searchProgressDlg.showPosCount(posCount=posCnt, posPerSec=posPerSec)
-    searchProgressDlg.showRootPnDn(rootPn, rootDn)
-    searchProgressDlg.showTransTblStats(memUsed=ttSize, hits=ttHits, misses=ttMisses)
+    s = stats
+    searchProgressDlg.showTimeElapsed(s.timeElapsed)
+    searchProgressDlg.showMemoryAllocated(0)
+    searchProgressDlg.showPosCount(posCount=s.positionCount, posPerSec=s.positionsPerSecond)
+    searchProgressDlg.showRootPnDn(s.rootPN, s.rootDN)
+    searchProgressDlg.showTransTblStats(memUsed=s.transTblSize, hits=s.transTblHits, misses=s.transTblMisses)
 
     searchProgressDlg.addObserver(self)
     searchProgressDlg.run()
@@ -1552,7 +1400,7 @@ class PositionEditorDialog(object):
     object.__init__(self)
 
     if board is None:
-      board = Board()
+      board = apnsmod.Board()
 
     self._parent = parent
     self._window = DialogWindow(parent, title)
@@ -1659,7 +1507,7 @@ class PositionDisplay(Observable):
   def selectPlayer(self, player):
     '''Change the player selection to the given player.'''
 
-    if player == Piece.Color.gold:
+    if player == apnsmod.Piece.Color.gold:
       self._gold.invoke()
     else:
       self._silver.invoke()
@@ -1669,9 +1517,9 @@ class PositionDisplay(Observable):
     '''Get the Piece.Color value of the currently selected player.'''
 
     if self._color.get() == 'g':
-      return Piece.Color.gold
+      return apnsmod.Piece.Color.gold
     else:
-      return Piece.Color.silver
+      return apnsmod.Piece.Color.silver
 
   color = property(_getColor)
 
@@ -1770,9 +1618,9 @@ class ImageManager(object):
   def _imageName(self, color, type):
     '''Get the filename of the image of the piece with given color and type.'''
 
-    colorName = { Piece.Color.gold: 'Gold', Piece.Color.silver: 'Silver' }[color]
-    typeName = { Piece.Type.elephant: 'Elephant', Piece.Type.camel: 'Camel', Piece.Type.horse: 'Horse',
-                 Piece.Type.dog: 'Dog', Piece.Type.cat: 'Cat', Piece.Type.rabbit: 'Rabbit' }[type]
+    colorName = { apnsmod.Piece.Color.gold: 'Gold', apnsmod.Piece.Color.silver: 'Silver' }[color]
+    typeName = { apnsmod.Piece.Type.elephant: 'Elephant', apnsmod.Piece.Type.camel: 'Camel', apnsmod.Piece.Type.horse: 'Horse',
+                 apnsmod.Piece.Type.dog: 'Dog', apnsmod.Piece.Type.cat: 'Cat', apnsmod.Piece.Type.rabbit: 'Rabbit' }[type]
     return 'interface/arimaa-graphics/' + colorName + typeName + '.gif'
 
 

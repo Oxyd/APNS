@@ -154,34 +154,24 @@ def main():
   transTblElements = args.transTblSize * MB / apnsmod.TranspositionTable.sizeOfElement
   #search.useTranspositionTable(transTblElements, args.transTblKeepTime)
 
-  class ProgressPrinter:
-    def __init__(self):
-      self.lastMeasurement = time.clock()
-      self.posPerSec = 0
-      self.lastPosCount = controller.positionCount
+  def printProgress(ctrl, progress):
+    show('Still working:')
+    show('  -- {0} seconds elapsed'.format(int(progress.timeElapsed)))
+    if progress.timeLeft:
+      show('  -- {0} seconds left'.format(int(progress.timeLeft)))
+    show('  -- Root vertex PN: {0}'.format(strFromNum(progress.rootPN)))
+    show('  -- Root vertex DN: {0}'.format(strFromNum(progress.rootDN)))
+    #show('  -- {0} Search memory used'.format(strFromMem(memoryUsedTotal())))
+    show('  -- {0} unique positions total'.format(progress.positionCount))
+    show('  -- {0} new positions per second'.format(int(progress.positionsPerSecond)))
 
-    def __call__(self, ctrl, progress):
-      show('Still working:')
-      show('  -- {0} seconds elapsed'.format(int(progress.timeElapsed)))
-      if progress.timeLeft:
-        show('  -- {0} seconds left'.format(int(progress.timeLeft)))
-      show('  -- Root vertex PN: {0}'.format(strFromNum(progress.rootPN)))
-      show('  -- Root vertex DN: {0}'.format(strFromNum(progress.rootDN)))
-      #show('  -- {0} Search memory used'.format(strFromMem(memoryUsedTotal())))
-      show('  -- {0} unique positions total'.format(progress.positionCount))
-      show('  -- {0} new positions per second'.format(self.posPerSec))
+    if progress.transTblSize:
+      show('  -- Transposition table:')
+      show('    -- Size: {0:.2f} MB'.format(float(progress.transTblSize) / MB))
+      show('    -- Hits: {0}'.format(progress.transTblHits))
+      show('    -- Misses: {0}'.format(progress.transTblMisses))
 
-      if progress.transTblSize:
-        show('  -- Transposition table:')
-        show('    -- Size: {0:.2f} MB'.format(float(progress.transTblSize) / MB))
-        show('    -- Hits: {0}'.format(progress.transTblHits))
-        show('    -- Misses: {0}'.format(progress.transTblMisses))
-
-      if time.clock() - self.lastMeasurement >= 1.0:
-        self.posPerSec = progress.positionCount - self.lastPosCount
-        self.lastPosCount = progress.positionCount
-
-  controller.searchProgressCallbacks.add(ProgressPrinter())
+  controller.searchProgressCallbacks.add(printProgress)
   show('Starting search. Pres Control-C to stop the search at any time.')
 
   controller.runSearch(burst=1000)

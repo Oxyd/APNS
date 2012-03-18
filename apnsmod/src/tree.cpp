@@ -237,14 +237,12 @@ struct reader {
     try {
       std::string token;
 
-      if (!(in >> token)) bad_format();
+      if (!std::getline(in, token, ':')) bad_format();
+      boost::algorithm::trim(token);
       boost::optional<step> maybe_step = step::from_string(token);
       if (maybe_step)
         v.step = maybe_step;
       else if (token != "root") bad_format();
-
-      if (!(in >> token)) bad_format();
-      if (token != ":") bad_format();
 
       if (!(in >> token)) bad_format();
       if (token == "or") v.type = vertex::type_or;
@@ -265,7 +263,7 @@ struct reader {
       else v.disproof_number = vertex::infty;
 
       if (!(in >> num_token)) bad_format();
-      v.reserve(num_token);
+      v.resize(num_token);
     } catch (boost::bad_lexical_cast&) {
       bad_format();
     }
