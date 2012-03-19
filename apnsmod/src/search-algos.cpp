@@ -128,9 +128,11 @@ bool history_visitor::operator () (vertex const& v, board const& board) {
 
 bool hash_visitor::operator () (vertex const& v) {
   if (v.step) {  // Unless this is the root.
+    zobrist_hasher::hash_t last_hash = hashes.back();
     piece::color_t const next_player = v.type == last_visited_type ? last_visited_player : opponent_color(last_visited_player);
-    hash = hasher->update(hash, v.step->step_sequence_begin(), v.step->step_sequence_end(),
-                          last_visited_player, next_player);
+    zobrist_hasher::hash_t hash = hasher->update(last_hash, v.step->step_sequence_begin(), v.step->step_sequence_end(),
+                                                 last_visited_player, next_player);
+    hashes.push_back(hash);
 
     last_visited_player = next_player;
     last_visited_type   = v.type;
@@ -183,11 +185,20 @@ void update_numbers(vertex& v) {
 
   assert(v.proof_number <= vertex::infty);
   assert(v.disproof_number <= vertex::infty);
+  assert(v.proof_number < vertex::infty || v.disproof_number == 0);
+  assert(v.disproof_number < vertex::infty || v.proof_number == 0);
+  assert(v.proof_number != 0 || v.disproof_number == vertex::infty);
+  assert(v.disproof_number != 0 || v.proof_number == vertex::infty);
 }
 
 void proof_number_search::do_iterate() {
   assert(game);
   assert(!game->root.step);
+
+  if (finished()) return;
+
+  if (trans_tbl)
+    trans_tbl->tick();
 
   hash_visitor    hash_v(hasher, initial_hash, game->attacker);
   path_visitor    path_v;
@@ -203,23 +214,32 @@ void proof_number_search::do_iterate() {
       make_composite_visitor(
         boost::ref(path_v),
         boost::ref(board_v))));
+  
+  assert(hash_v.hashes.size() == path_v.path.size());
 
-  expand(leaf, board_v.board, hash_v.hash, history_v.history);
+  expand(leaf, board_v.board, hash_v.hashes.back(), history_v.history);
 
+  if (trans_tbl && leaf->proof_number != 0 && leaf->disproof_number != 0)
+    trans_tbl->insert(hash_v.hashes.back(), std::make_pair(leaf->proof_number, leaf->disproof_number));
+
+  hash_visitor::hashes_cont::const_reverse_iterator hash = hash_v.hashes.rbegin();
   for (path_visitor::path_cont::reverse_iterator vertex = path_v.path.rbegin();
        vertex != path_v.path.rend();
-       ++vertex)
+       ++vertex, ++hash) {
     update_numbers(**vertex);
+    if (trans_tbl && vertex != path_v.path.rbegin() && (*vertex)->proof_number != 0 && (*vertex)->disproof_number != 0)
+      trans_tbl->update(*hash, std::make_pair((*vertex)->proof_number, (*vertex)->disproof_number));
+  }
 }
 
 void proof_number_search::expand(vertex::children_iterator leaf, ::board& leaf_state,
-                                 zobrist_hasher::hash_t /*leaf_hash*/, history_visitor::history_cont const& history) {
+                                 zobrist_hasher::hash_t leaf_hash, history_visitor::history_cont const& history) {
   assert(leaf->children_count() == 0);  // leaf is a leaf.
   assert(leaf->proof_number != 0 || leaf->disproof_number != 0); // It's not (dis-)proven yet.
 
   // Who plays in this leaf?
   piece::color_t const player = leaf->type == vertex::type_or ? game->attacker : opponent_color(game->attacker);
-  //piece::color_t const opponent = opponent_color(player);
+  piece::color_t const opponent = opponent_color(player);
 
   // Make a list of all possible steps.
   typedef std::vector<std::pair<step, vertex::e_type> > steps_seq;
@@ -248,8 +268,26 @@ void proof_number_search::expand(vertex::children_iterator leaf, ::board& leaf_s
     else
       child->steps_remaining = MAX_STEPS;
 
-    // TODO: Use trans tbl. here
-    
+    if (trans_tbl) {
+      zobrist_hasher::hash_t child_hash = hasher.update(
+        leaf_hash, child->step->step_sequence_begin(), child->step->step_sequence_end(),
+        player, leaf->type == child->type ? player : opponent
+      );
+      boost::optional<transposition_table::entry_t> values = trans_tbl->query(child_hash);
+      if (values) {
+        vertex::number_t pn = values->first;
+        vertex::number_t dn = values->second;
+        assert(pn != 0 && dn != 0);
+
+        child->proof_number = pn;
+        child->disproof_number = dn;
+
+        continue;
+      }
+    }
+
+    // If values were not found in the transposition table.
+
     apply(step, leaf_state);
     
     boost::optional<piece::color_t> winner;

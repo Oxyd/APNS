@@ -55,7 +55,8 @@ def config(conf, bits, debug):
         'python':         'python27',
         #'boost-python':   'libboost_python-vc100-mt{0}-1_48'.format('-gd' if debug else ''),
         'boost-python':   '',  # Use the auto-linking feature of MSVC.
-        'boost-random':   'libboost_random-vc100-mt-{0}-1_48.lib'.format('s' if not debug else 'sgd'),
+        #'boost-random':   'libboost_random-vc100-mt-{0}-1_48.lib'.format('s' if not debug else 'sgd'),
+        'boost-random':   '',
         'gtest':          'gtest' if not debug else 'gtestd'
       },
       'extra':            lambda env: _extraSetup(env, bits)

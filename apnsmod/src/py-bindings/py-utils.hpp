@@ -41,7 +41,7 @@ struct optional_to_T {
     if (o) {
       return incref(object(*o).ptr());
     } else {
-      return Py_None;
+      return incref(Py_None);
     }
   }
 };

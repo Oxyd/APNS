@@ -2,6 +2,9 @@
 #include "board.hpp"
 #include "util.hpp"
 
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/random/uniform_int_distribution.hpp>
+
 #include <cstdlib>
 #include <limits>
 
@@ -20,6 +23,9 @@ zobrist_hasher::zobrist_hasher()
 {
   hash_t const MAX_VALUE = std::numeric_limits<hash_t>::max();
 
+  boost::random::mt19937 prng;
+  boost::random::uniform_int_distribution<hash_t> rand_distrib;
+
   for (std::size_t type = 0; type < piece::type_count; ++type)
     for (std::size_t color = 0; color < piece::color_count; ++color)
       for (std::size_t row = board::MIN_ROW; row <= board::MAX_ROW; ++row)
@@ -27,7 +33,7 @@ zobrist_hasher::zobrist_hasher()
           codes[type]
                [color]
                [row - board::MIN_ROW]
-               [column - board::MIN_COLUMN] = static_cast<hash_t>(uniform_deviate(rand()) * MAX_VALUE);
+               [column - board::MIN_COLUMN] = rand_distrib(prng);
 
   for (std::size_t player = 0; player < piece::color_count; ++player)
     players[player] = static_cast<hash_t>(uniform_deviate(rand()) * MAX_VALUE);
@@ -95,7 +101,7 @@ transposition_table::transposition_table(std::size_t table_size, std::size_t kee
   , keep_time(keep_time)
   , pages((table_size / PAGE_RECORDS) + (table_size % PAGE_RECORDS != 0 ? 1 : 0))  // pages := ceil(table_size / PAGE_RECORDS)
   , table(new page_ptr[pages])
-  , current_iteration(0)
+  , now(1)
   , allocated_pages(0)
   , elements(0)
   , hits(0)
@@ -105,46 +111,38 @@ transposition_table::transposition_table(std::size_t table_size, std::size_t kee
   assert(pages * PAGE_RECORDS >= table_size);
 }
 
-void transposition_table::insert(hash_t hash, vertex* vertex) {
-  page_ptr& pg = table[page_number(hash % table_size)];
-
-  if (pg == 0) {
-    page* p = new page;
-    pg.reset(p);
-    ++allocated_pages;
-  }
-
-  record& r = (*pg)[page_offset(hash % table_size)];
-  if (r.vertex == 0 || current_iteration - r.last_accessed > keep_time) {
-    r.vertex = vertex;
-    r.last_accessed = current_iteration;
+void transposition_table::insert(hash_t hash, entry_t entry) {
+  record& r = find_record(hash);
+  if (r.last_accessed == NEVER || now - r.last_accessed > keep_time) {
+    r.entry = entry;
+    r.last_accessed = now;
     ++elements;
   }
 }
 
-vertex* transposition_table::query(hash_t hash) {
-  page_ptr& pg = table[page_number(hash % table_size)];
-  if (pg) {
-    record& r = (*pg)[page_offset(hash % table_size)];
-    r.last_accessed = current_iteration;
-    if (r.vertex)
-      return r.vertex;
-    else
-      return 0;
-  } else
-    return 0;
+void transposition_table::update(hash_t hash, entry_t entry) {
+  record& r = find_record(hash);
+  if (r.last_accessed != NEVER) {
+    r.entry = entry;
+    r.last_accessed = now;
+  }
 }
 
-void transposition_table::hit() {
-  ++hits;
-}
+boost::optional<transposition_table::entry_t> transposition_table::query(hash_t hash) {
+  record& r = find_record(hash);
+  if (r.last_accessed != NEVER) {
+    r.last_accessed = now;
+    ++hits;
 
-void transposition_table::miss() {
-  ++misses;
+    return r.entry;
+  } else {
+    ++misses;
+    return boost::none;
+  }
 }
 
 void transposition_table::tick() {
-  ++current_iteration;
+  ++now;
 }
 
 std::size_t transposition_table::get_memory_usage() const {
@@ -157,5 +155,16 @@ std::size_t transposition_table::page_number(std::size_t index) const {
 
 std::size_t transposition_table::page_offset(std::size_t index) const {
   return index % PAGE_RECORDS;
+}
+
+transposition_table::record& transposition_table::find_record(hash_t hash) {
+  page_ptr& pg = table[page_number(hash % table_size)];
+
+  if (pg == 0) {
+    pg.reset(new page);
+    ++allocated_pages;
+  }
+
+  return (*pg)[page_offset(hash % table_size)];
 }
 

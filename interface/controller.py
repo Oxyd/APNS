@@ -188,8 +188,10 @@ class Controller(object):
   def newGame(self, *args):
     '''Load a new game from an initial board file or from Board and Piece.Color (initial state and attacker).'''
 
+    self.dropGame()
+
     if len(args) == 1:
-      (board, attacker) = loadBoard(positionPath)
+      (board, attacker) = loadBoard(args[0])
     else:
       (board, attacker) = args
 
@@ -198,6 +200,8 @@ class Controller(object):
 
   def loadGame(self, gamePath):
     '''Load an old game from a search file.'''
+
+    self.dropGame()
 
     self._cancel = False
     (self._game, self._posCount) = apnsmod.loadGame(gamePath, Controller._OpCtrl(self, self.loadGameCallbacks))
@@ -223,6 +227,8 @@ class Controller(object):
   def runSearch(self, burst=_MS_BURST_TIME):
     '''Run the search until one of the terminating conditions is met.'''
 
+    MB = 1024 * 1024
+
     self._cancel = False
 
     if self._game is None:
@@ -230,6 +236,12 @@ class Controller(object):
 
     if self._search is None:
       self._search = apnsmod.ProofNumberSearch(self._game, self._posCount)
+
+    if self.searchParameters.transTblSize > 0:
+      mbSize = self.searchParameters.transTblSize
+      bSize = mbSize * MB
+      elements = bSize / (apnsmod.TranspositionTable.sizeOfElement)
+      self._search.useTransTbl(elements, 16)  # XXX: Trans tbl keep time not user-settable.
 
     self._searchStart = time.clock()
     self._startPosCount = self._posCount
@@ -274,5 +286,11 @@ class Controller(object):
       progress.positionsPerSecond = (self._posCount - self._startPosCount) / (now - self._searchStart)
     else:
       progress.positionsPerSecond = 0
+
+    tt = self._search.transpositionTable
+    if tt:
+      progress.transTblSize = tt.memoryUsage
+      progress.transTblHits = tt.hits
+      progress.transTblMisses = tt.misses
 
     return progress

@@ -1,8 +1,9 @@
 #ifndef SEARCH_ALGOS_HPP
 #define SEARCH_ALGOS_HPP
 
-#include "movement.hpp"
 #include "tree.hpp"
+#include "hash.hpp"
+#include "movement.hpp"
 
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
@@ -103,16 +104,18 @@ private:
   piece::color_t  attacker;
 };
 
-//! Visitor that keeps track of the hash of a board.
+//! Visitor that keeps track of the hash of the board. This visitor keeps the complete history of hashes encountered during the
+//! descent.
 struct hash_visitor {
-  zobrist_hasher::hash_t  hash;
+  typedef std::vector<zobrist_hasher::hash_t> hashes_cont;
+  hashes_cont hashes;
 
   //! Construct the visitor.
   //! \param hasher Hasher used for the algorithm.
   //! \param initial_hash Hash value of the initial board.
   //! \param attacker Attacker's colour.
   hash_visitor(zobrist_hasher const& hasher, zobrist_hasher::hash_t initial_hash, piece::color_t attacker) :
-    hash(initial_hash),
+    hashes(1, initial_hash),
     last_visited_type(vertex::type_or),
     last_visited_player(attacker),
     hasher(&hasher)

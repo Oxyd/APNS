@@ -35,8 +35,7 @@ void export_hash() {
         "Insert a vertex into the table")
     .def("query", &transposition_table::query,
         "t.query(Hash) -> Vertex\n\n"
-        "Find a vertex in the table by the key. Return None if the vertex doesn't exist in the table",
-        return_internal_reference<>())
+        "Find a vertex in the table by the key. Return None if the vertex doesn't exist in the table")
     .def("tick", &transposition_table::tick,
         "t.tick() -> None\n\n"
         "Update the internal tick count.")

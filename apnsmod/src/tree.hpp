@@ -1,7 +1,6 @@
 #ifndef TREE_HPP
 #define TREE_HPP
 
-#include "hash.hpp"
 #include "board.hpp"
 #include "movement.hpp"
 #include "util.hpp"

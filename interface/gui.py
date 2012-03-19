@@ -3,9 +3,7 @@
 #from apnsmod import Board, Vertex, Piece, Position, OperationController, Step, empty, apply, opponentColor,\
                     #memoryUsedTotal, TranspositionTable, saveGame, loadGame
 import apnsmod
-from interface.fileio import loadBoard, saveBoard
 from interface.observable import Observable
-from interface.search import makeSearch
 from interface.controller import Controller, SearchProgress, SearchParameters, loadBoard, saveBoard
 
 import time, gc, os, sys, itertools
@@ -536,6 +534,8 @@ class ResultsController(object):
       self._tree.expand(self._resultsDsply)
       self._updateBest(self._tree)
       self._resultsDsply.selectNode(self._tree.handle)
+    else:
+      self._resultsDsply.showBoard(None)
 
 
   def _expandVertex(self, handle):

@@ -8,6 +8,7 @@
 #define HASH_HPP
 
 #include "board.hpp"
+#include "tree.hpp"
 #include "movement.hpp"
 
 #include <boost/array.hpp>
@@ -17,6 +18,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/scoped_array.hpp>
 #include <boost/utility.hpp>
+#include <boost/optional.hpp>
 
 #include <iostream>
 
@@ -81,8 +83,6 @@ private:
   players_cont  players;
 };
 
-class vertex;
-
 /**
  * A transposition table serves as a cache for already explored positions -- vertices of the search tree. Vertices are indexed
  * by their hash values as given by the supplied Hasher algorithm.
@@ -97,15 +97,21 @@ class vertex;
  * \tparam Hasher Hashing algorithm that is used to make the keys.
  */
 class transposition_table : boost::noncopyable {
+public:
+  //! Type of values stored in the table.
+  typedef std::pair<vertex::number_t, vertex::number_t> entry_t;
+  
 private:
   typedef unsigned iteration_t;
 
+  static iteration_t const NEVER = 0;  //! Special value of last_accessed saying that the entry has never been accessed.
+
   //! One record in the table.
   struct record {
-    ::vertex*   vertex;
+    entry_t     entry;
     iteration_t last_accessed;
 
-    record() : vertex(0), last_accessed(0) { }
+    record() : last_accessed(NEVER) { }
   };
 
 public:
@@ -124,24 +130,18 @@ public:
    * \param hash Key of the element.
    * \param vertex Value of the element.
    */
-  void insert(hash_t hash, vertex* vertex);
+  void insert(hash_t hash, entry_t entry);
+
+  //! Update an entry in the table. This differs from insert in the fact that this always overwrites the old value, no matter
+  //! when it was last accessed.
+  void update(hash_t hash, entry_t entry);
 
   /**
    * Try to retreive an element from the table.
    * \param hash The key.
    * \returns Either the found element or an empty pointer if the element wasn't found.
    */
-  vertex* query(hash_t hash);
-
-  /**
-   * Inform the table that a query was a hit. That is, the table returned an expected vertex.
-   */
-  void hit();
-
-  /**
-   * Inform the table that a query was a miss.
-   */
-  void miss();
+  boost::optional<entry_t> query(hash_t hash);
 
   //! Update the internal iteration-count timer. Call this each iteration of the search algorithm.
   void tick();
@@ -167,12 +167,15 @@ private:
   std::size_t const pages;         //!< How many pages are there?
 
   directory table;                 //!< The table itself.
-  iteration_t current_iteration;   //!< Current "time" measured in iterations of the search algorithm.
+  iteration_t now;                 //!< Current "time" measured in iterations of the search algorithm.
 
   std::size_t allocated_pages;     //!< Number of pages allocated.
   std::size_t elements;            //!< Number of elements stored.
   std::size_t hits;                //!< Number of successful retreivals from the table.
   std::size_t misses;              //!< Number of unsuccessful retreival attempts.
+
+  //! Get the record for given hash.
+  record& find_record(hash_t hash);
 };
 
 #endif

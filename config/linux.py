@@ -21,17 +21,20 @@ def config(conf, bits, debug):
       ],
       'includedirs': {
         'boost-python':   '',  # These two are already found in the standard include locations.
+        'boost-random':   '',
         'gtest':          '',
         'python':         '/usr/include/python2.7/'
       },
       'libdirs': {
         'boost-python':   '',  # Same as above.
+        'boost-random':   '',  # Same as above.
         'gtest':          '',
         'python':         '/usr/lib/python2.7/'
       },
       'libs': {
         'python':         'python2.7',
         'boost-python':   'boost_python',
+        'boost-random':   'boost_random',
         'gtest':          'gtest'
       },
       'extra':            _setupPrefix
