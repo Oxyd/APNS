@@ -18,6 +18,8 @@
 #include <cassert>
 #include <iterator>
 
+#include <iostream>
+
 //! A vertex of the game tree.
 //!
 //! Vertices are non-copyable to prevent costly copies of large subtrees. Internally, they are implemented via resizeable
@@ -106,6 +108,8 @@ public:
 
   //! Swap the subtree rooted in this vertex with a subtree rooted in the other vertex.
   void swap(vertex& other);
+
+  static std::size_t count;
   
 private:
   //! Memory allocation interface. It is here so that it can be changed easily, but also so that a change of the allocator
@@ -165,6 +169,9 @@ private:
 
   //! Get a child with a given index. Doesn't do any bounds checking.
   vertex& get(std::size_t index);
+
+  //! Destroy this vertex assuming that its children have been destroyed too (regardless of what capacity and size have to say).
+  void destroy();
 };
 
 //! Given a vertex type, return its opposite.
@@ -183,10 +190,15 @@ public:
     attacker(attacker),
     initial_state(initial_state)
   {
+    std::cerr << "*game()\n";
     root.type             = vertex::type_or;
     root.proof_number     = 1;
     root.disproof_number  = 1;
     root.steps_remaining  = 4;
+  }
+
+  ~game() {
+    std::cerr << "~game()\n";
   }
 };
 
@@ -266,6 +278,35 @@ vertex::children_iterator traverse(vertex& root, TraversalPolicy traversal_polic
 template <typename TraversalPolicy>
 vertex::children_iterator traverse(vertex& root, TraversalPolicy traversal_policy) {
   return traverse(root, traversal_policy, null_visitor(), null_stop_condition());
+}
+
+//! Generic tree traverser like traverse, except that this one applies TraversalPolicy first and Visitor and StopCondition after
+//! that. Useful for post-order traversals.
+template <typename TraversalPolicy, typename Visitor, typename StopCondition>
+vertex::children_iterator traverse_postorder(vertex& root, TraversalPolicy traversal_policy,
+                                             Visitor visitor, StopCondition stop_condition) {
+  vertex::children_iterator previous = &root;
+  vertex::children_iterator current = boost::unwrap_ref(traversal_policy)(root);
+  while (current) {
+    boost::unwrap_ref(visitor)(*current);
+    if (boost::unwrap_ref(stop_condition)(*current))
+      return current;
+
+    previous = current;
+    current = boost::unwrap_ref(traversal_policy)(*current);
+  }
+
+  return previous;
+}
+
+template <typename TraversalPolicy, typename Visitor>
+vertex::children_iterator traverse_postorder(vertex& root, TraversalPolicy traversal_policy, Visitor visitor) {
+  return traverse_postorder(root, traversal_policy, visitor, null_stop_condition());
+}
+
+template <typename TraversalPolicy>
+vertex::children_iterator traverse_postorder(vertex& root, TraversalPolicy traversal_policy) {
+  return traverse_postorder(root, traversal_policy, null_visitor(), null_stop_condition());
 }
 
 //! Holds an instance of a concrete traversal policy object and delegates the traversal to it.

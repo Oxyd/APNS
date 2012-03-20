@@ -149,12 +149,14 @@ class MainWindowController(object):
     if command == MainWindow.Command.newSearch:
       positionEditorDlg = PositionEditorDialog(self._mainWindowDsply.window,
                                                  'Create or load initial position',
-                                                 'Specify an initial search position or load one from disk:', 
+                                                 'Specify an initial search position or load one from disk:',
                                                  self._mainWindowDsply.imageManager)
       if positionEditorDlg.board is not None:
+        print 'Before:', apnsmod.Vertex.count,
         self._controller.newGame(positionEditorDlg.board, positionEditorDlg.player)
-        gc.collect()
         self._resultsCtrl.updateTree(self._controller)
+        gc.collect(2)
+        print 'and after:', apnsmod.Vertex.count
         self._mainWindowDsply.disableStats()
         self._mainWindowDsply.enableSearch()
 
@@ -527,6 +529,7 @@ class ResultsController(object):
     if self._tree:
       self._resultsDsply.removeNode(self._tree.handle)
       ResultsController._DisplayNode.release()
+      self._tree = None
 
     if controller.root is not None:
       self._tree = ResultsController._DisplayNode(None, controller.root, self._resultsDsply, True, True)

@@ -2,6 +2,7 @@
 
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/trim.hpp>
+#include <boost/bind.hpp>
 
 #include <algorithm>
 #include <limits>
@@ -12,8 +13,50 @@
 #include <stack>
 #include <utility>
 
+namespace {
+
+//! Postorder traveral policy for traverse_postorder. Do note that this never traverses the root vertex.
+class postorder {
+  typedef std::stack<std::pair<vertex::children_iterator, vertex::children_iterator> > stack_t;
+
+public:
+  vertex::children_iterator operator () (vertex& v) {
+    if (stack.empty())
+      return recurse(&v)++;
+
+    if (stack.top().first != stack.top().second)
+      return recurse(stack.top().first)++;
+    else {
+      while (!stack.empty() && stack.top().first == stack.top().second)
+        stack.pop();
+
+      if (!stack.empty())
+        return stack.top().first++;
+      else
+        return vertex::children_iterator();
+    }
+  }
+
+private:
+  stack_t stack;
+
+  vertex::children_iterator& recurse(vertex::children_iterator from) {
+    vertex::children_iterator current = from;
+    while (current->children_count() > 0) {
+      stack.push(std::make_pair(current->children_begin(), current->children_end()));
+      current = current->children_begin();
+    }
+
+    return stack.top().first;
+  }
+};
+
+} // anonymous namespace
+
 vertex::number_t const vertex::max_num = std::numeric_limits<vertex::number_t>::max();
 vertex::number_t const vertex::infty   = std::numeric_limits<vertex::number_t>::max() - 1;
+
+std::size_t vertex::count = 0;
 
 vertex::vertex() :
   proof_number(0),
@@ -24,10 +67,15 @@ vertex::vertex() :
   storage(0),
   size(0),
   capacity(0)
-{ }
+{
+  ++count;
+}
 
 vertex::~vertex() {
-  resize(0);
+  --count;
+
+  if (children_count() > 0)
+    traverse_postorder(*this, postorder(), boost::bind(&vertex::destroy, _1));
 }
 
 vertex::children_iterator vertex::add_child() {
@@ -111,6 +159,7 @@ vertex::vertex(vertex& other) :
   size(0),
   capacity(0)
 { 
+  ++count;
   storage.swap(other.storage);
   std::swap(size, other.size);
   std::swap(capacity, other.capacity);
@@ -151,6 +200,12 @@ void vertex::realloc(std::size_t new_alloc) {
 
 vertex& vertex::get(std::size_t index) {
   return *(children_begin() + index);
+}
+
+void vertex::destroy() {
+  capacity = size = 0;
+  storage.reset();
+  this->~vertex();
 }
 
 namespace {

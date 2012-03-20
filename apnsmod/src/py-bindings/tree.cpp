@@ -118,12 +118,17 @@ void export_tree() {
           static_cast<vertex::children_iterator (vertex::*)()>(&vertex::children_begin),
           static_cast<vertex::children_iterator (vertex::*)()>(&vertex::children_end)))
       .add_property("childrenCount", &vertex::children_count)
+
+      .def_readwrite("count", &vertex::count)
       
       .def("addChild", &vertex::add_child,
            return_internal_reference<>(),
            "v.addChild() -> Vertex\n\nAdd a child to this vertex. Returns a reference to the new child")
       .def("removeChild", &vertex::remove_child,
            "v.removeChild(Vertex) -> None\n\nRemove a child of this vertex")
+      .def("resize", &vertex::resize,
+           "v.resize(n) -> None\n\nResize this vertex to have exactly n children. If that means to shrink this vertex, the "
+           "children at the end are removed.")
       .def("reserve", &vertex::reserve,
            "v.reserve(n) -> None\n\nReserve enough memory for this vertex to hold n children")
       .def("pack", &vertex::pack,
