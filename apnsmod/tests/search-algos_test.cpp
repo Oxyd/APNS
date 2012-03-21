@@ -83,7 +83,7 @@ TEST(traversing, hash_test) {
   hash_visitor hash_v(hasher, initial_hash, g->attacker);
   traverse(g->root, &best_successor, boost::ref(hash_v));
 
-  EXPECT_EQ(hasher.generate_initial(target, piece::silver), hash_v.hash);
+  EXPECT_EQ(hasher.generate_initial(target, piece::silver), hash_v.hashes.back());
 }
 
 TEST(traversing, board_test) {

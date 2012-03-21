@@ -13,7 +13,9 @@
 #include <boost/pool/pool_alloc.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/transform_iterator.hpp>
+#include <boost/shared_array.hpp>
 
+#include <list>
 #include <vector>
 #include <utility>
 
@@ -90,9 +92,7 @@ bool operator != (elementary_step const& lhs, elementary_step const& rhs);
 class step {
 public:
   //! A sequence of elementary steps.
-  typedef std::vector<
-    elementary_step
-  > elementary_step_seq;
+  typedef boost::shared_array<elementary_step> elementary_step_seq;
 
   //! Validate and possibly construct an ordinary step.
   //! \param board The board which is to be affected by this step.

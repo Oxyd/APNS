@@ -19,7 +19,7 @@ namespace {
 
 //! Is a stronger than b? (Their colour does not matter.)
 bool stronger(piece a, piece b) {
-  return a.get_type() < b.get_type();
+  return index_from_type(a.get_type()) < index_from_type(b.get_type());
 }
 
 /*

@@ -1,6 +1,6 @@
 # config/windows.py -- configuration values for building on Windows systems.
 
-def config(conf, bits, debug):
+def config(conf, bits, debug, profile):
   if bits == 64:
     boostBase   = 'C:/Users/Oxyd/Development/boost_1_48_0/'
     pythonBase  = 'C:/Python27/'

@@ -16,7 +16,7 @@ bool repetition(board& board, piece::color_t player, history_visitor::history_co
   bool lose = false;
 
   if (!history.empty()) {
-    if (history.back().position == board && history.back().player == player)
+    if (history.back().player == player && history.back().position == board)
       lose = true;  // Lead doesn't move to a net change in overall position.
     else {
       // Check for third-time repetitions.

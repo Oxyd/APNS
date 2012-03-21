@@ -19,6 +19,7 @@
 #include <list>
 #include <string>
 #include <ostream>
+#include <algorithm>
 
 /**
  * One game piece.
@@ -36,26 +37,42 @@ struct piece {
 
   //! Type of the piece. That is, the animal that's used to represent it.
   enum type_t {
-    elephant = 0,
-    camel,
-    horse,
-    dog,
-    cat,
-    rabbit,
+    elephant = 'e',
+    camel = 'm',
+    horse = 'h',
+    dog = 'd',
+    cat = 'c',
+    rabbit = 'r',
 
     type_count = 6  //!< How many animals are there in total in our zoo?
   };
 
   //! Init a piece with given color and type.
-  piece(color_t color = gold, type_t type = elephant);
+  piece(color_t color, type_t type);
 
   color_t get_color() const;  //!< Get the color of this piece.
   type_t  get_type() const;   //!< Get the type of this piece.
 
+  //! Compare two pieces.
+  bool equal(piece const& other) const;
+
+  //! Get the Arimaa letter for this piece.
+  char letter() const { return data; }
+
 private:
-  color_t color;
-  type_t  type;
+  friend piece piece_from_letter_unsafe(char);
+  explicit piece(char letter);
+  char data;
 };
+
+typedef boost::array<piece::color_t const, 2> colors_array_t;
+typedef boost::array<piece::type_t const, 6> types_array_t;
+
+extern colors_array_t const COLORS;  //!< Array of all colours.
+extern types_array_t const TYPES;    //!< Array of all types. This array is sorted from the strongest type to the weakest.
+
+std::size_t index_from_color(piece::color_t color);  //!< Convert color to its index in COLORS.
+std::size_t index_from_type(piece::type_t type);     //!< Convert type to its index in TYPES.
 
 //! Equality comparison of pieces.
 bool operator == (piece lhs, piece rhs);
@@ -204,7 +221,8 @@ public:
 private:
   //! Pieces are stored in a container of this type.
   typedef boost::array<
-    boost::optional<piece>,
+    //boost::optional<piece>,
+    char,
     ROWS * COLUMNS
   > pieces_cont;
 
@@ -242,6 +260,8 @@ public:
     std::size_t pos;  //!< Index into board::pieces that this iterator is currently pointing to.
   };
 
+  board();
+
   /**
    * Put a piece on a given position.
    * \throws std::logic_error #where already contains a piece.
@@ -263,12 +283,14 @@ public:
 
   //! Remove all pieces from the board.
   void clear() {
-    for (pieces_cont::iterator piece = pieces.begin(); piece != pieces.end(); ++piece)
-      *piece = boost::none;
+    std::fill(pieces.begin(), pieces.end(), ' ');
   }
 
   pieces_iterator pieces_begin() const;  //!< Get the start iterator of the sequence of all pieces stored within board.
   pieces_iterator pieces_end() const;    //!< Get the one-past-the-end iterator of the sequence.
+
+  //! Compare boards;
+  bool equal(board const& other) const { return pieces == other.pieces; }
 
 private:
   pieces_cont       pieces;

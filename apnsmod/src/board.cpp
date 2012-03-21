@@ -34,24 +34,67 @@ std::size_t linear_from_board(position::row_t row, position::col_t col) {
 
 direction const directions[] = { north, east, south, west };
 
+char letter_from_pair(piece::color_t c, piece::type_t t) {
+  char letter = t;
+  if (c == piece::gold)
+    letter &= ~0x20;  // Assuming ASCII here. Convert to uppercase.
+
+  return letter;
+}
+
 }  // Anonymous namespace.
 
-piece::piece(color_t c, type_t t)
-  : color(c)
-  , type(t)
+//! Same as piece_from_letter but assumes that the input is valid.
+piece piece_from_letter_unsafe(char letter) {
+  return piece(letter);
+}
+
+piece::piece(color_t c, type_t t) : 
+  data(letter_from_pair(c, t))
+{ }
+
+piece::piece(char letter) :
+  data(letter)
 { }
 
 piece::color_t piece::get_color() const {
-  return color;
+  return data & 0x20 ? piece::silver : piece::gold;
 }
 
 piece::type_t piece::get_type() const {
-  return type;
+  return static_cast<piece::type_t>(data | 0x20);
+}
+
+bool piece::equal(piece const& other) const {
+  return data == other.data;
+}
+
+boost::array<piece::color_t const, 2> const COLORS = { { piece::gold, piece::silver } };
+boost::array<piece::type_t const, 6> const TYPES = { {
+  piece::elephant, piece::camel, piece::horse, piece::dog, piece::cat, piece::rabbit
+} };
+
+std::size_t index_from_color(piece::color_t color) {
+  if (color == piece::gold)
+    return 0;
+  else
+    return 1;
+}
+
+std::size_t index_from_type(piece::type_t type) {
+  switch (type) {
+  case piece::elephant:   return 0;
+  case piece::camel:      return 1;
+  case piece::horse:      return 2;
+  case piece::dog:        return 3;
+  case piece::cat:        return 4;
+  case piece::rabbit:     return 5;
+  default:                assert(!"Can't happen"); return 0;
+  }
 }
 
 bool operator == (piece lhs, piece rhs) {
-  return lhs.get_color() == rhs.get_color()
-      && lhs.get_type() == rhs.get_type();
+  return lhs.equal(rhs);
 }
 
 bool operator != (piece lhs, piece rhs) {
@@ -69,39 +112,15 @@ piece::color_t opponent_color(piece::color_t player) {
 }
 
 char letter_from_piece(piece p) {
-  char letter = '?';
-  switch (p.get_type()) {
-  case piece::elephant:     letter = 'e'; break;
-  case piece::camel:        letter = 'm'; break;
-  case piece::horse:        letter = 'h'; break;
-  case piece::dog:          letter = 'd'; break;
-  case piece::cat:          letter = 'c'; break;
-  case piece::rabbit:       letter = 'r'; break;
-  default: assert(!"Can't get here");
-  }
-
-  if (p.get_color() == piece::gold) {
-    letter = toupper(letter);
-  }
-
-  return letter;
+  return p.letter();
 }
 
 boost::optional<piece> piece_from_letter(char letter) {
-  piece::type_t type;
-  switch (std::tolower(letter)) {
-  case 'e':   type = piece::elephant;   break;
-  case 'm':   type = piece::camel;      break;
-  case 'h':   type = piece::horse;      break;
-  case 'd':   type = piece::dog;        break;
-  case 'c':   type = piece::cat;        break;
-  case 'r':   type = piece::rabbit;     break;
-  default:
-    return boost::optional<piece>();
-  }
-
-  piece::color_t const color = (std::islower(letter) ? piece::silver : piece::gold);
-  return piece(color, type);
+  if (letter == 'e' || letter == 'm' || letter == 'h' || letter == 'd' || letter == 'c' || letter == 'r'
+      || letter == 'E' || letter == 'M' || letter == 'H' || letter == 'D' || letter == 'C' || letter == 'R')
+    return piece_from_letter_unsafe(letter);
+  else
+    return boost::none;
 }
 
 char letter_from_direction(direction d) {
@@ -248,10 +267,10 @@ board::pieces_iterator::pieces_iterator(base_type original, std::size_t pos)
 
 board::pieces_iterator::reference board::pieces_iterator::dereference() const {
   assert(pos < board::ROWS * board::COLUMNS);
-  assert(*base());
+  assert(*base() != ' ');
 
   std::pair<position::row_t, position::col_t> const coordinates = board_from_linear(pos);
-  return std::make_pair(position(coordinates.first, coordinates.second), **base());
+  return std::make_pair(position(coordinates.first, coordinates.second), *piece_from_letter(*base()));
 }
 
 void board::pieces_iterator::increment() {
@@ -276,9 +295,8 @@ void board::pieces_iterator::decrement() {
 
 void board::pieces_iterator::forward_to_nonempty() {
   while (pos < board::ROWS * board::COLUMNS) {
-    if (*base()) {
+    if (*base() != ' ')
       return;  // We're done, this is the next nonempty position.
-    }
 
     ++pos;
     ++base_reference();
@@ -291,35 +309,40 @@ void board::pieces_iterator::reverse_to_nonempty() {
   // Once it gets down to pos == 0, then we don't have to do anything more: either there's really something here or we got
   // here by decrementing a begin() iterator which results in undefined behaviour.
   while (pos > 0) {
-    if (*base()) {
+    if (*base() != ' ')
       return;
-    }
 
     --pos;
     --base_reference();
   }
 }
 
+board::board() {
+  std::fill(pieces.begin(), pieces.end(), ' ');
+}
+
 void board::put(position where, piece what) {
   std::size_t const linear = linear_from_board(where.get_row(), where.get_column());
-  if (!pieces[linear]) {
-    pieces[linear] = what;
-  } else {
+  if (pieces[linear] == ' ')
+    pieces[linear] = letter_from_piece(what);
+  else
     throw std::logic_error("board: Attempted to put a piece at an occupied position");
-  }
 }
 
 void board::remove(position where) {
   std::size_t const linear = linear_from_board(where.get_row(), where.get_column());
-  if (pieces[linear]) {
-    pieces[linear] = boost::optional<piece>();
-  } else {
+  if (pieces[linear] != ' ')
+    pieces[linear] = ' ';
+  else
     throw std::logic_error("board: Attempted to remove a piece from a vacant position");
-  }
 }
 
 boost::optional<piece> board::get(position from) const {
-  return pieces[linear_from_board(from.get_row(), from.get_column())];
+  char const p = pieces[linear_from_board(from.get_row(), from.get_column())];
+  if (p != ' ')
+    return piece_from_letter(p);
+  else
+    return boost::none;
 }
 
 board::pieces_iterator board::pieces_begin() const {
@@ -333,19 +356,7 @@ board::pieces_iterator board::pieces_end() const {
 }
 
 bool operator == (board const& lhs, board const& rhs) {
-  // This implementation assumes that the traversal order of pieces iterators is always the same for two boards with same
-  // contents.
-
-  board::pieces_iterator left = lhs.pieces_begin();
-  board::pieces_iterator right = rhs.pieces_begin();
-
-  for (; left != lhs.pieces_end() && right != rhs.pieces_end(); ++left, ++right) {
-    if (left->first != right->first || left->second != right->second) {
-      return false;
-    }
-  }
-
-  return left == lhs.pieces_end() && right == rhs.pieces_end();
+  return lhs.equal(rhs);
 }
 
 bool operator != (board const& lhs, board const& rhs) {

@@ -12,13 +12,14 @@ if bits not in (32, 64):
   raise SystemExit(1)
 
 debug = int(ARGUMENTS.get('debug', 0))
+profile = int(ARGUMENTS.get('profile', 0))
 
 config = {}
 for c in glob('config/*.py'):
   print 'SConstruct: Reading platform configuration file', c
   mod = dict()
   execfile(c, mod)
-  mod['config'](config, bits, debug)
+  mod['config'](config, bits, debug, profile)
 
 platform = ARGUMENTS.get('platform', sys.platform)
 toolchain = ARGUMENTS.get('toolchain', config[platform]['default-toolchain'])

@@ -12,31 +12,25 @@ namespace {
 
 typedef boost::multi_array_types::index_range range;
 
-double uniform_deviate(int seed) {
-  return seed * (1.0 / (RAND_MAX + 1.0));
-}
-
 } // anonymous namespace
 
 zobrist_hasher::zobrist_hasher() 
   : codes(boost::extents[piece::type_count][piece::color_count][board::ROWS][board::COLUMNS])
 {
-  hash_t const MAX_VALUE = std::numeric_limits<hash_t>::max();
-
   boost::random::mt19937 prng;
   boost::random::uniform_int_distribution<hash_t> rand_distrib;
 
-  for (std::size_t type = 0; type < piece::type_count; ++type)
-    for (std::size_t color = 0; color < piece::color_count; ++color)
+  for (types_array_t::const_iterator type = TYPES.begin(); type != TYPES.end(); ++type)
+    for (colors_array_t::const_iterator color = COLORS.begin(); color != COLORS.end(); ++color)
       for (std::size_t row = board::MIN_ROW; row <= board::MAX_ROW; ++row)
         for (std::size_t column = board::MIN_COLUMN; column <= board::MAX_COLUMN; ++column)
-          codes[type]
-               [color]
+          codes[type - TYPES.begin()]
+               [color - COLORS.begin()]
                [row - board::MIN_ROW]
                [column - board::MIN_COLUMN] = rand_distrib(prng);
 
   for (std::size_t player = 0; player < piece::color_count; ++player)
-    players[player] = static_cast<hash_t>(uniform_deviate(rand()) * MAX_VALUE);
+    players[player] = static_cast<hash_t>(rand_distrib(prng));
 }
 
 zobrist_hasher::hash_t zobrist_hasher::generate_initial(board const& board, piece::color_t on_move) const {
@@ -46,8 +40,8 @@ zobrist_hasher::hash_t zobrist_hasher::generate_initial(board const& board, piec
     position const& position = p->first;
     piece const& piece = p->second;
 
-    hash ^= codes[piece.get_type()]
-                 [piece.get_color()]
+    hash ^= codes[index_from_type(piece.get_type())]
+                 [index_from_color(piece.get_color())]
                  [position.get_row() - board::MIN_ROW]
                  [position.get_column() - board::MIN_COLUMN];
   }
@@ -68,15 +62,15 @@ zobrist_hasher::hash_t zobrist_hasher::update(hash_t old_hash,
 
     // First remove the piece from its old position. If this is a displacement, add the piece's new position to the
     // hash later.
-    hash ^= codes[piece.get_type()]
-                 [piece.get_color()]
+    hash ^= codes[index_from_type(piece.get_type())]
+                 [index_from_color(piece.get_color())]
                  [old_position.get_row() - board::MIN_ROW]
                  [old_position.get_column() - board::MIN_COLUMN];
 
     if (!step->is_capture()) {
       position new_position = make_adjacent(old_position, step->get_where());
-      hash ^= codes[piece.get_type()]
-                   [piece.get_color()]
+      hash ^= codes[index_from_type(piece.get_type())]
+                   [index_from_color(piece.get_color())]
                    [new_position.get_row() - board::MIN_ROW]
                    [new_position.get_column() - board::MIN_COLUMN];
     }

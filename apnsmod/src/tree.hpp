@@ -13,12 +13,11 @@
 #include <boost/cstdint.hpp>
 #include <boost/type_traits.hpp>
 #include <boost/ref.hpp>
+#include <boost/pool/pool_alloc.hpp>
 
 #include <cstddef>
 #include <cassert>
 #include <iterator>
-
-#include <iostream>
 
 //! A vertex of the game tree.
 //!
@@ -118,16 +117,20 @@ private:
   struct allocator {
     //! Allocate memory to hold count objects of type vertex.
     //!
-    //! \returns Pointer to new memory or null if memory has been exhausted.
-    static char* allocate(std::size_t count) throw ();
+    //! \returns Pointer to new memory.
+    //! \throws std::bad_alloc
+    static vertex* allocate(std::size_t count);
 
     //! Reclaim previously-allocated memory.
     //!
     //! \param memory Pointer to previously-allocated memory. May be null.
-    static void deallocate(char* memory) throw ();
+    static void deallocate(vertex* memory) throw ();
+
+  private:
+    typedef boost::pool_allocator<vertex> sub_allocator;
   };
 
-  //! A SBRM wrapper for a non-copyable, non-transferrable arrays of char. This mimics boost::scoped_array, except it uses
+  //! A SBRM wrapper for a non-copyable, non-transferrable arrays of vertex. This mimics boost::scoped_array, except it uses
   //! allocator::deallocate to deallocate the storage, unlikely boost::scoped_array which always uses delete-expression.
   class storage_wrapper {
     // Safe bool idiom.
@@ -135,7 +138,7 @@ private:
     void this_type_does_not_support_comparisons() const { }
 
   public:
-    typedef char element_type;
+    typedef vertex element_type;
 
     explicit storage_wrapper(element_type* ptr = 0) : storage(ptr) { }
     ~storage_wrapper() throw ()                                 { reset(); }
@@ -190,15 +193,10 @@ public:
     attacker(attacker),
     initial_state(initial_state)
   {
-    std::cerr << "*game()\n";
     root.type             = vertex::type_or;
     root.proof_number     = 1;
     root.disproof_number  = 1;
     root.steps_remaining  = 4;
-  }
-
-  ~game() {
-    std::cerr << "~game()\n";
   }
 };
 

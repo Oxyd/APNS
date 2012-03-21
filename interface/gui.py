@@ -152,11 +152,9 @@ class MainWindowController(object):
                                                  'Specify an initial search position or load one from disk:',
                                                  self._mainWindowDsply.imageManager)
       if positionEditorDlg.board is not None:
-        print 'Before:', apnsmod.Vertex.count,
         self._controller.newGame(positionEditorDlg.board, positionEditorDlg.player)
         self._resultsCtrl.updateTree(self._controller)
-        gc.collect(2)
-        print 'and after:', apnsmod.Vertex.count
+        gc.collect()
         self._mainWindowDsply.disableStats()
         self._mainWindowDsply.enableSearch()
 
@@ -192,7 +190,7 @@ class MainWindowController(object):
         self._controller.dropGame()
         gc.collect()
 
-        dlg = LoadProgressDialog(self._mainWindowDsply.window)
+        dlg = SaveLoadProgressDialog(self._mainWindowDsply.window, 'Loading search tree', 'Loading the search tree.\nThis might take a while')
         ctrl = LoadProgressController(self._controller, dlg, str(filename))
         self._resultsCtrl.updateTree(self._controller)
 
@@ -203,7 +201,7 @@ class MainWindowController(object):
     elif command == MainWindow.Command.saveSearch:
       filename = tkFileDialog.asksaveasfilename()
       if len(filename) > 0:
-        dlg = SaveProgressDialog(self._mainWindowDsply.window)
+        dlg = SaveLoadProgressDialog(self._mainWindowDsply.window, 'Saving search tree', 'Saving the search tree.\nThis might take a while')
         SaveProgressController(self._controller, dlg, str(filename))
 
     elif command == MainWindow.Command.searchStats:
@@ -692,25 +690,22 @@ class DialogWindow(object):
 
 
 
-class SaveProgressDialog(Observable):
-  '''A simple dialog window showing the progress of the Save Tree action.'''
+class SaveLoadProgressDialog(Observable):
+  '''A simple dialog window showing the progress of the Save Tree or Load Tree actions.'''
 
   window = property(lambda self: self._dialog.window)
 
-  def __init__(self, parent):
+  def __init__(self, parent, title, text):
     Observable.__init__(self)
 
-    self._dialog = DialogWindow(parent, 'Saving tree')
+    self._dialog = DialogWindow(parent, title)
 
-    savingLbl = ttk.Label(self._dialog.content, text='Saving the search tree...')
-    self._progressBar = ttk.Progressbar(self._dialog.content)
+    self._lbl = ttk.Label(self._dialog.content, text=text + '   ')
 
     cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel', command=lambda: self.notifyObservers())
     self._dialog.setDeleteAction(lambda: cancelBtn.invoke())
 
-    savingLbl.grid(row=0, column=0, sticky='W')
-    self._progressBar.grid(row=1, column=0, sticky='WE', pady=5)
-
+    self._lbl.grid(row=0, column=0, sticky='W', padx=5, pady=5)
     cancelBtn.grid(row=0, column=0, sticky='E')
 
     self._dialog.content.rowconfigure(1, weight=1)
@@ -720,10 +715,18 @@ class SaveProgressDialog(Observable):
     self._dialog.window.bind('<Escape>', lambda e: cancelBtn.invoke())
 
 
-  def showProgress(self, percent):
-    '''Set the progressbar value to 'percent'.'''
+  def tick(self):
+    '''Make a simple dots animation.'''
 
-    self._progressBar['value'] = percent
+    text = self._lbl['text']
+    dots = 0
+    for i in xrange(len(text) - 3, len(text)):
+      if text[i] == '.': dots += 1
+
+    if dots < 3:
+      self._lbl['text'] = text[:len(text) - 3 + dots] + '.' + (3 - dots - 1) * ' '
+    else:
+      self._lbl['text'] = text[:len(text) - 3] + '   '
 
 
   def run(self):
@@ -741,9 +744,15 @@ class Canceller:
   def __init__(self, controller, dialog):
     self.controller = controller
     self.dialog = dialog
+    self.lastTick = time.time()
 
   def callback(self, controller):
     self.dialog.window.update()
+
+    now = time.time()
+    if now - self.lastTick > 0.5:
+      self.dialog.tick()
+      self.lastTick = now
 
   def update(self, source):
     '''Update from the dialog -- this means the user wishes to cancel the operation.'''
@@ -765,55 +774,6 @@ class SaveProgressController(object):
 
     controller.saveGameCallbacks.remove(canceller.callback)
     dialog.close()
-
-
-class LoadProgressDialog(Observable):
-  window = property(lambda self: self._dialog.window)
-
-  def __init__(self, parent):
-    Observable.__init__(self)
-
-    self._dialog = DialogWindow(parent, title='Loading Search Tree')
-
-    loadingLbl = ttk.Label(self._dialog.content, text='Loading the search tree...')
-    self._memoryUsageLbl = ttk.Label(self._dialog.content)
-    self._progressBar = ttk.Progressbar(self._dialog.content)
-
-    cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel', command=lambda: self.notifyObservers())
-    self._dialog.setDeleteAction(lambda: cancelBtn.invoke())
-
-    loadingLbl.grid(row=0, column=0, sticky='W')
-    self._memoryUsageLbl.grid(row=1, column=0, sticky='W', pady=5)
-    self._progressBar.grid(row=2, column=0, sticky='WE', pady=5)
-    self._dialog.content.rowconfigure(1, weight=1)
-
-    cancelBtn.grid(row=0, column=0, sticky='E')
-    self._dialog.buttonBox.columnconfigure(0, weight=1)
-
-    self.showMemoryUsage('0 B')
-
-    self._dialog.content.focus_set()
-    self._dialog.window.bind('<Escape>', lambda e: cancelBtn.invoke())
-
-
-  def showMemoryUsage(self, memUsage):
-    '''Update the memory usage label.'''
-
-    self._memoryUsageLbl['text'] = 'Memory usage: {0}'.format(memUsage)
-
-
-  def showProgress(self, percent):
-    '''Show the progress in percent.'''
-
-    self._progressBar['value'] = percent
-
-
-  def run(self):
-    self._dialog.run(wait=False)
-
-
-  def close(self):
-    self._dialog.close()
 
 
 class LoadProgressController(object):
@@ -1345,7 +1305,8 @@ class SearchProgressController(object):
         if self.progCtrl._timeLimit is not None:
           dlg.showTimeLeft(progress.timeLeft)
         dlg.showTimeElapsed(progress.timeElapsed)
-        dlg.showTransTblStats(memUsed=progress.transTblSize, hits=progress.transTblHits, misses=progress.transTblMisses)
+        ttSize = '{0:.2f} MB'.format(progress.transTblSize / float(1024 * 1024))
+        dlg.showTransTblStats(memUsed=ttSize, hits=progress.transTblHits, misses=progress.transTblMisses)
         dlg.showPosCount(posCount=progress.positionCount, posPerSec=progress.positionsPerSecond)
         dlg.showRootPnDn(progress.rootPN, progress.rootDN)
         dlg.updateGui()
@@ -1369,7 +1330,8 @@ class SearchStatsController(object):
     searchProgressDlg.showMemoryAllocated(0)
     searchProgressDlg.showPosCount(posCount=s.positionCount, posPerSec=s.positionsPerSecond)
     searchProgressDlg.showRootPnDn(s.rootPN, s.rootDN)
-    searchProgressDlg.showTransTblStats(memUsed=s.transTblSize, hits=s.transTblHits, misses=s.transTblMisses)
+    ttSize = '{0:.2f} MB'.format(progress.transTblSize / float(1024 * 1024))
+    searchProgressDlg.showTransTblStats(ttSize, hits=s.transTblHits, misses=s.transTblMisses)
 
     searchProgressDlg.addObserver(self)
     searchProgressDlg.run()

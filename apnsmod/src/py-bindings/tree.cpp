@@ -93,6 +93,13 @@ vertex* game_get_root(game& g) {
   return &g.root;
 }
 
+struct foo {
+  char* memory;
+  ~foo() {
+    delete [] memory;
+  }
+};
+
 } // anonymous namespace
 
 //! Export functions and types declared in tree.hpp.
@@ -118,8 +125,6 @@ void export_tree() {
           static_cast<vertex::children_iterator (vertex::*)()>(&vertex::children_begin),
           static_cast<vertex::children_iterator (vertex::*)()>(&vertex::children_end)))
       .add_property("childrenCount", &vertex::children_count)
-
-      .def_readwrite("count", &vertex::count)
       
       .def("addChild", &vertex::add_child,
            return_internal_reference<>(),

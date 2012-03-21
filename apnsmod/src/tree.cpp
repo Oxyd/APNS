@@ -132,12 +132,14 @@ void vertex::swap(vertex& other) {
   std::swap(type, other.type);
 }
 
-char* vertex::allocator::allocate(std::size_t n) throw () {
-  return new (std::nothrow) char[n * sizeof(vertex)];
+vertex* vertex::allocator::allocate(std::size_t n) {
+  //return sub_allocator::allocate(n);
+  return static_cast<vertex*>(::operator new[] (n * sizeof(vertex)));
 }
 
-void vertex::allocator::deallocate(char* memory) throw () {
-  delete [] memory;
+void vertex::allocator::deallocate(vertex* memory) throw () {
+  //return sub_allocator::deallocate(memory);
+  ::operator delete[] (memory);
 }
 
 void vertex::storage_wrapper::reset(element_type* new_ptr) throw () {
@@ -189,7 +191,7 @@ void vertex::realloc(std::size_t new_alloc) {
 
     // *Move* children into new storage.
     for (std::size_t index = 0; index < size; ++index) {
-      new (new_storage.get() + index * sizeof(vertex)) vertex(get(index));
+      new (new_storage.get() + index) vertex(get(index));
       get(index).~vertex();  // Won't deallocate children as the storage of that child is null already.
     }
   }

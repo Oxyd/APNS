@@ -1,6 +1,6 @@
 # config/linux.py -- configuration values for building on Linux systems.
 
-def config(conf, bits, debug):
+def config(conf, bits, debug, profile):
   conf['linux2'] = {
     'default-toolchain':  'gcc',
     'gcc': {
@@ -10,8 +10,10 @@ def config(conf, bits, debug):
         '-ansi',
         '-pedantic',
         '-O3' if not debug else '',
-        '-ggdb' if debug else '',
+        '-ggdb' if debug or profile else '',
         '-fstack-protector-all' if debug else ''
+      ],
+      'link-flags': [
       ],
       'defines': [
         'POSIX',
