@@ -298,7 +298,7 @@ step::step(elementary_step_seq s)
   : representation(string_from_el_steps(s.begin(), s.end()))
 { }
 
-boost::optional<step> step::validate_ordinary_step(board const& board, elementary_step step) {
+step_holder step::validate_ordinary_step(board const& board, elementary_step step) {
   position const& from    = step.get_from();
   direction const& where  = step.get_where();
 
@@ -313,7 +313,7 @@ boost::optional<step> step::validate_ordinary_step(board const& board, elementar
         && ((what.get_color() == piece::gold && where == south)
             || (what.get_color() == piece::silver && where == north))) {
       // Rabbits can't go backwards.
-      return boost::optional< ::step>();
+      return step_holder::none;
     }
 
     elementary_step_seq sequence;
@@ -322,13 +322,13 @@ boost::optional<step> step::validate_ordinary_step(board const& board, elementar
 
     check_for_captures(what, from, destination, board, sequence);
 
-    return ::step(sequence);
+    return step_holder(::step(sequence));
   } else {
-    return boost::optional< ::step>();
+    return step_holder::none;
   }
 }
 
-boost::optional<step> step::validate_push(board const& board,
+step_holder step::validate_push(board const& board,
     elementary_step const& first_step, elementary_step const& second_step) {
   if (adjacent(first_step.get_from(), second_step.get_from())
       && !empty(first_step.get_from(), board)
@@ -342,11 +342,11 @@ boost::optional<step> step::validate_push(board const& board,
       && !frozen(second_step.get_from(), board)) {
     return make_push_pull(board, first_step, second_step);
   } else {
-    return boost::optional<step>();
+    return step_holder::none;
   }
 }
 
-boost::optional<step> step::validate_pull(board const& board,
+step_holder step::validate_pull(board const& board,
     elementary_step const& first_step, elementary_step const& second_step) {
   if (adjacent(first_step.get_from(), second_step.get_from())
       && !empty(first_step.get_from(), board)
@@ -361,11 +361,11 @@ boost::optional<step> step::validate_pull(board const& board,
       ) {
     return make_push_pull(board, first_step, second_step);
   } else {
-    return boost::optional<step>();
+    return step_holder::none;
   }
 }
 
-boost::optional<step> step::from_string(std::string const& string) {
+step_holder step::from_string(std::string const& string) {
   // Split the input up into elementary steps separated by spaces. Convert each elementary step separately.
 
   std::size_t const MAX_ELEMENTARY_STEPS_POSSIBLE = 4;  // At most four elementary steps per one step are possible.
@@ -378,15 +378,15 @@ boost::optional<step> step::from_string(std::string const& string) {
     if (el_step) {
       elementary_steps.insert(elementary_steps.end(), *el_step);
     } else {
-      return boost::optional<step>();
+      return step_holder::none;
     }
   }
 
   if (elementary_steps.size() <= MAX_ELEMENTARY_STEPS_POSSIBLE) {
-    return step(elementary_steps);
+    return step_holder(step(elementary_steps));
   }
 
-  return boost::optional<step>();
+  return step_holder::none;
 }
 
 bool step::capture() const {
@@ -401,11 +401,11 @@ std::string step::to_string() const {
 }
 
 step::el_steps_iterator step::step_sequence_begin() const {
-  return el_steps_iterator(representation.begin(), representation.end());
+  return el_steps_iterator(representation.get().begin(), representation.get().end());
 }
 
 step::el_steps_iterator step::step_sequence_end() const {
-  return el_steps_iterator(representation.end(), representation.end());
+  return el_steps_iterator(representation.get().end(), representation.get().end());
 }
 
 step::reverse_el_steps_iterator step::step_sequence_rbegin() const {
@@ -456,6 +456,8 @@ bool operator == (step const& lhs, step const& rhs) {
 bool operator != (step const& lhs, step const& rhs) {
   return !operator == (lhs, rhs);
 }
+
+step_holder const step_holder::none;
 
 e_step_kind step_kind(step const& step, piece::color_t player, board const& board) {
   if (step.steps_used() == 1) {

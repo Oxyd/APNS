@@ -296,7 +296,7 @@ struct reader {
       boost::algorithm::trim(token);
       boost::optional<step> maybe_step = step::from_string(token);
       if (maybe_step)
-        v.step = maybe_step;
+        v.step = *maybe_step;
       else if (token != "root") bad_format();
 
       if (!(in >> token)) bad_format();

@@ -51,7 +51,7 @@ public:
 
   number_t                  proof_number;
   number_t                  disproof_number;
-  boost::optional< ::step>  step;
+  step_holder               step;
   int                       steps_remaining;
   e_type                    type;
 

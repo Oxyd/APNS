@@ -123,7 +123,7 @@ TEST(movement, simple_move_capture_test) {
         board b;
         b.put(p, piece(color, type));
 
-        boost::optional<step> s = step::validate_ordinary_step(b, elementary_step::displacement(p, d));
+        step_holder s = step::validate_ordinary_step(b, elementary_step::displacement(p, d));
         ASSERT_TRUE(s);
         EXPECT_TRUE(s->capture());
       }
@@ -137,7 +137,7 @@ TEST(movement, simple_move_capture_test_2) {
     b.put(position(4, 'c'), piece(piece::gold, piece::elephant));
     b.put(position(3, 'b'), piece(piece::gold, piece::horse));
 
-    boost::optional<step> s = step::validate_ordinary_step(b, elementary_step::displacement(position(3, 'b'), east));
+    step_holder s = step::validate_ordinary_step(b, elementary_step::displacement(position(3, 'b'), east));
     ASSERT_TRUE(s);
     EXPECT_TRUE(!s->capture());
   }
@@ -146,7 +146,7 @@ TEST(movement, simple_move_capture_test_2) {
     b.put(position(3, 'c'), piece(piece::silver, piece::camel));
     b.put(position(3, 'd'), piece(piece::silver, piece::cat));
 
-    boost::optional<step> s = step::validate_ordinary_step(b, elementary_step::displacement(position(3, 'd'), east));
+    step_holder s = step::validate_ordinary_step(b, elementary_step::displacement(position(3, 'd'), east));
     ASSERT_TRUE(s);
     EXPECT_TRUE(s->capture());
 
@@ -191,7 +191,7 @@ TEST(movement, simple_push_capture_test) {
   b.put(position(3, 'b'), piece(piece::gold, piece::cat));
   b.put(position(2, 'b'), piece(piece::silver, piece::horse));
 
-  boost::optional<step> s = step::validate_push(b,
+  step_holder s = step::validate_push(b,
       elementary_step::displacement(position(3, 'b'), east),
       elementary_step::displacement(position(2, 'b'), north));
   ASSERT_TRUE(s);
@@ -256,7 +256,7 @@ TEST(movement, simple_pull_capture_test) {
   b.put(position(2, 'b'), piece(piece::gold, piece::cat));
   b.put(position(3, 'b'), piece(piece::silver, piece::horse));
 
-  boost::optional<step> s = step::validate_pull(b,
+  step_holder s = step::validate_pull(b,
       elementary_step::displacement(position(3, 'b'), north),
       elementary_step::displacement(position(2, 'b'), north));
   ASSERT_TRUE(s);
@@ -288,7 +288,7 @@ TEST(movement, sacrifice_test) {
   b.put(position(6, 'f'), piece(piece::gold, piece::elephant));
   b.put(position(7, 'f'), piece(piece::gold, piece::rabbit));
 
-  boost::optional<step> s = step::validate_ordinary_step(b, elementary_step::displacement(position(7, 'f'), north));
+  step_holder s = step::validate_ordinary_step(b, elementary_step::displacement(position(7, 'f'), north));
   ASSERT_TRUE(s);
   EXPECT_TRUE(s->capture());
 
@@ -537,61 +537,61 @@ std::ostream& operator << (std::ostream& output, step const& step) {
 }
 
 TEST_F(string_test, displacement) {
-  boost::optional<step> s = step::validate_ordinary_step(b, elementary_step::displacement(position(2, 'b'), east));
+  step_holder s = step::validate_ordinary_step(b, elementary_step::displacement(position(2, 'b'), east));
   ASSERT_TRUE(s);
   EXPECT_EQ("cb2e", s->to_string());
-  boost::optional<step> q = step::from_string("cb2e");
+  step_holder q = step::from_string("cb2e");
   ASSERT_TRUE(q);
   EXPECT_EQ(*s, *q);
 }
 
 TEST_F(string_test, suicide) {
-  boost::optional<step> s = step::validate_ordinary_step(b, elementary_step::displacement(position(3, 'g'), west));
+  step_holder s = step::validate_ordinary_step(b, elementary_step::displacement(position(3, 'g'), west));
   ASSERT_TRUE(s);
   EXPECT_EQ("Rg3w Rf3x", s->to_string());
-  boost::optional<step> q = step::from_string("Rg3w Rf3x");
+  step_holder q = step::from_string("Rg3w Rf3x");
   ASSERT_TRUE(q);
   EXPECT_EQ(*s, *q);
 }
 
 TEST_F(string_test, push) {
-  boost::optional<step> s = step::validate_push(b,
+  step_holder s = step::validate_push(b,
       elementary_step::displacement(position(5, 'c'), south),
       elementary_step::displacement(position(5, 'b'), east));
   ASSERT_TRUE(s);
   EXPECT_EQ("cc5s Hb5e", s->to_string());
-  boost::optional<step> q = step::from_string("cc5s Hb5e");
+  step_holder q = step::from_string("cc5s Hb5e");
   ASSERT_TRUE(q);
   EXPECT_EQ(*s, *q);
 }
 
 TEST_F(string_test, pull) {
-  boost::optional<step> s = step::validate_pull(b,
+  step_holder s = step::validate_pull(b,
       elementary_step::displacement(position(5, 'b'), north),
       elementary_step::displacement(position(5, 'c'), west));
   ASSERT_TRUE(s);
   EXPECT_EQ("Hb5n cc5w", s->to_string());
-  boost::optional<step> q = step::from_string("Hb5n cc5w");
+  step_holder q = step::from_string("Hb5n cc5w");
   ASSERT_TRUE(q);
   EXPECT_EQ(*s, *q);
 }
 
 TEST_F(string_test, capture) {
-  boost::optional<step> s = step::validate_push(b,
+  step_holder s = step::validate_push(b,
       elementary_step::displacement(position(5, 'c'), north),
       elementary_step::displacement(position(5, 'b'), east));
   ASSERT_TRUE(s);
   EXPECT_EQ("cc5n cc6x Hb5e", s->to_string());
-  boost::optional<step> q = step::from_string("cc5n cc6x Hb5e");
+  step_holder q = step::from_string("cc5n cc6x Hb5e");
   ASSERT_TRUE(q);
   EXPECT_EQ(*s, *q);
 }
 
 TEST_F(string_test, sacrifice) {
-  boost::optional<step> s = step::validate_ordinary_step(b, elementary_step::displacement(position(7, 'f'), north));
+  step_holder s = step::validate_ordinary_step(b, elementary_step::displacement(position(7, 'f'), north));
   ASSERT_TRUE(s);
   EXPECT_EQ("Rf7n Ef6x", s->to_string());
-  boost::optional<step> q = step::from_string("Rf7n Ef6x");
+  step_holder q = step::from_string("Rf7n Ef6x");
   ASSERT_TRUE(q);
   EXPECT_EQ(*s, *q);
 }

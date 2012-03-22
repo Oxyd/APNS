@@ -12,6 +12,8 @@
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/reverse_iterator.hpp>
+#include <boost/flyweight.hpp>
+#include <boost/flyweight/no_locking.hpp>
 
 #include <vector>
 #include <utility>
@@ -88,6 +90,8 @@ inline elementary_step detail::el_step_from_string(std::string::const_iterator b
   return elementary_step(begin, end);
 }
 
+class step_holder;
+
 /**
  * A complete, valid Arimaa step.
  *
@@ -159,21 +163,21 @@ public:
   //! Validate and possibly construct an ordinary step.
   //! \param board The board which is to be affected by this step.
   //! \param step Movement of the single piece.
-  static boost::optional<step> validate_ordinary_step(board const& board, elementary_step step);
+  static step_holder validate_ordinary_step(board const& board, elementary_step step);
 
   //! Validate and possibly construct a push kind of step.
   //! \param board The board which is to be affected by this step.
   //! \param first_step Movement of the pushed piece.
   //! \param second_step Movement of the pushing piece.
-  static boost::optional<step> validate_push(board const& board,
-      elementary_step const& first_step, elementary_step const& second_step);
+  static step_holder validate_push(board const& board,
+                                   elementary_step const& first_step, elementary_step const& second_step);
 
   //! Validate and possibly construct a pull kind of step.
   //! \param board The board which is to be affected by this step.
   //! \param first_step Movement of the pulling piece.
   //! \param second_step Movement of the pulled piece.
-  static boost::optional<step> validate_pull(board const& board,
-        elementary_step const& first_step, elementary_step const& second_step);
+  static step_holder validate_pull(board const& board,
+                                   elementary_step const& first_step, elementary_step const& second_step);
 
   //! Construct a step from a string.
   //! \note This function does not check for the validity of the step itself. It merely checks the syntax of the input string
@@ -181,7 +185,7 @@ public:
   //! restore-search-from-disk part of the program.
   //!
   //! \returns Either the corresponding step, or nothing, if the input doesn't describe a valid step.
-  static boost::optional<step> from_string(std::string const& string);
+  static step_holder from_string(std::string const& string);
 
   //! Does this step cause a capture on the board?
   bool capture() const;
@@ -203,10 +207,15 @@ public:
   std::string to_string() const;
 
 private:
-  std::string representation;
+  typedef boost::flyweight<std::string, boost::flyweights::no_locking> representation_t;
+  representation_t representation;
   //elementary_step_seq full_sequence;  //!< Full sequence of elementary steps, including captures.
 
-  step();  // Users aren't allowed to directly create objects of this type.
+  friend class step_holder;
+  // These two are to be used by step_holder.
+  step() { }
+  bool is_empty() const { return representation.get().empty(); }
+
   explicit step(elementary_step_seq s);
 
   //! Make a push/pull move assuming that the move is valid.
@@ -216,6 +225,51 @@ private:
 
 bool operator == (step const& lhs, step const& rhs);
 bool operator != (step const& lhs, step const& rhs);
+
+//! Holder for a step. This mimicks boost::optional, except it doesn't require the extra bool and instead cooperates with step
+//! to tell if it holds value or not.
+class step_holder {
+  typedef void (step_holder::* bool_type)() const;
+  void this_type_does_not_support_comparisons() const { }
+
+public:
+  //! Construct an empty holder.
+  step_holder() { }
+
+  //! Implicit conversion from step, mimicking boost::optional.
+  step_holder(::step const& step) : step(step) { }
+  
+  static step_holder const none;  //!< An empty holder.
+
+  //! Is this holder empty?
+  bool empty() { return step.is_empty(); }
+  bool empty() const { return step.is_empty(); }
+  operator bool_type() { return !empty() ? &step_holder::this_type_does_not_support_comparisons : 0; }
+  operator bool_type() const { return !empty() ? &step_holder::this_type_does_not_support_comparisons : 0; }
+
+  //! For compatibility with old code, provide an implicit conversion to optional<step>.
+  operator boost::optional<step> () const {
+    if (!step.is_empty())
+      return step;
+    else
+      return boost::none;
+  }
+
+  ::step& operator * ()               { assert(!empty()); return step; }
+  ::step const& operator * () const   { assert(!empty()); return step; }
+  ::step* operator -> ()              { assert(!empty()); return &step; }
+  ::step const* operator -> () const  { assert(!empty()); return &step; }
+
+  step_holder& operator = (::step const& s) {
+    step = s;
+    return *this;
+  }
+
+  ::step* get() { if (!empty()) return &step; else return 0; }
+
+private:
+  ::step step;
+};
 
 //! Kind of a step.
 enum e_step_kind {
@@ -291,7 +345,7 @@ private:
   position piece_pos;           //!< The specified position of the piece.
   directions_iter first_dir;    //!< Where to move the piece (possibly pushing something else away).
   directions_iter second_dir;   //!< Where to push the second piece (if pushing) or which of the neighbours to pull.
-  boost::optional<step> result; //!< Resulting step.
+  step_holder result;           //!< Resulting step.
 
   enum {
     ordinary,  //!< Generating ordinary steps.

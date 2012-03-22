@@ -14,7 +14,7 @@ void vertex_set_step(vertex& vertex, boost::python::object step) {
   if (!step.is_none())
     vertex.step = extract< ::step>(step)();
   else
-    vertex.step = boost::none;
+    vertex.step = step_holder::none;
 }
 
 //! Wrapper around Traversal Policy to make it more Python-friendly.

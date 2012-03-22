@@ -4,11 +4,29 @@
 #include <boost/optional.hpp>
 #include <boost/python.hpp>
 
+namespace {
+
+//! Convert a step_holder to Step or None.
+struct step_holder_converter {
+  static PyObject* convert(step_holder const& holder) {
+    using namespace boost::python;
+
+    if (holder)
+      return incref(object(*holder).ptr());
+    else
+      return incref(Py_None);
+  }
+};
+
+}
+
 /**
  * \brief Export types and functions declared in movement.hpp.
  */
 void export_movement() {
   using namespace boost::python;
+
+  to_python_converter<step_holder, step_holder_converter>();
 
   class_<elementary_step>("ElementaryStep",
     "An elementary step is a displacement of a single piece on the board or a capture of a piece."
