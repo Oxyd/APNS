@@ -292,7 +292,7 @@ TEST(movement, sacrifice_test) {
   ASSERT_TRUE(s);
   EXPECT_TRUE(s->capture());
 
-  step::elementary_step_seq el_steps(s->step_sequence_begin(), s->step_sequence_end());
+  std::vector<elementary_step> el_steps(s->step_sequence_begin(), s->step_sequence_end());
   ASSERT_EQ(2, el_steps.size());
 
   elementary_step const& e1 = el_steps.front();

@@ -5,6 +5,15 @@
 
 namespace {
 
+zobrist_hasher::hash_t zobrist_hasher_update(
+  zobrist_hasher const& hasher,
+  zobrist_hasher::hash_t original,
+  std::vector<elementary_step> const& steps,
+  piece::color_t from, piece::color_t to)
+{
+  return hasher.update(original, steps.begin(), steps.end(), from, to);
+}
+
 } // anonymous namespace
 
 //! Export functions and types declared in hash.hpp
@@ -15,13 +24,7 @@ void export_hash() {
       .def("generateInitial", &zobrist_hasher::generate_initial,
           "z.generateInitial(Board, Color) -> hash\n\n"
           "Generate the initial hash value for given board, assuming the specified player is on move")
-      .def("update",
-          static_cast<
-            zobrist_hasher::hash_t (zobrist_hasher::*)(zobrist_hasher::hash_t,
-                                                       step::elementary_step_seq const&,
-                                                       piece::color_t,
-                                                       piece::color_t) const
-          >(&zobrist_hasher::update),
+      .def("update", &zobrist_hasher_update,
           "z.update(hash, [ElementaryStep], Color, Color) -> hash\n\n"
           "Update the hash value.")
       ;

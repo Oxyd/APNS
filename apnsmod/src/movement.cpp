@@ -120,6 +120,8 @@ bool would_be_capture(position pos, piece what, position from, position where, b
   }
 }
 
+typedef std::vector<elementary_step> elementary_steps_cont;
+
 /**
  * Check for captures and insert them into a sequence of elementary steps.
  *
@@ -133,7 +135,7 @@ bool would_be_capture(position pos, piece what, position from, position where, b
  * \param sequence All detected captures will be inserted here.
  */
 void check_for_captures(piece what, position from, position destination,
-    board const& board, step::elementary_step_seq& sequence) {
+    board const& board, elementary_steps_cont& sequence) {
   if (would_be_capture(what, from, destination, board)) {
     elementary_step capture = elementary_step::capture(destination);
     capture.set_what(what);
@@ -209,6 +211,21 @@ direction dir_from_letter(char letter) {
   return north;
 }
 
+template <typename Iter>
+std::string string_from_el_steps(Iter begin, Iter end) {
+  std::string result;
+  result.reserve(3 * std::distance(begin, end));
+
+  for (Iter el_step = begin; el_step != end; ++el_step) {
+    if (el_step != begin)
+      result += ' ';
+
+    result += el_step->to_string();
+  }
+
+  return result;
+}
+
 // Indexes into elementary_step::representation.
 std::size_t const PIECE_INDEX = 0;
 std::size_t const COLUMN_INDEX = 1;
@@ -230,7 +247,7 @@ bool elementary_step::is_capture() const {
 }
 
 boost::optional<piece> elementary_step::get_what() const {
-  return piece_from_letter(representation[PIECE_INDEX]);
+  return piece_from_letter_unsafe(representation[PIECE_INDEX]);
 }
 
 std::string elementary_step::to_string() const {
@@ -278,7 +295,7 @@ bool operator != (elementary_step const& lhs, elementary_step const& rhs) {
 }
 
 step::step(elementary_step_seq s)
-  : full_sequence(s)
+  : representation(string_from_el_steps(s.begin(), s.end()))
 { }
 
 boost::optional<step> step::validate_ordinary_step(board const& board, elementary_step step) {
@@ -373,49 +390,34 @@ boost::optional<step> step::from_string(std::string const& string) {
 }
 
 bool step::capture() const {
-  for (elementary_step_seq::const_iterator el_step = full_sequence.begin();
-      el_step != full_sequence.end(); ++el_step) {
-    if (el_step->is_capture()) {
+  for (el_steps_iterator el_step = step_sequence_begin(); el_step != step_sequence_end(); ++el_step)
+    if (el_step->is_capture())
       return true;
-    }
-  }
-
   return false;
 }
 
 std::string step::to_string() const {
-  std::ostringstream result;
-
-  for (step::elementary_step_seq::const_iterator el_step = full_sequence.begin();
-      el_step != full_sequence.end(); ++el_step) {
-    if (el_step != full_sequence.begin()) {
-      result << ' ';
-    }
-
-    result << el_step->to_string();
-  }
-
-  return result.str();
+  return representation;
 }
 
-step::elementary_step_seq::const_iterator step::step_sequence_begin() const {
-  return full_sequence.begin();
+step::el_steps_iterator step::step_sequence_begin() const {
+  return el_steps_iterator(representation.begin(), representation.end());
 }
 
-step::elementary_step_seq::const_iterator step::step_sequence_end() const {
-  return full_sequence.end();
+step::el_steps_iterator step::step_sequence_end() const {
+  return el_steps_iterator(representation.end(), representation.end());
 }
 
-step::elementary_step_seq::const_reverse_iterator step::step_sequence_rbegin() const {
-  return full_sequence.rbegin();
+step::reverse_el_steps_iterator step::step_sequence_rbegin() const {
+  return reverse_el_steps_iterator(step_sequence_end());
 }
 
-step::elementary_step_seq::const_reverse_iterator step::step_sequence_rend() const {
-  return full_sequence.rend();
+step::reverse_el_steps_iterator step::step_sequence_rend() const {
+  return reverse_el_steps_iterator(step_sequence_begin());
 }
 
 std::size_t step::steps_used() const {
-  return std::count_if(full_sequence.begin(), full_sequence.end(),
+  return std::count_if(step_sequence_begin(), step_sequence_end(),
       !boost::bind(&elementary_step::is_capture, _1));
 }
 
@@ -441,14 +443,12 @@ step step::make_push_pull(board const& board, elementary_step first_step, elemen
 }
 
 bool operator == (step const& lhs, step const& rhs) {
-  step::elementary_step_seq::const_iterator left = lhs.step_sequence_begin();
-  step::elementary_step_seq::const_iterator right = rhs.step_sequence_begin();
+  step::el_steps_iterator left = lhs.step_sequence_begin();
+  step::el_steps_iterator right = rhs.step_sequence_begin();
 
-  for (; left != lhs.step_sequence_end() && right != rhs.step_sequence_end(); ++left, ++right) {
-    if (*left != *right) {
+  for (; left != lhs.step_sequence_end() && right != rhs.step_sequence_end(); ++left, ++right)
+    if (*left != *right)
       return false;
-    }
-  }
 
   return left == lhs.step_sequence_end() && right == rhs.step_sequence_end();
 }
@@ -468,7 +468,7 @@ e_step_kind step_kind(step const& step, piece::color_t player, board const& boar
 }
 
 void apply(step const& step, board& board) {
-  for (::step::elementary_step_seq::const_iterator es = step.step_sequence_begin();
+  for (::step::el_steps_iterator es = step.step_sequence_begin();
       es != step.step_sequence_end(); ++es) {
     boost::optional<piece> maybe_what = board.get(es->get_from());
     if (maybe_what) {
@@ -488,7 +488,7 @@ void apply(step const& step, board& board) {
 
 void unapply(step const& step, board& board) {
   // Traverse the sequence of elementary steps *backwards*.
-  for (::step::elementary_step_seq::const_reverse_iterator es = step.step_sequence_rbegin();
+  for (::step::reverse_el_steps_iterator es = step.step_sequence_rbegin();
       es != step.step_sequence_rend(); ++es) {
     position const original_position = es->get_from();
 

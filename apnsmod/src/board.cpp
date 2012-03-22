@@ -44,17 +44,8 @@ char letter_from_pair(piece::color_t c, piece::type_t t) {
 
 }  // Anonymous namespace.
 
-//! Same as piece_from_letter but assumes that the input is valid.
-piece piece_from_letter_unsafe(char letter) {
-  return piece(letter);
-}
-
 piece::piece(color_t c, type_t t) : 
   data(letter_from_pair(c, t))
-{ }
-
-piece::piece(char letter) :
-  data(letter)
 { }
 
 piece::color_t piece::get_color() const {

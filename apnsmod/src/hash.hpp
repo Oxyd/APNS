@@ -61,27 +61,49 @@ public:
    * \param current_player Who made the steps described?
    * \param next_player Whose turn is it now?
    */
-  hash_t update(hash_t old_hash,
-      step::elementary_step_seq::const_iterator steps_begin, step::elementary_step_seq::const_iterator steps_end,
-      piece::color_t current_player, piece::color_t next_player) const;
-  
-  /**
-   * Same as above, except this function accepts a reference to the sequence of elementary steps, instead of a pair
-   * of iterators.
-   */
-  hash_t update(hash_t old_hash,
-      step::elementary_step_seq const& steps,
-      piece::color_t current_player, piece::color_t next_player) const;
+  template <typename Iter>
+    hash_t update(hash_t old_hash, Iter steps_begin, Iter steps_end,
+                  piece::color_t current_player, piece::color_t next_player) const;
 
 private:
-  friend class zobrist_hasher_pickle;
-
   typedef boost::multi_array<hash_t, 4>   codes_cont;
   typedef boost::array<hash_t, 2>         players_cont;
 
   codes_cont    codes;
   players_cont  players;
 };
+
+template <typename Iter>
+zobrist_hasher::hash_t zobrist_hasher::update(hash_t old_hash, Iter steps_begin, Iter steps_end, 
+                                              piece::color_t current_player, piece::color_t next_player) const {
+  hash_t hash = old_hash;
+
+  for (Iter step = steps_begin; step != steps_end; ++step) {
+    position const& old_position = step->get_from();
+    piece const& piece = *step->get_what();  // Assumed to be non-empty.
+
+    // First remove the piece from its old position. If this is a displacement, add the piece's new position to the
+    // hash later.
+    hash ^= codes[index_from_type(piece.get_type())]
+                 [index_from_color(piece.get_color())]
+                 [old_position.get_row() - board::MIN_ROW]
+                 [old_position.get_column() - board::MIN_COLUMN];
+
+    if (!step->is_capture()) {
+      position new_position = make_adjacent(old_position, step->get_where());
+      hash ^= codes[index_from_type(piece.get_type())]
+                   [index_from_color(piece.get_color())]
+                   [new_position.get_row() - board::MIN_ROW]
+                   [new_position.get_column() - board::MIN_COLUMN];
+    }
+  }
+
+  hash ^= players[current_player];
+  hash ^= players[next_player];
+
+  return hash;
+}
+
 
 /**
  * A transposition table serves as a cache for already explored positions -- vertices of the search tree. Vertices are indexed

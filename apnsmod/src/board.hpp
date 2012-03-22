@@ -61,7 +61,7 @@ struct piece {
 
 private:
   friend piece piece_from_letter_unsafe(char);
-  explicit piece(char letter);
+  explicit piece(char letter) : data(letter) { }
   char data;
 };
 
@@ -85,6 +85,11 @@ piece::color_t opponent_color(piece::color_t player);
 
 //! Return the letter representing given piece according to the Arimaa notation rules.
 char letter_from_piece(piece p);
+
+//! Same as piece_from_letter but assumes that the input is valid.
+inline piece piece_from_letter_unsafe(char letter) {
+  return piece(letter);
+}
 
 //! Convert a piece letter into a piece, or nothing if the letter doesn't describe a valid piece.
 boost::optional<piece> piece_from_letter(char letter);

@@ -51,43 +51,6 @@ zobrist_hasher::hash_t zobrist_hasher::generate_initial(board const& board, piec
   return hash;
 }
 
-zobrist_hasher::hash_t zobrist_hasher::update(hash_t old_hash,
-    step::elementary_step_seq::const_iterator steps_begin, step::elementary_step_seq::const_iterator steps_end,
-    piece::color_t current_player, piece::color_t next_player) const {
-  hash_t hash = old_hash;
-
-  for (step::elementary_step_seq::const_iterator step = steps_begin; step != steps_end; ++step) {
-    position const& old_position = step->get_from();
-    piece const& piece = *step->get_what();  // Assumed to be non-empty.
-
-    // First remove the piece from its old position. If this is a displacement, add the piece's new position to the
-    // hash later.
-    hash ^= codes[index_from_type(piece.get_type())]
-                 [index_from_color(piece.get_color())]
-                 [old_position.get_row() - board::MIN_ROW]
-                 [old_position.get_column() - board::MIN_COLUMN];
-
-    if (!step->is_capture()) {
-      position new_position = make_adjacent(old_position, step->get_where());
-      hash ^= codes[index_from_type(piece.get_type())]
-                   [index_from_color(piece.get_color())]
-                   [new_position.get_row() - board::MIN_ROW]
-                   [new_position.get_column() - board::MIN_COLUMN];
-    }
-  }
-
-  hash ^= players[current_player];
-  hash ^= players[next_player];
-
-  return hash;
-}
-
-zobrist_hasher::hash_t zobrist_hasher::update(hash_t old_hash,
-    step::elementary_step_seq const& steps,
-    piece::color_t current_player, piece::color_t next_player) const {
-  return update(old_hash, steps.begin(), steps.end(), current_player, next_player);
-}
-
 std::size_t const transposition_table::SIZE_OF_ELEMENT = sizeof(record);
 
 transposition_table::transposition_table(std::size_t table_size, std::size_t keep_time)

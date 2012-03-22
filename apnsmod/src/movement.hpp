@@ -11,12 +11,21 @@
 #include "util.hpp"
 
 #include <boost/iterator/iterator_facade.hpp>
+#include <boost/iterator/reverse_iterator.hpp>
 
 #include <vector>
 #include <utility>
 
 //! Maximum allowed number of steps in a move.
 unsigned const MAX_STEPS = 4;
+
+struct elementary_step;
+
+namespace detail {
+
+elementary_step el_step_from_string(std::string::const_iterator begin, std::string::const_iterator end);
+
+}  // anonymous namespace
 
 /**
  * Displacement of a single piece on the board or capture of a piece.
@@ -48,11 +57,25 @@ struct elementary_step {
   static elementary_step capture(position from, boost::optional<piece> what = boost::optional<piece>());
 
 private:
+  friend elementary_step detail::el_step_from_string(std::string::const_iterator, std::string::const_iterator);
+
   //! A displacement.
   elementary_step(position from, direction where, boost::optional<piece> what);
 
   //! A capture.
   explicit elementary_step(position which, boost::optional<piece> what);
+
+  //! Construct from string.
+  explicit elementary_step(std::string::const_iterator begin, std::string::const_iterator end) {
+    assert(end - begin == 4);
+    assert(*begin == 'E' || *begin == 'M' || *begin == 'H' || *begin == 'D' || *begin == 'C' || *begin == 'R'
+           || *begin == 'e' || *begin == 'm' || *begin == 'h' || *begin == 'd' || *begin == 'c' || *begin == 'r'
+           || *begin == ' ');
+    assert(*(begin + 1) >= 'a' && *(begin + 1) <= 'h');
+    assert(*(begin + 2) >= '1' && *(begin + 2) <= '8');
+    assert(*(begin + 3) == 'n' || *(begin + 3) == 'e' || *(begin + 3) == 's' || *(begin + 3) == 'w' || *(begin + 3) == 'x');
+    std::copy(begin, end, representation);
+  }
 
   //! Four-character representation of the elementary step. This is a string like "Rc7n" or " d3e" if the piece is not known.
   char representation[4];
@@ -60,6 +83,10 @@ private:
 
 bool operator == (elementary_step const& lhs, elementary_step const& rhs);
 bool operator != (elementary_step const& lhs, elementary_step const& rhs);
+
+inline elementary_step detail::el_step_from_string(std::string::const_iterator begin, std::string::const_iterator end) {
+  return elementary_step(begin, end);
+}
 
 /**
  * A complete, valid Arimaa step.
@@ -86,9 +113,48 @@ bool operator != (elementary_step const& lhs, elementary_step const& rhs);
  * of this class are expected to check for repetition themselves via other means.
  */
 class step {
-public:
   //! A sequence of elementary steps.
   typedef std::vector<elementary_step> elementary_step_seq;
+
+public:
+  //typedef elementary_step_seq::const_iterator         el_steps_iterator;
+  //typedef elementary_step_seq::const_reverse_iterator reverse_el_steps_iterator;
+  
+  struct el_steps_iterator : boost::iterator_facade<
+    el_steps_iterator, 
+    elementary_step const, 
+    boost::bidirectional_traversal_tag,
+    elementary_step const
+  > {
+    reference dereference() const { 
+      return detail::el_step_from_string(position, position + 4); 
+    }
+
+    void increment() { 
+      position += 4;
+      if (position != end)
+        ++position;
+    }
+
+    void decrement() { 
+      if (position == end)
+        position -= 4;
+      else
+        position -= 5;
+    }
+
+    bool equal(el_steps_iterator const& other) const { return position == other.position; }
+
+  private:
+    friend class step;
+
+    std::string::const_iterator position;
+    std::string::const_iterator end;
+
+    explicit el_steps_iterator(std::string::const_iterator pos, std::string::const_iterator end) : position(pos), end(end) { }
+  };
+
+  typedef boost::reverse_iterator<el_steps_iterator> reverse_el_steps_iterator;
 
   //! Validate and possibly construct an ordinary step.
   //! \param board The board which is to be affected by this step.
@@ -122,23 +188,23 @@ public:
 
   //! Get the beginning of the full sequence of elementary steps that represent this one step. Elementary steps in this
   //! sequence are guaranteed to have a non-empty value for the elementary_step::what member.
-  elementary_step_seq::const_iterator step_sequence_begin() const;
-  elementary_step_seq::const_iterator step_sequence_end() const;  //!< Get the end of the full sequence of elementary steps.
+  el_steps_iterator step_sequence_begin() const;
+  el_steps_iterator step_sequence_end() const;  //!< Get the end of the full sequence of elementary steps.
 
   //! Get the reverse iterator to the beginning of the reversed sequence of elementary steps.
-  elementary_step_seq::const_reverse_iterator step_sequence_rbegin() const;
+  reverse_el_steps_iterator step_sequence_rbegin() const;
   //! Get the reverse iterator to the end of the reversed sequence of elementary steps.
-  elementary_step_seq::const_reverse_iterator step_sequence_rend() const;
+  reverse_el_steps_iterator step_sequence_rend() const;
 
   //! How many steps does this step use? For ordinary moves, it is 1; for push and pull it's 2. Captures do not count as
   //! used steps.
   std::size_t steps_used() const;
 
-  //! Convert this step to its string representation according to the official Arimaa game notation rules.
   std::string to_string() const;
 
 private:
-  elementary_step_seq full_sequence;  //!< Full sequence of elementary steps, including captures.
+  std::string representation;
+  //elementary_step_seq full_sequence;  //!< Full sequence of elementary steps, including captures.
 
   step();  // Users aren't allowed to directly create objects of this type.
   explicit step(elementary_step_seq s);
