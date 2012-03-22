@@ -1305,6 +1305,7 @@ class SearchProgressController(object):
         if self.progCtrl._timeLimit is not None:
           dlg.showTimeLeft(progress.timeLeft)
         dlg.showTimeElapsed(progress.timeElapsed)
+        dlg.showMemoryAllocated('{0:.2f} MB'.format(progress.memUsed / float(1024 * 1024)))
         ttSize = '{0:.2f} MB'.format(progress.transTblSize / float(1024 * 1024))
         dlg.showTransTblStats(memUsed=ttSize, hits=progress.transTblHits, misses=progress.transTblMisses)
         dlg.showPosCount(posCount=progress.positionCount, posPerSec=progress.positionsPerSecond)
@@ -1327,10 +1328,10 @@ class SearchStatsController(object):
   def __init__(self, searchProgressDlg, stats):
     s = stats
     searchProgressDlg.showTimeElapsed(s.timeElapsed)
-    searchProgressDlg.showMemoryAllocated(0)
+    searchProgressDlg.showMemoryAllocated('{0:.2f} MB'.format(s.memUsed / float(1024 * 1024)))
     searchProgressDlg.showPosCount(posCount=s.positionCount, posPerSec=s.positionsPerSecond)
     searchProgressDlg.showRootPnDn(s.rootPN, s.rootDN)
-    ttSize = '{0:.2f} MB'.format(progress.transTblSize / float(1024 * 1024))
+    ttSize = '{0:.2f} MB'.format(s.transTblSize / float(1024 * 1024))
     searchProgressDlg.showTransTblStats(ttSize, hits=s.transTblHits, misses=s.transTblMisses)
 
     searchProgressDlg.addObserver(self)

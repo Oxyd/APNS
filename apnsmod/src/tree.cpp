@@ -56,8 +56,6 @@ private:
 vertex::number_t const vertex::max_num = std::numeric_limits<vertex::number_t>::max();
 vertex::number_t const vertex::infty   = std::numeric_limits<vertex::number_t>::max() - 1;
 
-std::size_t vertex::count = 0;
-
 vertex::vertex() :
   proof_number(0),
   disproof_number(0),
@@ -67,13 +65,9 @@ vertex::vertex() :
   storage(0),
   size(0),
   capacity(0)
-{
-  ++count;
-}
+{ }
 
 vertex::~vertex() {
-  --count;
-
   if (children_count() > 0)
     traverse_postorder(*this, postorder(), boost::bind(&vertex::destroy, _1));
 }
@@ -132,23 +126,28 @@ void vertex::swap(vertex& other) {
   std::swap(type, other.type);
 }
 
+std::size_t vertex::allocator::alloc = 0;
+
 vertex* vertex::allocator::allocate(std::size_t n) {
-  //return sub_allocator::allocate(n);
-  return static_cast<vertex*>(::operator new[] (n * sizeof(vertex)));
+  vertex* storage = static_cast<vertex*>(::operator new[] (n * sizeof(vertex)));
+  alloc += n * sizeof(vertex);
+  return storage;
 }
 
-void vertex::allocator::deallocate(vertex* memory) throw () {
-  //return sub_allocator::deallocate(memory);
+void vertex::allocator::deallocate(vertex* memory, std::size_t n) throw () {
+  alloc -= n * sizeof(vertex);
   ::operator delete[] (memory);
 }
 
-void vertex::storage_wrapper::reset(element_type* new_ptr) throw () {
-  allocator::deallocate(storage);
+void vertex::storage_wrapper::reset(element_type* new_ptr, std::size_t new_size) throw () {
+  allocator::deallocate(storage, size);
   storage = new_ptr;
+  size = new_size;
 }
 
 void vertex::storage_wrapper::swap(storage_wrapper& other) throw () {
   std::swap(storage, other.storage);
+  std::swap(size, other.size);
 }
 
 vertex::vertex(vertex& other) :
@@ -161,7 +160,6 @@ vertex::vertex(vertex& other) :
   size(0),
   capacity(0)
 { 
-  ++count;
   storage.swap(other.storage);
   std::swap(size, other.size);
   std::swap(capacity, other.capacity);
@@ -187,7 +185,7 @@ void vertex::realloc(std::size_t new_alloc) {
   storage_wrapper new_storage;
 
   if (new_alloc > 0) {
-    new_storage.reset(allocator::allocate(new_alloc));
+    new_storage.reset(allocator::allocate(new_alloc), new_alloc);
 
     // *Move* children into new storage.
     for (std::size_t index = 0; index < size; ++index) {
@@ -206,7 +204,7 @@ vertex& vertex::get(std::size_t index) {
 
 void vertex::destroy() {
   capacity = size = 0;
-  storage.reset();
+  storage.reset(0, 0);
   this->~vertex();
 }
 

@@ -146,6 +146,7 @@ class SearchProgress:
   def __init__(self):
     self.timeElapsed = None
     self.timeLeft = None
+    self.memUsed = None
     self.rootPN = None
     self.rootDN = None
     self.positionCount = None
@@ -279,6 +280,7 @@ class Controller(object):
     progress.timeElapsed = now - self._searchStart
     if self.searchParameters.timeLimit:
       progress.timeLeft = self.searchParameters.timeLimit - progress.timeElapsed
+    progress.memUsed = apnsmod.Vertex.allocSize
     progress.rootPN = self._game.root.proofNumber
     progress.rootDN = self._game.root.disproofNumber
     self._posCount = progress.positionCount = self._search.positionCount

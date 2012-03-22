@@ -111,6 +111,8 @@ void export_tree() {
       "Vertex", "A single vertex of a search tree")
       .def_readonly("maxNum", &vertex::max_num, "Maximum possible value of proof- and disproof-numbers")
       .def_readonly("infty", &vertex::infty, "Infinity value for proof- and disproof-numbers")
+      .add_static_property("allocSize", &vertex::alloc_size,
+                           "Total number of bytes allocated by all Vertices in the program")
 
       .def_readwrite("proofNumber", &vertex::proof_number, "The proof number associated with this vertex")
       .def_readwrite("disproofNumber", &vertex::disproof_number, "The disproof number associated with this vertex")

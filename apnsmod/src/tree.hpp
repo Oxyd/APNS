@@ -108,7 +108,8 @@ public:
   //! Swap the subtree rooted in this vertex with a subtree rooted in the other vertex.
   void swap(vertex& other);
 
-  static std::size_t count;
+  //! Get the total memory usage by all vertices of any tree.
+  static std::size_t alloc_size() { return allocator::alloc; }
   
 private:
   //! Memory allocation interface. It is here so that it can be changed easily, but also so that a change of the allocator
@@ -124,10 +125,9 @@ private:
     //! Reclaim previously-allocated memory.
     //!
     //! \param memory Pointer to previously-allocated memory. May be null.
-    static void deallocate(vertex* memory) throw ();
+    static void deallocate(vertex* memory, std::size_t count) throw ();
 
-  private:
-    typedef boost::pool_allocator<vertex> sub_allocator;
+    static std::size_t alloc;
   };
 
   //! A SBRM wrapper for a non-copyable, non-transferrable arrays of vertex. This mimics boost::scoped_array, except it uses
@@ -140,10 +140,10 @@ private:
   public:
     typedef vertex element_type;
 
-    explicit storage_wrapper(element_type* ptr = 0) : storage(ptr) { }
-    ~storage_wrapper() throw ()                                 { reset(); }
+    storage_wrapper(element_type* ptr = 0, std::size_t size = 0) : storage(ptr), size(size) { }
+    ~storage_wrapper() throw ()                                 { reset(0, 0); }
 
-    void reset(element_type* new_ptr = 0) throw ();
+    void reset(element_type* new_ptr, std::size_t size) throw ();
 
     element_type& operator [] (std::ptrdiff_t i) const throw () { return *(get() + i); }
     element_type* get() const throw ()                          { return storage; }
@@ -156,6 +156,7 @@ private:
 
   private:
     element_type* storage;
+    std::size_t   size;
   };
 
   storage_wrapper storage;

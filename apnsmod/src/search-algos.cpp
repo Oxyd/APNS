@@ -243,7 +243,8 @@ void proof_number_search::expand(vertex::children_iterator leaf, ::board& leaf_s
 
   // Make a list of all possible steps.
   typedef std::vector<std::pair<step, vertex::e_type> > steps_seq;
-  steps_seq steps;
+  static steps_seq steps;  // Static so that that we don't keep allocating and reallocating it all the time.
+  steps.erase(steps.begin(), steps.end());
 
   for (all_steps_iter new_step = all_steps_begin(leaf_state, player); new_step != all_steps_end(); ++new_step)
     if (leaf->steps_remaining - static_cast<signed>(new_step->steps_used()) >= 0) {
