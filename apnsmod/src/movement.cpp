@@ -211,21 +211,6 @@ direction dir_from_letter(char letter) {
   return north;
 }
 
-template <typename Iter>
-std::string string_from_el_steps(Iter begin, Iter end) {
-  std::string result;
-  result.reserve(3 * std::distance(begin, end));
-
-  for (Iter el_step = begin; el_step != end; ++el_step) {
-    if (el_step != begin)
-      result += ' ';
-
-    result += el_step->to_string();
-  }
-
-  return result;
-}
-
 // Indexes into elementary_step::representation.
 std::size_t const PIECE_INDEX = 0;
 std::size_t const COLUMN_INDEX = 1;
@@ -294,10 +279,6 @@ bool operator != (elementary_step const& lhs, elementary_step const& rhs) {
   return !operator == (lhs, rhs);
 }
 
-step::step(elementary_step_seq s)
-  : representation(string_from_el_steps(s.begin(), s.end()))
-{ }
-
 step_holder step::validate_ordinary_step(board const& board, elementary_step step) {
   position const& from    = step.get_from();
   direction const& where  = step.get_where();
@@ -322,7 +303,7 @@ step_holder step::validate_ordinary_step(board const& board, elementary_step ste
 
     check_for_captures(what, from, destination, board, sequence);
 
-    return step_holder(::step(sequence));
+    return step_holder(::step(sequence.begin(), sequence.end()));
   } else {
     return step_holder::none;
   }
@@ -383,7 +364,7 @@ step_holder step::from_string(std::string const& string) {
   }
 
   if (elementary_steps.size() <= MAX_ELEMENTARY_STEPS_POSSIBLE) {
-    return step_holder(step(elementary_steps));
+    return step_holder(step(elementary_steps.begin(), elementary_steps.end()));
   }
 
   return step_holder::none;
@@ -439,7 +420,7 @@ step step::make_push_pull(board const& board, elementary_step first_step, elemen
 
   check_for_captures(second_piece, second_step.get_from(), second_destination, board, sequence);
 
-  return step(sequence);
+  return step(sequence.begin(), sequence.end());
 }
 
 bool operator == (step const& lhs, step const& rhs) {

@@ -90,6 +90,25 @@ inline elementary_step detail::el_step_from_string(std::string::const_iterator b
   return elementary_step(begin, end);
 }
 
+namespace detail {
+
+template <typename Iter>
+std::string string_from_el_steps(Iter begin, Iter end) {
+  std::string result;
+  result.reserve(3 * std::distance(begin, end));
+
+  for (Iter el_step = begin; el_step != end; ++el_step) {
+    if (el_step != begin)
+      result += ' ';
+
+    result += el_step->to_string();
+  }
+
+  return result;
+}
+
+} // namespace detail
+
 class step_holder;
 
 /**
@@ -216,7 +235,10 @@ private:
   step() { }
   bool is_empty() const { return representation.get().empty(); }
 
-  explicit step(elementary_step_seq s);
+  template <typename Iter>
+  step(Iter el_steps_begin, Iter el_steps_end)
+    : representation(detail::string_from_el_steps(el_steps_begin, el_steps_end))
+  { }
 
   //! Make a push/pull move assuming that the move is valid.
   static step make_push_pull(board const& board,
@@ -248,7 +270,7 @@ public:
   operator bool_type() const { return !empty() ? &step_holder::this_type_does_not_support_comparisons : 0; }
 
   //! For compatibility with old code, provide an implicit conversion to optional<step>.
-  operator boost::optional<step> () const {
+  operator boost::optional< ::step> () const {
     if (!step.is_empty())
       return step;
     else

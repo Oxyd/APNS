@@ -92,7 +92,13 @@ inline piece piece_from_letter_unsafe(char letter) {
 }
 
 //! Convert a piece letter into a piece, or nothing if the letter doesn't describe a valid piece.
-boost::optional<piece> piece_from_letter(char letter);
+inline boost::optional<piece> piece_from_letter(char letter) {
+  if (letter == 'e' || letter == 'm' || letter == 'h' || letter == 'd' || letter == 'c' || letter == 'r'
+      || letter == 'E' || letter == 'M' || letter == 'H' || letter == 'D' || letter == 'C' || letter == 'R')
+    return piece_from_letter_unsafe(letter);
+  else
+    return boost::none;
+}
 
 //! The four cardinal directions.
 enum direction { north, south, east, west };

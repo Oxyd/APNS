@@ -106,14 +106,6 @@ char letter_from_piece(piece p) {
   return p.letter();
 }
 
-boost::optional<piece> piece_from_letter(char letter) {
-  if (letter == 'e' || letter == 'm' || letter == 'h' || letter == 'd' || letter == 'c' || letter == 'r'
-      || letter == 'E' || letter == 'M' || letter == 'H' || letter == 'D' || letter == 'C' || letter == 'R')
-    return piece_from_letter_unsafe(letter);
-  else
-    return boost::none;
-}
-
 char letter_from_direction(direction d) {
   switch (d) {
   case north:   return 'n';
