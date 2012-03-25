@@ -5,6 +5,8 @@
 
 #include <utility>
 
+using namespace apns;
+
 TEST(elementary_step, elementary_step_test) {
   for (position::row_t row = board::MIN_ROW; row < board::MAX_ROW; ++row) {
     for (position::col_t column = board::MIN_COLUMN; column < board::MAX_COLUMN; ++column) {

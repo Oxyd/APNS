@@ -19,6 +19,8 @@
 #include <cassert>
 #include <iterator>
 
+namespace apns {
+
 //! A vertex of the game tree.
 //!
 //! Vertices are non-copyable to prevent costly copies of large subtrees. Internally, they are implemented via resizeable
@@ -177,8 +179,6 @@ private:
   //! Destroy this vertex assuming that its children have been destroyed too (regardless of what capacity and size have to say).
   void destroy();
 };
-
-namespace std { template <> inline void swap(vertex& x, vertex& y) { x.swap(y); } }
 
 //! Given a vertex type, return its opposite.
 inline vertex::e_type opposite_type(vertex::e_type t) {
@@ -398,5 +398,11 @@ struct virtual_stop_condition {
     return condition->stop(v);
   }
 };
+
+} // namespace apns
+
+namespace std {
+  template <> inline void swap(apns::vertex& x, apns::vertex& y) { x.swap(y); } 
+}
 
 #endif

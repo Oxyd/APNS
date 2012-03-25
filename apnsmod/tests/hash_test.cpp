@@ -5,10 +5,12 @@
 #include <gtest/gtest.h>
 
 TEST(zobrist_test, construction_test) {
-  zobrist_hasher z;
+  apns::zobrist_hasher z;
 }
 
 TEST(zobrist_test, hash_equality_test) {
+  using namespace apns;
+
   zobrist_hasher hasher;
   board b;
   b.put(position(2, 'c'), piece(piece::silver, piece::camel));
@@ -22,6 +24,8 @@ TEST(zobrist_test, hash_equality_test) {
 }
 
 TEST(zobrist_test, simple_move_test) {
+  using namespace apns;
+
   zobrist_hasher hasher;
   board initial;
   initial.put(position(2, 'c'), piece(piece::gold, piece::dog));
@@ -40,6 +44,8 @@ TEST(zobrist_test, simple_move_test) {
 }
 
 TEST(zobrist_test, pull_move_test) {
+  using namespace apns;
+
   zobrist_hasher hasher;
   board initial;
   initial.put(position(3, 'e'), piece(piece::gold, piece::elephant));

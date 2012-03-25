@@ -14,7 +14,7 @@ typedef boost::multi_array_types::index_range range;
 
 } // anonymous namespace
 
-zobrist_hasher::zobrist_hasher() 
+apns::zobrist_hasher::zobrist_hasher() 
   : codes(boost::extents[piece::type_count][piece::color_count][board::ROWS][board::COLUMNS])
 {
   boost::random::mt19937 prng;
@@ -33,7 +33,7 @@ zobrist_hasher::zobrist_hasher()
     players[player] = static_cast<hash_t>(rand_distrib(prng));
 }
 
-zobrist_hasher::hash_t zobrist_hasher::generate_initial(board const& board, piece::color_t on_move) const {
+apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(board const& board, piece::color_t on_move) const {
   hash_t hash = 0;
 
   for (board::pieces_iterator p = board.pieces_begin(); p != board.pieces_end(); ++p) {
@@ -51,9 +51,9 @@ zobrist_hasher::hash_t zobrist_hasher::generate_initial(board const& board, piec
   return hash;
 }
 
-std::size_t const transposition_table::SIZE_OF_ELEMENT = sizeof(record);
+std::size_t const apns::transposition_table::SIZE_OF_ELEMENT = sizeof(record);
 
-transposition_table::transposition_table(std::size_t table_size, std::size_t keep_time)
+apns::transposition_table::transposition_table(std::size_t table_size, std::size_t keep_time)
   : table_size(table_size)
   , keep_time(keep_time)
   , pages((table_size / PAGE_RECORDS) + (table_size % PAGE_RECORDS != 0 ? 1 : 0))  // pages := ceil(table_size / PAGE_RECORDS)
@@ -68,7 +68,7 @@ transposition_table::transposition_table(std::size_t table_size, std::size_t kee
   assert(pages * PAGE_RECORDS >= table_size);
 }
 
-void transposition_table::insert(hash_t hash, entry_t entry) {
+void apns::transposition_table::insert(hash_t hash, entry_t entry) {
   record& r = find_record(hash);
   if (r.last_accessed == NEVER || now - r.last_accessed > keep_time) {
     r.entry = entry;
@@ -77,7 +77,7 @@ void transposition_table::insert(hash_t hash, entry_t entry) {
   }
 }
 
-void transposition_table::update(hash_t hash, entry_t entry) {
+void apns::transposition_table::update(hash_t hash, entry_t entry) {
   record& r = find_record(hash);
   if (r.last_accessed != NEVER) {
     r.entry = entry;
@@ -85,7 +85,7 @@ void transposition_table::update(hash_t hash, entry_t entry) {
   }
 }
 
-boost::optional<transposition_table::entry_t> transposition_table::query(hash_t hash) {
+boost::optional<apns::transposition_table::entry_t> apns::transposition_table::query(hash_t hash) {
   record& r = find_record(hash);
   if (r.last_accessed != NEVER) {
     r.last_accessed = now;
@@ -98,23 +98,23 @@ boost::optional<transposition_table::entry_t> transposition_table::query(hash_t 
   }
 }
 
-void transposition_table::tick() {
+void apns::transposition_table::tick() {
   ++now;
 }
 
-std::size_t transposition_table::get_memory_usage() const {
+std::size_t apns::transposition_table::get_memory_usage() const {
   return allocated_pages * PAGE_SIZE + pages * sizeof(page_ptr);
 }
 
-std::size_t transposition_table::page_number(std::size_t index) const {
+std::size_t apns::transposition_table::page_number(std::size_t index) const {
   return index / PAGE_RECORDS;
 }
 
-std::size_t transposition_table::page_offset(std::size_t index) const {
+std::size_t apns::transposition_table::page_offset(std::size_t index) const {
   return index % PAGE_RECORDS;
 }
 
-transposition_table::record& transposition_table::find_record(hash_t hash) {
+apns::transposition_table::record& apns::transposition_table::find_record(hash_t hash) {
   page_ptr& pg = table[page_number(hash % table_size)];
 
   if (pg == 0) {

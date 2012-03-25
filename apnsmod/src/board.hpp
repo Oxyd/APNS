@@ -21,6 +21,8 @@
 #include <ostream>
 #include <algorithm>
 
+namespace apns {
+
 /**
  * One game piece.
  *
@@ -318,10 +320,10 @@ std::string string_from_board(board const& board);
 //! The input board will be .clear()ed before being populated with pieces.
 //!
 //! \throws std::runtime_error Thrown if the string is not a valid representation of a board.
-void board_from_string(std::string const& string, ::board& board);
+void board_from_string(std::string const& string, apns::board& board);
 
 //! Output a board object to an output string. This uses string_from_board to format the board.
-inline std::ostream& operator << (std::ostream& out, board const& board) {
+inline std::ostream& operator << (std::ostream& out, apns::board const& board) {
   return out << string_from_board(board);
 }
 
@@ -380,7 +382,7 @@ class adjacent_pieces_iter : public boost::iterator_adaptor<
 {
 public:
   adjacent_pieces_iter();  //!< Construct a singular iterator.
-  adjacent_pieces_iter(position center, ::board const& board);  //!< Construct an iterator going around center on board.
+  adjacent_pieces_iter(position center, apns::board const& board);  //!< Construct an iterator going around center on board.
 
 private:
   friend class boost::iterator_core_access;
@@ -392,7 +394,7 @@ private:
   void forward_to_nonempty();  //!< Forward the underlying neighbourhood_iter to next nonempty position or keep it
                                //!< where it is, if it already points to a nonempty position.
 
-  ::board const* board;
+  apns::board const* board;
 };
 
 //! Return the start iterator of a sequence of pieces adjacent to the given center position on the given board.
@@ -400,6 +402,8 @@ adjacent_pieces_iter adjacent_pieces_begin(board const& board, position center);
 
 //! Return the singular iterator of adjacent pieces sequence.
 adjacent_pieces_iter adjacent_pieces_end();
+
+} // namespace apns
 
 #endif
 

@@ -5,6 +5,8 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
 
+using namespace apns;
+
 namespace {
 
 boost::shared_ptr<game> make_game(board& best_board) {

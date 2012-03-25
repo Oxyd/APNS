@@ -17,10 +17,12 @@ namespace {
 
 //! Postorder traveral policy for traverse_postorder. Do note that this never traverses the root vertex.
 class postorder {
-  typedef std::stack<std::pair<vertex::children_iterator, vertex::children_iterator> > stack_t;
+  typedef std::stack<std::pair<apns::vertex::children_iterator, apns::vertex::children_iterator> > stack_t;
 
 public:
-  vertex::children_iterator operator () (vertex& v) {
+  apns::vertex::children_iterator operator () (apns::vertex& v) {
+    using namespace apns;
+
     if (stack.empty())
       return recurse(&v)++;
 
@@ -40,7 +42,9 @@ public:
 private:
   stack_t stack;
 
-  vertex::children_iterator& recurse(vertex::children_iterator from) {
+  apns::vertex::children_iterator& recurse(apns::vertex::children_iterator from) {
+    using namespace apns;
+
     vertex::children_iterator current = from;
     while (current->children_count() > 0) {
       stack.push(std::make_pair(current->children_begin(), current->children_end()));
@@ -52,6 +56,8 @@ private:
 };
 
 } // anonymous namespace
+
+namespace apns {
 
 vertex::number_t const vertex::max_num = std::numeric_limits<vertex::number_t>::max();
 vertex::number_t const vertex::infty   = std::numeric_limits<vertex::number_t>::max() - 1;
@@ -415,7 +421,7 @@ std::pair<boost::shared_ptr<game>, std::size_t> load_game(std::string const& fil
   else if (line == "silver")  attacker = piece::silver;
   else bad_format();
 
-  boost::shared_ptr< ::game> game(new ::game(initial_state, attacker));
+  boost::shared_ptr<apns::game> game(new apns::game(initial_state, attacker));
   vertex_counter counter;
   traverse(game->root, backtrack(),
            make_composite_visitor(reader(in), boost::ref(counter)),
@@ -424,6 +430,8 @@ std::pair<boost::shared_ptr<game>, std::size_t> load_game(std::string const& fil
   if (!op_ctrl.stop())
     return std::make_pair(game, counter.count);
   else
-    return std::make_pair(boost::shared_ptr< ::game>(), 0);
+    return std::make_pair(boost::shared_ptr<apns::game>(), 0);
 }
+
+} // namespace apns
 

@@ -9,6 +9,8 @@
 #include <vector>
 #include <iostream>
 
+using namespace apns;
+
 class position_test : public testing::Test {
 };
 

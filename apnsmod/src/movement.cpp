@@ -18,7 +18,8 @@
 namespace {
 
 //! Is a stronger than b? (Their colour does not matter.)
-bool stronger(piece a, piece b) {
+bool stronger(apns::piece a, apns::piece b) {
+  using namespace apns;
   return index_from_type(a.get_type()) < index_from_type(b.get_type());
 }
 
@@ -29,7 +30,8 @@ bool stronger(piece a, piece b) {
  * \param color What color to search for.
  * \param board Board with the pieces on it.
  */
-bool colour_adjacent(position where, piece::color_t color, board const& board) {
+bool colour_adjacent(apns::position where, apns::piece::color_t color, apns::board const& board) {
+  using namespace apns;
   return std::find_if(
       adjacent_pieces_begin(board, where), adjacent_pieces_end(),
       boost::bind(&piece::get_color, _1) == color)
@@ -42,7 +44,8 @@ bool colour_adjacent(position where, piece::color_t color, board const& board) {
  * \param where Where is the given piece. This position must be nonempty.
  * \param board Board with the pieces.
  */
-bool friendly_adjacent(position where, board const& board) {
+bool friendly_adjacent(apns::position where, apns::board const& board) {
+  using namespace apns;
   piece const what = *board.get(where);  // Assuming the position is non-empty.
   return colour_adjacent(where, what.get_color(), board);
 }
@@ -53,7 +56,8 @@ bool friendly_adjacent(position where, board const& board) {
  * \param where Where is the given piece. This position must be nonempty.
  * \param board Board with the pieces.
  */
-bool stronger_opponent_adjacent(position where, board const& board) {
+bool stronger_opponent_adjacent(apns::position where, apns::board const& board) {
+  using namespace apns;
   piece const what = *board.get(where);  // Assuming the position is non-empty.
 
   return std::find_if(
@@ -72,7 +76,8 @@ bool stronger_opponent_adjacent(position where, board const& board) {
  *
  * \return Would #what be captured after such move?
  */
-bool would_be_capture(piece what, position old_position, position new_position, board const& board) {
+bool would_be_capture(apns::piece what, apns::position old_position, apns::position new_position, apns::board const& board) {
+  using namespace apns;
   if (trap(new_position)) {
     for (neighbourhood_iter neighbour = neighbourhood_begin(new_position); neighbour != neighbourhood_end(); ++neighbour) {
       // Is there a friendly piece adjacent?
@@ -97,7 +102,8 @@ bool would_be_capture(piece what, position old_position, position new_position, 
  *
  * \return Would piece from #pos be captured?
  */
-bool would_be_capture(position pos, piece what, position from, position where, board const& board) {
+bool would_be_capture(apns::position pos, apns::piece what, apns::position from, apns::position where, apns::board const& board) {
+  using namespace apns;
   if (!empty(pos, board)
       && trap(pos)) {
     piece const& target = *board.get(pos);
@@ -120,7 +126,7 @@ bool would_be_capture(position pos, piece what, position from, position where, b
   }
 }
 
-typedef std::vector<elementary_step> elementary_steps_cont;
+typedef std::vector<apns::elementary_step> elementary_steps_cont;
 
 /**
  * Check for captures and insert them into a sequence of elementary steps.
@@ -134,8 +140,9 @@ typedef std::vector<elementary_step> elementary_steps_cont;
  * \param board Contains the pieces.
  * \param sequence All detected captures will be inserted here.
  */
-void check_for_captures(piece what, position from, position destination,
-    board const& board, elementary_steps_cont& sequence) {
+void check_for_captures(apns::piece what, apns::position from, apns::position destination,
+    apns::board const& board, elementary_steps_cont& sequence) {
+  using namespace apns;
   if (would_be_capture(what, from, destination, board)) {
     elementary_step capture = elementary_step::capture(destination);
     capture.set_what(what);
@@ -152,7 +159,8 @@ void check_for_captures(piece what, position from, position destination,
 }
 
 //! Get the inverse direction to the given one.
-direction inverse_dir(direction dir) {
+apns::direction inverse_dir(apns::direction dir) {
+  using namespace apns;
   switch (dir) {
   case north:       return south;
   case east:        return west;
@@ -165,7 +173,9 @@ direction inverse_dir(direction dir) {
 }
 
 //! Convert a string description of an elementary step into a real elementary step, or nothing if the description isn't valid.
-boost::optional<elementary_step> elementary_step_from_string(std::string const& string) {
+boost::optional<apns::elementary_step> elementary_step_from_string(std::string const& string) {
+  using namespace apns;
+
   if (string.length() == 4) {  // Each elementary step is exactly four characters long.
     boost::optional<piece> maybe_piece = piece_from_letter(string[0]);
     position::col_t const column = string[1];
@@ -176,7 +186,7 @@ boost::optional<elementary_step> elementary_step_from_string(std::string const& 
         && board::MIN_COLUMN <= column && column <= board::MAX_COLUMN
         && board::MIN_ROW <= row && row <= board::MAX_ROW) {
       piece const piece = *maybe_piece;
-      position const position = ::position(row, column);
+      position const position = apns::position(row, column);
 
       if (dir_or_capture == 'x') {  // A capture.
         return elementary_step::capture(position, piece);
@@ -200,7 +210,8 @@ boost::optional<elementary_step> elementary_step_from_string(std::string const& 
 }
 
 //! Convert 'n', 's', 'e' or 'w' to the apropriate direction.
-direction dir_from_letter(char letter) {
+apns::direction dir_from_letter(char letter) {
+  using namespace apns;
   switch (letter) {
   case 'n':     return north;
   case 'e':     return east;
@@ -218,6 +229,8 @@ std::size_t const ROW_INDEX = 2;
 std::size_t const DIR_INDEX = 3;
 
 } // Anonymous namespace.
+
+namespace apns {
 
 position elementary_step::get_from() const {
   return position(representation[ROW_INDEX] - '0', representation[COLUMN_INDEX]);
@@ -303,7 +316,7 @@ step_holder step::validate_ordinary_step(board const& board, elementary_step ste
 
     check_for_captures(what, from, destination, board, sequence);
 
-    return step_holder(::step(sequence.begin(), sequence.end()));
+    return step_holder(apns::step(sequence.begin(), sequence.end()));
   } else {
     return step_holder::none;
   }
@@ -451,7 +464,7 @@ e_step_kind step_kind(step const& step, piece::color_t player, board const& boar
 }
 
 void apply(step const& step, board& board) {
-  for (::step::el_steps_iterator es = step.step_sequence_begin();
+  for (apns::step::el_steps_iterator es = step.step_sequence_begin();
       es != step.step_sequence_end(); ++es) {
     boost::optional<piece> maybe_what = board.get(es->get_from());
     if (maybe_what) {
@@ -471,7 +484,7 @@ void apply(step const& step, board& board) {
 
 void unapply(step const& step, board& board) {
   // Traverse the sequence of elementary steps *backwards*.
-  for (::step::reverse_el_steps_iterator es = step.step_sequence_rbegin();
+  for (apns::step::reverse_el_steps_iterator es = step.step_sequence_rbegin();
       es != step.step_sequence_rend(); ++es) {
     position const original_position = es->get_from();
 
@@ -516,7 +529,7 @@ steps_iter::steps_iter()
   assert(!board);
 }
 
-steps_iter::steps_iter(position what_piece, ::board const& board)
+steps_iter::steps_iter(position what_piece, apns::board const& board)
   : board(&board)
   , piece_pos(what_piece)
   , first_dir(directions_begin())
@@ -709,7 +722,7 @@ all_steps_iter::all_steps_iter()
   : board(0)
 { }
 
-all_steps_iter::all_steps_iter(::board const& board, piece::color_t player)
+all_steps_iter::all_steps_iter(apns::board const& board, piece::color_t player)
   : board(&board)
   , current_piece(board.pieces_begin())
   , player(player)
@@ -782,3 +795,6 @@ all_steps_iter all_steps_begin(board const& board, piece::color_t player) {
 all_steps_iter all_steps_end() {
   return all_steps_iter();
 }
+
+} // namespace apns
+

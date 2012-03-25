@@ -14,6 +14,8 @@
 #include <vector>
 #include <cassert>
 
+namespace apns {
+
 /**
  * Did any player win?
  *
@@ -34,11 +36,11 @@ struct null_board_visitor {
 //! A stack of boards visited during tree traversal. This doesn't actually store the whole stack but instead only the current
 //! board and updates it.
 struct board_stack {
-  explicit board_stack(::board const& initial_board) :
+  explicit board_stack(apns::board const& initial_board) :
     board(initial_board)
   { }
 
-  ::board const& top() const {
+  apns::board const& top() const {
     return board;
   }
 
@@ -51,16 +53,16 @@ struct board_stack {
   }
 
 private:
-  ::board board;
+  apns::board board;
 };
 
 //! Container for the history of a path. That is, all board states at the point of the beginnings of each player's turn.
 struct history {
   struct record {
-    ::board         position;
-    piece::color_t  player;
+    apns::board       position;
+    piece::color_t    player;
 
-    record(::board const& b, piece::color_t p) : position(b), player(p) { }
+    record(apns::board const& b, piece::color_t p) : position(b), player(p) { }
   };
 
   typedef std::vector<record> records_cont;
@@ -83,12 +85,12 @@ private:
 template <typename SubVisitor = null_board_visitor>
 struct board_visitor {
 
-  explicit board_visitor(::board const& initial_board, SubVisitor sub_visitor = SubVisitor()) :
+  explicit board_visitor(apns::board const& initial_board, SubVisitor sub_visitor = SubVisitor()) :
     boards(initial_board),
     sub_visitor(sub_visitor)
   { }
 
-  ::board const& get_board() const {
+  apns::board const& get_board() const {
     return boards.top();
   }
 
@@ -109,11 +111,11 @@ private:
 
 //! Helper to make a board_visitor.
 template <typename SubVisitor>
-board_visitor<SubVisitor> make_board_visitor(::board const& initial_board, SubVisitor sub_visitor) {
+board_visitor<SubVisitor> make_board_visitor(apns::board const& initial_board, SubVisitor sub_visitor) {
   return board_visitor<SubVisitor>(initial_board, sub_visitor);
 }
 
-inline board_visitor<null_board_visitor> make_board_visitor(::board const& initial_board) {
+inline board_visitor<null_board_visitor> make_board_visitor(apns::board const& initial_board) {
   return board_visitor<null_board_visitor>(initial_board);
 }
 
@@ -207,7 +209,7 @@ void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t a
 //! A CRTP base class for search algorithms.
 template <typename Algo>
 struct search_algo : private boost::noncopyable {
-  boost::shared_ptr< ::game> get_game() const {
+  boost::shared_ptr<apns::game> get_game() const {
     return game;
   }
 
@@ -244,13 +246,13 @@ struct search_algo : private boost::noncopyable {
   }
 
 protected:
-  boost::shared_ptr< ::game>  game;
+  boost::shared_ptr<apns::game>  game;
   boost::scoped_ptr<transposition_table> trans_tbl;
   zobrist_hasher              hasher;         //!< Hasher to be used during the algorithm.
   zobrist_hasher::hash_t      initial_hash;   //!< Hash corresponding to initial_state.
   std::size_t                 position_count;
 
-  search_algo(boost::shared_ptr< ::game> const& game, std::size_t position_count = 1) :
+  search_algo(boost::shared_ptr<apns::game> const& game, std::size_t position_count = 1) :
     game(game),
     initial_hash(hasher.generate_initial(game->initial_state, game->attacker)),
     position_count(position_count)
@@ -258,7 +260,7 @@ protected:
 
   void expand(vertex::children_iterator leaf, board_stack& state,
               zobrist_hasher::hash_t leaf_hash, history::records_cont const& history) {
-    ::expand(leaf, state, game->attacker, trans_tbl.get(), hasher, leaf_hash, history);
+    apns::expand(leaf, state, game->attacker, trans_tbl.get(), hasher, leaf_hash, history);
   }
 };
 
@@ -268,7 +270,7 @@ public:
   //! Make an algorithm instance for the given game instance. 
   //!
   //! \param position_count Number of positions in the passed-in game.
-  explicit proof_number_search(boost::shared_ptr< ::game> const& game, std::size_t position_count = 1) :
+  explicit proof_number_search(boost::shared_ptr<apns::game> const& game, std::size_t position_count = 1) :
     search_algo(game, position_count)
   { }
 
@@ -296,6 +298,8 @@ private:
   board_visitor<history_visitor> board;
 };
 #endif
+
+} // namespace apns
 
 #endif
 

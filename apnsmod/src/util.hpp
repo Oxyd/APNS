@@ -7,10 +7,9 @@
 
 #include <memory>
 
-class vertex;
+namespace apns {
 
-//! Get the total memory usage by this module.
-std::size_t get_memory_usage();
+class vertex;
 
 /**
  * Controller for long-running operations. It serves as a simple interface between the algorithm and the user interface.
@@ -91,6 +90,8 @@ public:
 private:
   virtual void do_update() { }
 };
+
+} // namespace apns
 
 #endif
 

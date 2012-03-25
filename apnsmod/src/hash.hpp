@@ -28,6 +28,8 @@
 # error "Your platform does not support 64-bit integer types. Sorry."
 #endif
 
+namespace apns {
+
 /**
  * Zobrist's algorithm to generate hashes for game positions. This hasher is copyable and assignable, but neither
  * copying nor assigning is cheap.
@@ -199,6 +201,8 @@ private:
   //! Get the record for given hash.
   record& find_record(hash_t hash);
 };
+
+} // namespace apns
 
 #endif
 

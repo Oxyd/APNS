@@ -12,7 +12,9 @@ namespace {
 
 //! Check whether the game would be lost if the given player made the given step from the given position assuming the passed-in
 //! game history.
-bool repetition(board const& board, piece::color_t player, history::records_cont const& history) {
+bool repetition(apns::board const& board, apns::piece::color_t player, apns::history::records_cont const& history) {
+  using namespace apns;
+
   bool lose = false;
 
   if (!history.empty()) {
@@ -34,6 +36,8 @@ bool repetition(board const& board, piece::color_t player, history::records_cont
 }
 
 } // anonymous namespace
+
+namespace apns {
 
 /**
  * Did any player win?
@@ -258,7 +262,7 @@ void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t a
     
     boost::optional<piece::color_t> winner;
     if (child->type != leaf->type)  // Only check for win if this is the start of a move.
-      winner = ::winner(state.top(), player);
+      winner = apns::winner(state.top(), player);
 
     if (winner) {
       if (*winner == attacker) {
@@ -325,4 +329,6 @@ void proof_number_search::do_iterate() {
       trans_tbl->update(*hash, std::make_pair((*vertex)->proof_number, (*vertex)->disproof_number));
   }
 }
+
+} // namespace apns
 

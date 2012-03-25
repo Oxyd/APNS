@@ -18,6 +18,8 @@
 #include <vector>
 #include <utility>
 
+namespace apns {
+
 //! Maximum allowed number of steps in a move.
 unsigned const MAX_STEPS = 4;
 
@@ -247,8 +249,6 @@ private:
       elementary_step first_step, elementary_step second_step);
 };
 
-namespace std { template <> inline void swap(step& x, step& y) { x.swap(y); } }
-
 bool operator == (step const& lhs, step const& rhs);
 bool operator != (step const& lhs, step const& rhs);
 
@@ -263,7 +263,7 @@ public:
   step_holder() { }
 
   //! Implicit conversion from step, mimicking boost::optional.
-  step_holder(::step const& step) : step(step) { }
+  step_holder(apns::step const& step) : step(step) { }
   
   static step_holder none;
 
@@ -274,32 +274,30 @@ public:
   operator bool_type() const { return !empty() ? &step_holder::this_type_does_not_support_comparisons : 0; }
 
   //! For compatibility with old code, provide an implicit conversion to optional<step>.
-  operator boost::optional< ::step> () const {
+  operator boost::optional<apns::step> () const {
     if (!step.is_empty())
       return step;
     else
       return boost::none;
   }
 
-  ::step& operator * ()               { assert(!empty()); return step; }
-  ::step const& operator * () const   { assert(!empty()); return step; }
-  ::step* operator -> ()              { assert(!empty()); return &step; }
-  ::step const* operator -> () const  { assert(!empty()); return &step; }
+  apns::step& operator * ()               { assert(!empty()); return step; }
+  apns::step const& operator * () const   { assert(!empty()); return step; }
+  apns::step* operator -> ()              { assert(!empty()); return &step; }
+  apns::step const* operator -> () const  { assert(!empty()); return &step; }
 
-  step_holder& operator = (::step const& s) {
+  step_holder& operator = (apns::step const& s) {
     step = s;
     return *this;
   }
 
-  ::step* get() { if (!empty()) return &step; else return 0; }
+  apns::step* get() { if (!empty()) return &step; else return 0; }
 
   void swap(step_holder& other) { step.swap(other.step); }
 
 private:
-  ::step step;
+  apns::step step;
 };
-
-namespace std { template <> inline void swap(step_holder& x, step_holder& y) { x.swap(y); } }
 
 //! Kind of a step.
 enum e_step_kind {
@@ -366,12 +364,12 @@ public:
    *                   referred to by this parameter must contain a piece.
    * \param board The board.
    */
-  steps_iter(position what_piece, ::board const& board);
+  steps_iter(position what_piece, apns::board const& board);
 
 private:
   friend class boost::iterator_core_access;
 
-  ::board const* board;
+  apns::board const* board;
   position piece_pos;           //!< The specified position of the piece.
   directions_iter first_dir;    //!< Where to move the piece (possibly pushing something else away).
   directions_iter second_dir;   //!< Where to push the second piece (if pushing) or which of the neighbours to pull.
@@ -416,13 +414,13 @@ class all_steps_iter : public boost::iterator_facade<
 {
 public:
   all_steps_iter();
-  all_steps_iter(::board const& board, piece::color_t player);
+  all_steps_iter(apns::board const& board, piece::color_t player);
 
 private:
   friend class boost::iterator_core_access;
 
-  ::board const*            board;
-  ::board::pieces_iterator  current_piece;
+  apns::board const*            board;
+  apns::board::pieces_iterator  current_piece;
   steps_iter                current_step;
   piece::color_t            player;
 
@@ -436,5 +434,12 @@ private:
 
 all_steps_iter all_steps_begin(board const& board, piece::color_t player);
 all_steps_iter all_steps_end();
+
+} // namespace apns
+
+namespace std {
+  template <> inline void swap(apns::step& x, apns::step& y) { x.swap(y); }
+  template <> inline void swap(apns::step_holder& x, apns::step_holder& y) { x.swap(y); } 
+}
 
 #endif

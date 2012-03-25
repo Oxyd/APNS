@@ -8,6 +8,8 @@
 
 #include <queue>
 
+using namespace apns;
+
 namespace {
 
 boost::shared_ptr<vertex> make_tree() {

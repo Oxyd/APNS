@@ -15,7 +15,8 @@
 namespace {
 
 //! Convert a linear board coordinate into a pair of row, column.
-std::pair<position::row_t, position::col_t> board_from_linear(std::size_t linear) {
+std::pair<apns::position::row_t, apns::position::col_t> board_from_linear(std::size_t linear) {
+  using namespace apns;
   assert(linear < board::ROWS * board::COLUMNS);
 
   return std::make_pair(
@@ -25,16 +26,19 @@ std::pair<position::row_t, position::col_t> board_from_linear(std::size_t linear
 }
 
 //! Convert board coordinates into linear position.
-std::size_t linear_from_board(position::row_t row, position::col_t col) {
+std::size_t linear_from_board(apns::position::row_t row, apns::position::col_t col) {
+  using namespace apns;
   assert(board::MIN_ROW <= row && row <= board::MAX_ROW);
   assert(board::MIN_COLUMN <= col && col <= board::MAX_COLUMN);
 
   return (row - board::MIN_ROW) * board::COLUMNS + (col - board::MIN_COLUMN);
 }
 
-direction const directions[] = { north, east, south, west };
+apns::direction const directions[] = { apns::north, apns::east, apns::south, apns::west };
 
-char letter_from_pair(piece::color_t c, piece::type_t t) {
+char letter_from_pair(apns::piece::color_t c, apns::piece::type_t t) {
+  using namespace apns;
+
   char letter = t;
   if (c == piece::gold)
     letter &= ~0x20;  // Assuming ASCII here. Convert to uppercase.
@@ -43,6 +47,8 @@ char letter_from_pair(piece::color_t c, piece::type_t t) {
 }
 
 }  // Anonymous namespace.
+
+namespace apns {
 
 piece::piece(color_t c, type_t t) : 
   data(letter_from_pair(c, t))
@@ -445,7 +451,7 @@ adjacent_pieces_iter::adjacent_pieces_iter()
   : board(0)
 { }
 
-adjacent_pieces_iter::adjacent_pieces_iter(position center, ::board const& board)
+adjacent_pieces_iter::adjacent_pieces_iter(position center, apns::board const& board)
   : iterator_adaptor_(center)
   , board(&board)
 {
@@ -486,3 +492,6 @@ adjacent_pieces_iter adjacent_pieces_begin(board const& board, position center) 
 adjacent_pieces_iter adjacent_pieces_end() {
   return adjacent_pieces_iter();
 }
+
+} // namespace apns
+
