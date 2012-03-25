@@ -178,6 +178,8 @@ private:
   void destroy();
 };
 
+namespace std { template <> inline void swap(vertex& x, vertex& y) { x.swap(y); } }
+
 //! Given a vertex type, return its opposite.
 inline vertex::e_type opposite_type(vertex::e_type t) {
   return t == vertex::type_or ? vertex::type_and : vertex::type_or;

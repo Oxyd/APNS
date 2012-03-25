@@ -93,7 +93,7 @@ TEST(traversing, board_test) {
   board_visitor<> board_v(g->initial_state);
   traverse(g->root, &best_successor, boost::ref(board_v));
 
-  EXPECT_EQ(target, board_v.board);
+  EXPECT_EQ(target, board_v.get_board());
 }
 
 TEST(traversing, history_test) {
@@ -104,7 +104,7 @@ TEST(traversing, history_test) {
   board_visitor<boost::reference_wrapper<history_visitor> > board_v(g->initial_state, boost::ref(history_v));
   traverse(g->root, &best_successor, boost::ref(board_v));
 
-  history_visitor::history_cont& h = history_v.history;
+  history::records_cont const& h = history_v.get_history();
 
   ASSERT_EQ(2, h.size());
   EXPECT_EQ(g->initial_state, h[0].position);

@@ -225,10 +225,12 @@ public:
 
   std::string to_string() const;
 
+  void swap(step& other) { representation.swap(other.representation); }
+
 private:
   typedef boost::flyweight<std::string, boost::flyweights::no_locking> representation_t;
+
   representation_t representation;
-  //elementary_step_seq full_sequence;  //!< Full sequence of elementary steps, including captures.
 
   friend class step_holder;
   // These two are to be used by step_holder.
@@ -244,6 +246,8 @@ private:
   static step make_push_pull(board const& board,
       elementary_step first_step, elementary_step second_step);
 };
+
+namespace std { template <> inline void swap(step& x, step& y) { x.swap(y); } }
 
 bool operator == (step const& lhs, step const& rhs);
 bool operator != (step const& lhs, step const& rhs);
@@ -261,7 +265,7 @@ public:
   //! Implicit conversion from step, mimicking boost::optional.
   step_holder(::step const& step) : step(step) { }
   
-  static step_holder const none;  //!< An empty holder.
+  static step_holder none;
 
   //! Is this holder empty?
   bool empty() { return step.is_empty(); }
@@ -289,9 +293,13 @@ public:
 
   ::step* get() { if (!empty()) return &step; else return 0; }
 
+  void swap(step_holder& other) { step.swap(other.step); }
+
 private:
   ::step step;
 };
+
+namespace std { template <> inline void swap(step_holder& x, step_holder& y) { x.swap(y); } }
 
 //! Kind of a step.
 enum e_step_kind {

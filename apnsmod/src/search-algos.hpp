@@ -31,24 +31,80 @@ struct null_board_visitor {
   void operator () (vertex const&, board const&) { }
 };
 
+//! A stack of boards visited during tree traversal. This doesn't actually store the whole stack but instead only the current
+//! board and updates it.
+struct board_stack {
+  explicit board_stack(::board const& initial_board) :
+    board(initial_board)
+  { }
+
+  ::board const& top() const {
+    return board;
+  }
+
+  void push(step const& s) {
+    apply(s, board);
+  }
+
+  void pop(step const& s) {
+    unapply(s, board);
+  }
+
+private:
+  ::board board;
+};
+
+//! Container for the history of a path. That is, all board states at the point of the beginnings of each player's turn.
+struct history {
+  struct record {
+    ::board         position;
+    piece::color_t  player;
+
+    record(::board const& b, piece::color_t p) : position(b), player(p) { }
+  };
+
+  typedef std::vector<record> records_cont;
+
+  explicit history(piece::color_t attacker);
+
+  records_cont const& records() { return current_records; }
+
+  void push(vertex const& vertex, board const& state);
+  void pop(vertex const& vertex);
+
+private:
+  records_cont    current_records;
+  vertex::e_type  last_visited_type;
+  piece::color_t  attacker;
+};
+
 //! A meta visitor that keeps track of the current board state and runs another visitor on both the given vertex and the
 //! computed board.
 template <typename SubVisitor = null_board_visitor>
 struct board_visitor {
-  ::board     board;  //!< The computed board.
-  SubVisitor  sub_visitor;
 
   explicit board_visitor(::board const& initial_board, SubVisitor sub_visitor = SubVisitor()) :
-    board(initial_board),
+    boards(initial_board),
     sub_visitor(sub_visitor)
   { }
 
+  ::board const& get_board() const {
+    return boards.top();
+  }
+
+  board_stack& get_board_stack() {
+    return boards;
+  }
+
   void operator () (vertex& v) {
     if (v.step)
-      apply(*v.step, board);
-
-    boost::unwrap_ref(sub_visitor)(v, board);
+      boards.push(*v.step);
+    boost::unwrap_ref(sub_visitor)(v, boards.top());
   }
+  
+private:
+  board_stack boards;
+  SubVisitor  sub_visitor;
 };
 
 //! Helper to make a board_visitor.
@@ -82,26 +138,18 @@ struct board_composite_visitor {
 //! Visitor that keeps track of a game history. History is a sequence of pairs (board, player) -- each pair corresponds to a
 //! game state at the beginning of a player's turn. This is a visitor for the board_visitor meta-visitor.
 struct history_visitor {
-  struct history_record {
-    ::board         position;
-    piece::color_t  player;
+  explicit history_visitor(piece::color_t attacker) : h(attacker) { }
 
-    history_record(::board const& b, piece::color_t p) :
-      position(b),
-      player(p)
-    { }
-  };
+  history::records_cont const& get_history() {
+    return h.records();
+  }
 
-  typedef std::vector<history_record> history_cont;
-
-  history_cont history;
-
-  explicit history_visitor(piece::color_t attacker);
-  bool operator () (vertex const& v, board const& board);
+  void operator () (vertex const& v, board const& board) {
+    h.push(v, board);
+  }
 
 private:
-  vertex::e_type  last_visited_type;
-  piece::color_t  attacker;
+  history h;
 };
 
 //! Visitor that keeps track of the hash of the board. This visitor keeps the complete history of hashes encountered during the
@@ -144,15 +192,27 @@ struct path_visitor {
 //! Update proof- and disproof-numbers of a single vertex.
 void update_numbers(vertex& v);
 
+//! Expand a leaf.
+//!
+//! \param leaf The leaf to be expanded.
+//! \param state Board state of the leaf.
+//! \param attacker Attacker.
+//! \param trans_tbl Transposition table to use or NULL.
+//! \param hasher The hasher instance used for this tree.
+//! \param leaf_hash Hash value of leaf_state
+//! \param history Game history gathered during the descend to the leaf.
+void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, transposition_table* trans_tbl,
+            zobrist_hasher& hasher, zobrist_hasher::hash_t leaf_hash, history::records_cont const& history);
+
 //! A CRTP base class for search algorithms.
 template <typename Algo>
-struct base_algo : boost::noncopyable {
+struct search_algo : private boost::noncopyable {
   boost::shared_ptr< ::game> get_game() const {
-    return static_cast<Algo const*>(this)->do_get_game();
+    return game;
   }
 
   bool finished() const {
-    return static_cast<Algo const*>(this)->do_finished();
+    return game->root.proof_number == 0 || game->root.disproof_number == 0;
   }
 
   void iterate() {
@@ -166,36 +226,6 @@ struct base_algo : boost::noncopyable {
     while (!finished() && (ms_how_long == 0 || timer.elapsed() < ms_how_long / 1000.0))
       iterate();
   }
-
-protected:
-  base_algo() { }
-};
-
-//! The basic variant of the Proof-Number Search algorithm.
-class proof_number_search : public base_algo<proof_number_search> {
-public:
-  //! Make an algorithm instance for the given game instance. 
-  //!
-  //! \param position_count Number of positions in the passed-in game.
-  explicit proof_number_search(boost::shared_ptr< ::game> const& game, std::size_t position_count = 1) :
-    game(game),
-    initial_hash(hasher.generate_initial(game->initial_state, game->attacker)),
-    position_count(position_count)
-  { }
-
-  //! Get the associated game instance.
-  boost::shared_ptr< ::game> do_get_game() const {
-    assert(game);
-    return game; 
-  }
-
-  //! Has the algorithm finished?
-  bool do_finished() const { 
-    return game->root.proof_number == 0 || game->root.disproof_number == 0; 
-  }
-
-  //! Perform an iteration of the algorithm.
-  void do_iterate();
 
   //! Make the algorithm use a transposition table.
   void use_trans_tbl(std::size_t size, std::size_t keep_time) {
@@ -213,22 +243,59 @@ public:
     return position_count;
   }
 
-private:
+protected:
   boost::shared_ptr< ::game>  game;
   boost::scoped_ptr<transposition_table> trans_tbl;
   zobrist_hasher              hasher;         //!< Hasher to be used during the algorithm.
   zobrist_hasher::hash_t      initial_hash;   //!< Hash corresponding to initial_state.
   std::size_t                 position_count;
 
-  //! Expand a leaf.
-  //!
-  //! \param leaf The leaf to be expanded.
-  //! \param leaf_state Board state of the leaf.
-  //! \param leaf_hash Hash value of leaf_state
-  //! \param history Game history gathered during the descend to the leaf.
-  void expand(vertex::children_iterator leaf, ::board& leaf_state,
-              zobrist_hasher::hash_t leaf_hash, history_visitor::history_cont const& history);
+  search_algo(boost::shared_ptr< ::game> const& game, std::size_t position_count = 1) :
+    game(game),
+    initial_hash(hasher.generate_initial(game->initial_state, game->attacker)),
+    position_count(position_count)
+  { }
+
+  void expand(vertex::children_iterator leaf, board_stack& state,
+              zobrist_hasher::hash_t leaf_hash, history::records_cont const& history) {
+    ::expand(leaf, state, game->attacker, trans_tbl.get(), hasher, leaf_hash, history);
+  }
 };
+
+//! The basic variant of the Proof-Number Search algorithm.
+class proof_number_search : public search_algo<proof_number_search> {
+public:
+  //! Make an algorithm instance for the given game instance. 
+  //!
+  //! \param position_count Number of positions in the passed-in game.
+  explicit proof_number_search(boost::shared_ptr< ::game> const& game, std::size_t position_count = 1) :
+    search_algo(game, position_count)
+  { }
+
+  //! Perform an iteration of the algorithm.
+  void do_iterate();
+};
+
+#if 0
+//! Depth-first variant of the Proof-Number Search algorithm.
+struct depth_first_pn : search_algo<depth_first_pn> {
+  explicit depth_first_pn(boost::shared_ptr< ::game> const& game, std::size_t position_count = 1) :
+    search_algo(game, position_count)
+  { }
+
+  void do_iterate();
+  
+private:
+  struct limits {
+    vertex::number_t pn_limit;
+    vertex::number_t dn_limit;
+  };
+
+  std::stack<std::pair<vertex::children_iterator, limits> > path;
+  history_visitor history;
+  board_visitor<history_visitor> board;
+};
+#endif
 
 #endif
 

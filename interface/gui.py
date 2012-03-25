@@ -1844,6 +1844,10 @@ class BoardController(object):
     # If there is a piece selected in the chooser and then the user clicks on a position on the _board,
     # it's an "add piece" command.
 
+    empty = apnsmod.empty
+    Position = apnsmod.Position
+    Piece = apnsmod.Piece
+
     if self._selectedPiece is not None:
       r, c = self._boardCoordsFromDisplay(row, column)
       color, type = self._selectedPiece
@@ -1881,7 +1885,7 @@ class BoardController(object):
           self._removeBoardSelection()
 
         else:
-          self._removeBoardSelection()  
+          self._removeBoardSelection()
 
       else:
         # If there is no selection, create a new one if there is a piece on the selected place.

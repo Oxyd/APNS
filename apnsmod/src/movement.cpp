@@ -423,6 +423,8 @@ step step::make_push_pull(board const& board, elementary_step first_step, elemen
   return step(sequence.begin(), sequence.end());
 }
 
+step_holder step_holder::none;
+
 bool operator == (step const& lhs, step const& rhs) {
   step::el_steps_iterator left = lhs.step_sequence_begin();
   step::el_steps_iterator right = rhs.step_sequence_begin();
@@ -437,8 +439,6 @@ bool operator == (step const& lhs, step const& rhs) {
 bool operator != (step const& lhs, step const& rhs) {
   return !operator == (lhs, rhs);
 }
-
-step_holder const step_holder::none;
 
 e_step_kind step_kind(step const& step, piece::color_t player, board const& board) {
   if (step.steps_used() == 1) {

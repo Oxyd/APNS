@@ -38,7 +38,7 @@ public:
 
   /**
    * Initialise the hasher. This constructor will generate 770 random numbers and store them in memory, so the construction
-   * is heavy. It uses the pseudo-random number generator defined in \c util.hpp.
+   * is heavy.
    */
   zobrist_hasher();
 

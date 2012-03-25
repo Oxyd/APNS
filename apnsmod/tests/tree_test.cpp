@@ -286,6 +286,35 @@ TEST(traverser, virtual_visitor) {
   traverse(*tree, bfs_traversal(), virtual_visitor(boost::make_shared<poly_visitor>()));
 }
 
+TEST(general, swap_test) {
+  vertex x;
+  x.proof_number = 1;
+  x.disproof_number = 2;
+  x.steps_remaining = 3;
+  x.step = step::from_string("Dc3n");
+
+  vertex y;
+  y.proof_number = 10;
+  y.disproof_number = 11;
+  y.steps_remaining = 2;
+  y.step = step::from_string("rd2e Ce5w");
+
+  x.swap(y);
+
+  EXPECT_EQ(10, x.proof_number);
+  EXPECT_EQ(11, x.disproof_number);
+  EXPECT_EQ(2, x.steps_remaining);
+  ASSERT_TRUE(x.step);
+  EXPECT_EQ("rd2e Ce5w", x.step->to_string());
+
+
+  EXPECT_EQ(1, y.proof_number);
+  EXPECT_EQ(2, y.disproof_number);
+  EXPECT_EQ(3, y.steps_remaining);
+  ASSERT_TRUE(y.step);
+  EXPECT_EQ("Dc3n", y.step->to_string());
+}
+
 bool find_two(vertex& v) {
   return v.proof_number == 2;
 }
