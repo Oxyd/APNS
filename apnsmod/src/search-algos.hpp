@@ -12,6 +12,7 @@
 #include <boost/ref.hpp>
 
 #include <vector>
+#include <stack>
 #include <cassert>
 
 namespace apns {
@@ -27,6 +28,9 @@ boost::optional<piece::color_t> winner(board const& board, piece::color_t player
 
 //! Return the best successor of a vertex. Can be used as a traversal policy.
 vertex::children_iterator best_successor(vertex& parent);
+
+//! Return the best successor of a vertex and, if any, the second-best successor.
+std::pair<vertex::children_iterator, vertex::children_iterator> two_best_successors(vertex& parent);
 
 //! A no-op visitor for board_visitor.
 struct null_board_visitor {
@@ -57,7 +61,7 @@ private:
 };
 
 //! Container for the history of a path. That is, all board states at the point of the beginnings of each player's turn.
-struct history {
+struct history_stack {
   struct record {
     apns::board       position;
     piece::color_t    player;
@@ -67,7 +71,7 @@ struct history {
 
   typedef std::vector<record> records_cont;
 
-  explicit history(piece::color_t attacker);
+  explicit history_stack(piece::color_t attacker);
 
   records_cont const& records() { return current_records; }
 
@@ -80,11 +84,35 @@ private:
   piece::color_t  attacker;
 };
 
+//! History of hashes met during a traversal.
+struct hashes_stack {
+  typedef std::vector<zobrist_hasher::hash_t> hashes_cont;
+
+  hashes_stack(zobrist_hasher const& hasher, zobrist_hasher::hash_t initial_hash, piece::color_t attacker) :
+    stack(1, initial_hash),
+    hasher(&hasher)
+  { 
+    last_visited.push(std::make_pair(vertex::type_or, attacker));
+  }
+
+  zobrist_hasher::hash_t top() const    { return stack.back(); }
+
+  //! Get a container of the encountered hashes. The top of the stack is the last element in the container; bottom is the first.
+  hashes_cont const&     hashes() const { return stack; }
+
+  void push(vertex const& v);
+  void pop();
+
+private:
+  hashes_cont           stack;
+  zobrist_hasher const* hasher;
+  std::stack<std::pair<vertex::e_type, piece::color_t> > last_visited;
+};
+
 //! A meta visitor that keeps track of the current board state and runs another visitor on both the given vertex and the
 //! computed board.
 template <typename SubVisitor = null_board_visitor>
 struct board_visitor {
-
   explicit board_visitor(apns::board const& initial_board, SubVisitor sub_visitor = SubVisitor()) :
     boards(initial_board),
     sub_visitor(sub_visitor)
@@ -142,7 +170,7 @@ struct board_composite_visitor {
 struct history_visitor {
   explicit history_visitor(piece::color_t attacker) : h(attacker) { }
 
-  history::records_cont const& get_history() {
+  history_stack::records_cont const& get_history() {
     return h.records();
   }
 
@@ -151,32 +179,26 @@ struct history_visitor {
   }
 
 private:
-  history h;
+  history_stack h;
 };
 
 //! Visitor that keeps track of the hash of the board. This visitor keeps the complete history of hashes encountered during the
 //! descent.
 struct hash_visitor {
-  typedef std::vector<zobrist_hasher::hash_t> hashes_cont;
-  hashes_cont hashes;
-
   //! Construct the visitor.
   //! \param hasher Hasher used for the algorithm.
   //! \param initial_hash Hash value of the initial board.
   //! \param attacker Attacker's colour.
   hash_visitor(zobrist_hasher const& hasher, zobrist_hasher::hash_t initial_hash, piece::color_t attacker) :
-    hashes(1, initial_hash),
-    last_visited_type(vertex::type_or),
-    last_visited_player(attacker),
-    hasher(&hasher)
+    stack_(hasher, initial_hash, attacker)
   { }
 
-  bool operator () (vertex const& v);
+  hashes_stack::hashes_cont const& hashes() const { return stack_.hashes(); }
+  hashes_stack& stack()                           { return stack_; }
+  void operator () (vertex const& v)              { stack_.push(v); }
 
 private:
-  vertex::e_type        last_visited_type;
-  piece::color_t        last_visited_player;
-  zobrist_hasher const* hasher;
+  hashes_stack stack_;
 };
 
 //! Visitor that keeps track of the visited vertices.
@@ -204,7 +226,7 @@ void update_numbers(vertex& v);
 //! \param leaf_hash Hash value of leaf_state
 //! \param history Game history gathered during the descend to the leaf.
 void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, transposition_table* trans_tbl,
-            zobrist_hasher& hasher, zobrist_hasher::hash_t leaf_hash, history::records_cont const& history);
+            hashes_stack& hashes, history_stack::records_cont const& history);
 
 //! A CRTP base class for search algorithms.
 template <typename Algo>
@@ -218,7 +240,11 @@ struct search_algo : private boost::noncopyable {
   }
 
   void iterate() {
-    return static_cast<Algo*>(this)->do_iterate();
+    if (!finished()) {
+      if (trans_tbl)
+        trans_tbl->tick();
+      static_cast<Algo*>(this)->do_iterate();
+    }
   }
 
   //! Run the algorithm for ms_how_long milliseconds.
@@ -259,9 +285,27 @@ protected:
   { }
 
   void expand(vertex::children_iterator leaf, board_stack& state,
-              zobrist_hasher::hash_t leaf_hash, history::records_cont const& history) {
-    apns::expand(leaf, state, game->attacker, trans_tbl.get(), hasher, leaf_hash, history);
+              hashes_stack& hashes, history_stack::records_cont const& history) {
+    apns::expand(leaf, state, game->attacker, trans_tbl.get(), hashes, history);
   }
+
+  template <typename HashesRevIter, typename PathRevIter>
+    void update_numbers(PathRevIter path_begin, PathRevIter path_end, HashesRevIter hashes_begin) {
+      PathRevIter vertex = path_begin;
+      while (vertex != path_end) {
+        apns::update_numbers(**vertex);
+
+        if (trans_tbl && (*vertex)->proof_number != 0 && (*vertex)->disproof_number != 0) {
+          if (vertex == path_begin)
+            trans_tbl->insert(*hashes_begin, std::make_pair((*vertex)->proof_number, (*vertex)->disproof_number));
+          else
+            trans_tbl->update(*hashes_begin, std::make_pair((*vertex)->proof_number, (*vertex)->disproof_number));
+        }
+
+        ++vertex;
+        ++hashes_begin;
+      }
+    }
 };
 
 //! The basic variant of the Proof-Number Search algorithm.
@@ -278,26 +322,39 @@ public:
   void do_iterate();
 };
 
-#if 0
 //! Depth-first variant of the Proof-Number Search algorithm.
-struct depth_first_pn : search_algo<depth_first_pn> {
-  explicit depth_first_pn(boost::shared_ptr< ::game> const& game, std::size_t position_count = 1) :
-    search_algo(game, position_count)
+struct depth_first_pns : search_algo<depth_first_pns> {
+  explicit depth_first_pns(boost::shared_ptr<apns::game> const& game, std::size_t position_count = 1) :
+    search_algo(game, position_count),
+    path(1, &game->root),
+    limits(1, limits_t(vertex::infty, vertex::infty)),
+    history(game->attacker),
+    hashes(hasher, initial_hash, game->attacker),
+    boards(game->initial_state)
   { }
 
   void do_iterate();
   
 private:
-  struct limits {
+  struct limits_t {
     vertex::number_t pn_limit;
     vertex::number_t dn_limit;
+
+    limits_t() { }
+    limits_t(vertex::number_t pn, vertex::number_t dn) : pn_limit(pn), dn_limit(dn) { }
   };
 
-  std::stack<std::pair<vertex::children_iterator, limits> > path;
-  history_visitor history;
-  board_visitor<history_visitor> board;
+  typedef std::vector<vertex*>  path_cont;
+  typedef std::vector<limits_t> limits_cont;
+
+  path_cont       path;
+  limits_cont     limits;
+  history_stack   history;
+  hashes_stack    hashes;
+  board_stack     boards;
+
+  limits_t make_limits(vertex& v, vertex& parent, boost::optional<vertex&> second_best, limits_t parent_limits);
 };
-#endif
 
 } // namespace apns
 

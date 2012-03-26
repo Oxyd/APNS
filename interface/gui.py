@@ -130,6 +130,7 @@ class MainWindowController(object):
     self._mainWindowDsply.addObserver(self)
     self._resultsCtrl = mainWindowDsply.searchResultsController
     self._controller = Controller()
+    self._searchPreferences = SearchParameters()
 
 
   def runApplication(self):
@@ -160,12 +161,19 @@ class MainWindowController(object):
 
     elif command == MainWindow.Command.runSearch:
       dlg = RunSearchDialog(self._mainWindowDsply.window)
-      runSearchCtrl = RunSearchController(dlg, self._controller.searchParameters)
+      runSearchCtrl = RunSearchController(dlg, self._searchPreferences)
       (doRun, newPrefs) = runSearchCtrl.run()
 
       if doRun:
         if newPrefs is not None:
-          self._controller.searchParameters = newPrefs
+          self._searchPreferences = newPrefs
+
+        pars = self._controller.searchParameters
+        pars.algo = newPrefs.algo
+        pars.timeLimit = newPrefs.timeLimit if newPrefs.timeLimitCheck else None
+        pars.positionLimit = newPrefs.positionLimit if newPrefs.positionLimitCheck else None
+        pars.memoryLimit = newPrefs.memLimit if newPrefs.memLimitCheck else None
+        pars.transTblSize = newPrefs.transTblSize
 
         #self._search.useTransTbl(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
         dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
@@ -800,6 +808,8 @@ class RunSearchDialog(Observable):
   '''A dialog window that lets the user choose search parameters and then execute a search.'''
 
   parent = property(lambda self: self._dialog.parent)
+  algo = property(lambda self: self._algoVar.get(),
+                  lambda self, val: self._setAlgo(val))
   timeLimit = property(lambda self: self._timeLimit.get(),
                        lambda self, val: self.setTimeLimit(val))
   timeLimitCheck = property(lambda self: self._timeLimitCheckVar.get() == '1',
@@ -826,6 +836,14 @@ class RunSearchDialog(Observable):
     self._dialog = DialogWindow(parent, 'Run Search')
 
     infoLabel = ttk.Label(self._dialog.content, text='Enter parameters of the search:')
+
+    algoFrame = ttk.Labelframe(self._dialog.content, text='Algorithm:', padding=5)
+    self._algoVar = Tkinter.StringVar(value='pns')
+    pnsRadio = ttk.Radiobutton(algoFrame, text='Proof-Number Search', variable=self._algoVar, value='pns')
+    dfPnRadio = ttk.Radiobutton(algoFrame, text='Depth-First Proof-Number Search', variable=self._algoVar, value='dfpns')
+
+    pnsRadio.grid(row=0, column=0, sticky='WE')
+    dfPnRadio.grid(row=1, column=0, sticky='WE')
 
     limitsFrame = ttk.Labelframe(self._dialog.content, text='Search limits:', padding=5)
 
@@ -882,17 +900,20 @@ class RunSearchDialog(Observable):
     self._memLimitSpin.grid(row=2, column=1, sticky='WE', padx=5)
     memLimitUnits.grid(row=2, column=2, sticky='W')
 
+    algoFrame.columnconfigure(0, weight=1)
+    algoFrame.grid(row=1, column=0, sticky='WE', pady=(0, 5))
+
     limitsFrame.columnconfigure(1, weight=1)
 
     infoLabel.grid(row=0, column=0, pady=5, sticky='W')
-    limitsFrame.grid(row=1, column=0, sticky='EW', pady=(0, 5))
+    limitsFrame.grid(row=2, column=0, sticky='EW', pady=(5, 5))
 
     sizeLabel.grid(row=0, column=0, sticky='W')
     self._memorySpin.grid(row=0, column=1, sticky='WE', padx=5)
     sizeUnits.grid(row=0, column=2)
 
     transTblFrame.columnconfigure(1, weight=1)
-    transTblFrame.grid(row=2, column=0, sticky='EW', pady=(5, 0))
+    transTblFrame.grid(row=3, column=0, sticky='EW', pady=(5, 0))
 
     runBtn.grid(row=0, column=0, padx=5)
     cancelBtn.grid(row=0, column=1)
@@ -930,6 +951,11 @@ class RunSearchDialog(Observable):
     '''Set time limit to 'value'. value must be an integral value.'''
 
     self._timeLimit.set(int(value))
+
+  def _setAlgo(self, value):
+    '''Set the algorithm to value.'''
+
+    self._algoVar.set(value)
 
   def enablePositionLimit(self, enable):
     '''Enable or disable the position limit spinbox.'''
@@ -981,6 +1007,7 @@ class RunSearchController(object):
   dialog showing the progress.
   '''
 
+  algo = property(lambda self: self._algo)
   timeLimit = property(lambda self: self._timeLimit)
   posLimit = property(lambda self: self._posLimit)
   memLimit = property(lambda self: self._memLimit)
@@ -1005,6 +1032,7 @@ class RunSearchController(object):
         return default
 
     self._runSearchDlg.addObserver(self)
+    self._runSearchDlg.algo = get('algo', 'pns')
     self._runSearchDlg.timeLimit = get('timeLimit', 60)
     self._runSearchDlg.timeLimitCheck = get('timeLimitCheck', True)
     self._runSearchDlg.positionLimit = get('positionLimit', 10000)
@@ -1020,7 +1048,7 @@ class RunSearchController(object):
   def run(self):
     '''ctrl.run() -> (doRun, lastValues)
 
-    Execute the dialog. Return a boolean value indicating whether the search should be performed or not, and a 
+    Execute the dialog. Return a boolean value indicating whether the search should be performed or not, and a
     new dictionary of last set values of None if last set values should not be updated.
     '''
 
@@ -1053,6 +1081,7 @@ class RunSearchController(object):
         else:
           memLimit = None
 
+        self._algo = self._runSearchDlg.algo
         self._transTblSize = (int(self._runSearchDlg.transTblSize) * MB) / apnsmod.TranspositionTable.sizeOfElement
         self._timeLimit = sTimeLimit
         self._posLimit = posLimit
@@ -1062,6 +1091,7 @@ class RunSearchController(object):
         self._lastSetValues = SearchParameters()
         last = self._lastSetValues
 
+        last.algo = self._algo
         last.timeLimitCheck = bool(showTimeLeft)
         last.timeLimit = int(self._runSearchDlg.timeLimit)
         last.positionLimit = int(self._runSearchDlg.positionLimit)
@@ -1431,7 +1461,7 @@ class PositionDisplay(Observable):
 
     goldSilverFrame = ttk.Frame(self._frame)
     self._color = Tkinter.StringVar(goldSilverFrame, 'g')
-    playerLabel = ttk.Label(goldSilverFrame, text='Player to move:')
+    playerLabel = ttk.Label(goldSilverFrame, text='Attacker:')
     self._gold = ttk.Radiobutton(goldSilverFrame, text='Gold', value='g', variable=self._color)
     self._silver = ttk.Radiobutton(goldSilverFrame, text='Silver', value='s', variable=self._color)
 
@@ -1542,7 +1572,7 @@ class ImageManager(object):
   3) Tkinter doesn't hold references to loaded images -- something else, then, needs to hold them.
 
   Therefore the purpose of this class is to load images upon creation, hold references to them so that they
-  stay alive, and ensure destruction at the "right time" -- that is, when individual parts of the interface 
+  stay alive, and ensure destruction at the "right time" -- that is, when individual parts of the interface
   are destroyed.
 
   The destruction part is implicit. The only important thing is that the last references to the loaded images are

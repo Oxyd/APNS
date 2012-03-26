@@ -7,6 +7,8 @@
 
 #include <memory>
 
+void export_util();
+
 namespace apns {
 
 class vertex;
@@ -67,7 +69,7 @@ public:
   unsigned get_work_total() const;
 
 private:
-  friend void export_util();  // So that the Python interface has access to do_update even though it's private.
+  friend void ::export_util();  // So that the Python interface has access to do_update even though it's private.
 
   //! Update the user interface. This function will be called each #ms_update_time milliseconds.
   virtual void do_update() = 0;

@@ -135,6 +135,7 @@ def saveBoard(board, moveNumber, player, filename):
 
 class SearchParameters:
   def __init__(self):
+    self.algo             = None
     self.timeLimit        = None
     self.positionLimit    = None
     self.memoryLimit      = None
@@ -155,6 +156,7 @@ class SearchProgress:
     self.transTblHits = None
     self.transTblMisses = None
 
+MB = 1024 * 1024
 
 class Controller(object):
   _MS_BURST_TIME = 100
@@ -228,15 +230,13 @@ class Controller(object):
   def runSearch(self, burst=_MS_BURST_TIME):
     '''Run the search until one of the terminating conditions is met.'''
 
-    MB = 1024 * 1024
-
     self._cancel = False
 
     if self._game is None:
       raise RuntimeError('Create or load a game first')
 
-    if self._search is None:
-      self._search = apnsmod.ProofNumberSearch(self._game, self._posCount)
+    if self._search is None or type(self._search) != self._algoType(self.searchParameters.algo):
+      self._search = self._algoType(self.searchParameters.algo)(self._game, self._posCount)
 
     if self.searchParameters.transTblSize > 0:
       mbSize = self.searchParameters.transTblSize
@@ -246,7 +246,7 @@ class Controller(object):
 
     self._searchStart = time.clock()
     self._startPosCount = self._posCount
-    while not self._search.finished and not self._timeLimitExceeded() and not self._cancel:
+    while not self._search.finished and not self._limitsExceeded() and not self._cancel:
       self._search.run(burst)
       self._updateProgress()
 
@@ -268,11 +268,10 @@ class Controller(object):
     progress = self._makeStats()
     self.searchProgressCallbacks.call(self, progress)
 
-  def _timeLimitExceeded(self):
-    if self.searchParameters.timeLimit is not None:
-      return time.clock() - self._searchStart > self.searchParameters.timeLimit
-    else:
-      return False
+  def _limitsExceeded(self):
+    timeExceeded = self.searchParameters.timeLimit and time.clock() - self._searchStart > self.searchParameters.timeLimit
+    memExceeded = self.searchParameters.memoryLimit and apnsmod.Vertex.allocSize / float(MB) > self.searchParameters.memoryLimit
+    return timeExceeded or memExceeded
 
   def _makeStats(self):
     now = time.clock()
@@ -296,3 +295,9 @@ class Controller(object):
       progress.transTblMisses = tt.misses
 
     return progress
+
+  def _algoType(self, algo):
+    return {
+        'pns':    apnsmod.ProofNumberSearch,
+        'dfpns':  apnsmod.DepthFirstPNS
+        }[algo]

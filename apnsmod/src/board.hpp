@@ -120,16 +120,6 @@ piece::color_t color_from_int(int value);
  * Position is immutable but it's copyable and assignable.
  */
 class position {
-private:
-  /**
-   * Python-specific typedef.
-   *
-   * <tt>unsigned char</tt> is an integral type, which results in an awkward syntax from the Python side, as Python doesn't have
-   * any 'single character' type. So we'll provide overloads where column is represented by a single-character string. This will
-   * provide nice syntax from the Python side, namely something like Position(1, 'c').
-   */
-  typedef std::string   python_col_t;
-
 public:
   typedef unsigned      row_t;  //!< Type used for representation of rows.
   typedef unsigned char col_t;  //!< Type used for representation of columns.
@@ -145,30 +135,16 @@ public:
    * \throws std::domain_error Specified row or column was not valid.
    */
   position(row_t row, col_t column);
-
-  /**
-   * You don't want to use this.
-   *
-   * It's intended for use from Python only to allow construction using a single-letter string for column, instead
-   * of just a char. It's not meant to be used from C++ code. Making it private, though, seems to cause more trouble
-   * than it's worth. Namely, this type would have to befriend some private helper type from deep within Boost.Python
-   * bowels.
-   */
-  position(row_t row, python_col_t const& column);
+  position(row_t row, std::string const& column);
 
   row_t get_row() const;
   col_t get_column() const;
+  std::string py_get_column() const;
 
 private:
   // Use unsigned char for both so that position is only two chars in size.
   unsigned char row;
   unsigned char column;
-
-  //! For Python bindings only.
-  python_col_t get_column_py() const;
-
-  //! Allow access to <tt>get_column_py</tt>. This function is defined in py_iface.cpp.
-  friend void export_board();
 };
 
 bool operator == (position lhs, position rhs);  //!< Compare two positions for equality.

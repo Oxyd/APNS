@@ -146,6 +146,23 @@ position::position(row_t row, col_t column)
   }
 }
 
+position::position(row_t row, std::string const& col)
+  : row(row)
+{
+  if (col.length() != 1)
+    throw std::domain_error("position::position: Expected a single-character string");
+
+  column = col[0];
+
+  if (row < board::MIN_ROW || row > board::MAX_ROW
+      || column < board::MIN_COLUMN || column > board::MAX_COLUMN) {
+    std::ostringstream message;
+    message << "position::position: attempted to create an invalid position: "
+            << row << column;
+    throw std::domain_error(message.str());
+  }
+}
+
 position::row_t position::get_row() const {
   return row;
 }
@@ -154,18 +171,8 @@ position::col_t position::get_column() const {
   return column;
 }
 
-position::position(row_t row, python_col_t const& col)
-  : row(row)
-{
-  if (col.length() == 1) {
-    column = static_cast<unsigned char>(col[0]);
-  } else {
-    throw std::runtime_error("position::position: column must be single-character string");
-  }
-}
-
-position::python_col_t position::get_column_py() const {
-  return std::string(1, column);
+std::string position::py_get_column() const {
+  return std::string(1, get_column());
 }
 
 bool operator == (position lhs, position rhs) {

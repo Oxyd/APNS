@@ -4,7 +4,6 @@
 
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
-
 #include <cstdlib>
 #include <limits>
 
@@ -30,7 +29,10 @@ apns::zobrist_hasher::zobrist_hasher()
                [column - board::MIN_COLUMN] = rand_distrib(prng);
 
   for (std::size_t player = 0; player < piece::color_count; ++player)
-    players[player] = static_cast<hash_t>(rand_distrib(prng));
+    players[player] = rand_distrib(prng);
+
+  for (std::size_t s = 0; s < 4; ++s)
+    steps[s] = rand_distrib(prng);
 }
 
 apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(board const& board, piece::color_t on_move) const {
@@ -47,6 +49,7 @@ apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(board const&
   }
 
   hash ^= players[on_move];
+  hash ^= steps[3];
 
   return hash;
 }
@@ -71,18 +74,18 @@ apns::transposition_table::transposition_table(std::size_t table_size, std::size
 void apns::transposition_table::insert(hash_t hash, entry_t entry) {
   record& r = find_record(hash);
   if (r.last_accessed == NEVER || now - r.last_accessed > keep_time) {
+    if (r.last_accessed == NEVER)
+      ++elements;
     r.entry = entry;
     r.last_accessed = now;
-    ++elements;
   }
 }
 
 void apns::transposition_table::update(hash_t hash, entry_t entry) {
   record& r = find_record(hash);
-  if (r.last_accessed != NEVER) {
-    r.entry = entry;
-    r.last_accessed = now;
-  }
+  assert(r.last_accessed != NEVER);
+  r.entry = entry;
+  r.last_accessed = now;
 }
 
 boost::optional<apns::transposition_table::entry_t> apns::transposition_table::query(hash_t hash) {

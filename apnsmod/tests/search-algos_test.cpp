@@ -85,7 +85,7 @@ TEST(traversing, hash_test) {
   hash_visitor hash_v(hasher, initial_hash, g->attacker);
   traverse(g->root, &best_successor, boost::ref(hash_v));
 
-  EXPECT_EQ(hasher.generate_initial(target, piece::silver), hash_v.hashes.back());
+  EXPECT_EQ(hasher.generate_initial(target, piece::silver), hash_v.hashes().back());
 }
 
 TEST(traversing, board_test) {
@@ -106,7 +106,7 @@ TEST(traversing, history_test) {
   board_visitor<boost::reference_wrapper<history_visitor> > board_v(g->initial_state, boost::ref(history_v));
   traverse(g->root, &best_successor, boost::ref(board_v));
 
-  history::records_cont const& h = history_v.get_history();
+  history_stack::records_cont const& h = history_v.get_history();
 
   ASSERT_EQ(2, h.size());
   EXPECT_EQ(g->initial_state, h[0].position);

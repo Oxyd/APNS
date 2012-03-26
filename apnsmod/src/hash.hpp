@@ -60,23 +60,29 @@ public:
    * \param old_hash Previous value of the hash.
    * \param steps_begin Beginning of a sequence of elementary steps that describe the movement of the pieces on the board.
    * \param steps_end End of the sequence of elementary steps.
+   * \param current_steps_remaining How many steps were remaining for the current player before having made this step?
+   * \param next_steps_remaining How many steps remain for the next player after having made this step?
    * \param current_player Who made the steps described?
    * \param next_player Whose turn is it now?
    */
   template <typename Iter>
-    hash_t update(hash_t old_hash, Iter steps_begin, Iter steps_end,
+    hash_t update(hash_t old_hash, Iter steps_begin, Iter steps_end, 
+                  unsigned current_steps_remaining, unsigned next_steps_remaining,
                   piece::color_t current_player, piece::color_t next_player) const;
 
 private:
   typedef boost::multi_array<hash_t, 4>   codes_cont;
   typedef boost::array<hash_t, 2>         players_cont;
+  typedef boost::array<hash_t, 4>         steps_cont;
 
   codes_cont    codes;
   players_cont  players;
+  steps_cont    steps;
 };
 
 template <typename Iter>
 zobrist_hasher::hash_t zobrist_hasher::update(hash_t old_hash, Iter steps_begin, Iter steps_end, 
+                                              unsigned current_steps_remaining, unsigned next_steps_remaining,
                                               piece::color_t current_player, piece::color_t next_player) const {
   hash_t hash = old_hash;
 
@@ -102,6 +108,9 @@ zobrist_hasher::hash_t zobrist_hasher::update(hash_t old_hash, Iter steps_begin,
 
   hash ^= players[current_player];
   hash ^= players[next_player];
+
+  hash ^= steps[current_steps_remaining - 1];
+  hash ^= steps[next_steps_remaining - 1];
 
   return hash;
 }

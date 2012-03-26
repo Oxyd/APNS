@@ -12,7 +12,7 @@ namespace {
 
 //! Check whether the game would be lost if the given player made the given step from the given position assuming the passed-in
 //! game history.
-bool repetition(apns::board const& board, apns::piece::color_t player, apns::history::records_cont const& history) {
+bool repetition(apns::board const& board, apns::piece::color_t player, apns::history_stack::records_cont const& history) {
   using namespace apns;
 
   bool lose = false;
@@ -23,7 +23,7 @@ bool repetition(apns::board const& board, apns::piece::color_t player, apns::his
     else {
       // Check for third-time repetitions.
       unsigned count = 0;
-      for (history::records_cont::const_iterator h = history.begin(); h != history.end(); ++h)
+      for (history_stack::records_cont::const_iterator h = history.begin(); h != history.end(); ++h)
         if (h->player == player && h->position == board)
           ++count;
 
@@ -103,52 +103,90 @@ boost::optional<piece::color_t> winner(board const& board, piece::color_t player
 
 
 vertex::children_iterator best_successor(vertex& parent) {
-  vertex::number_t vertex::* number = parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
-  vertex::number_t min_value = vertex::max_num;
-  vertex*          min_vertex = 0;
+  vertex::number_t vertex::*  number      = parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
+  vertex::number_t            min_value   = vertex::max_num;
+  vertex::children_iterator   min_vertex  = parent.children_end();
 
   for (vertex::children_iterator child = parent.children_begin(); child != parent.children_end(); ++child)
-    if (child->*number < min_value || (min_vertex && min_vertex->type != parent.type 
+    if (child->*number < min_value || (min_vertex != parent.children_end()
+                                       && min_vertex->type != parent.type 
                                        && child->*number == min_value && child->type == parent.type)) {
       min_value = child->*number;
-      min_vertex = &*child;
+      min_vertex = child;
     }
 
   return min_vertex;
 }
 
-history::history(piece::color_t attacker) :
+std::pair<vertex::children_iterator, vertex::children_iterator> two_best_successors(vertex& parent) {
+  vertex::number_t vertex::*  number            = parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
+  vertex::number_t            min_value         = vertex::max_num;
+  vertex::number_t            second_min_value  = vertex::max_num;
+  vertex::children_iterator   min_vertex        = parent.children_end();
+  vertex::children_iterator   second_min_vertex = parent.children_end();
+
+  for (vertex::children_iterator child = parent.children_begin(); child != parent.children_end(); ++child) {
+    if (child->*number < min_value || (min_vertex != parent.children_end()
+                                       && min_vertex->type != parent.type 
+                                       && child->*number == min_value && child->type == parent.type)) {
+      if (min_value < second_min_value) {
+        second_min_vertex = min_vertex;
+        second_min_value = min_value;
+      }
+
+      min_value = child->*number;
+      min_vertex = child;
+    } else if (child->*number < second_min_value || (second_min_vertex != parent.children_end()
+                                                     && second_min_vertex->type != parent.type
+                                                     && child->*number == second_min_value && child->type == parent.type)) {
+      second_min_value = child->*number;
+      second_min_vertex = child;
+    }
+  }
+
+  return std::make_pair(min_vertex, second_min_vertex);
+}
+
+history_stack::history_stack(piece::color_t attacker) :
   last_visited_type(vertex::type_and),  // Root's type is always OR, so this will force push() below to add the root to history.
   attacker(attacker)
 { }
 
-void history::push(vertex const& v, board const& board) {
+void history_stack::push(vertex const& v, board const& board) {
   if (v.type != last_visited_type)
     current_records.push_back(record(board, v.type == vertex::type_or ? attacker : opponent_color(attacker)));
 
   last_visited_type = v.type;
 }
 
-void history::pop(vertex const& v) {
+void history_stack::pop(vertex const& v) {
   if (v.type != last_visited_type)
     current_records.pop_back();
 
   last_visited_type = v.type;
 }
 
-bool hash_visitor::operator () (vertex const& v) {
+void hashes_stack::push(vertex const& v) {
   if (v.step) {  // Unless this is the root.
-    zobrist_hasher::hash_t last_hash = hashes.back();
+    zobrist_hasher::hash_t const  last_hash           = stack.back();
+    vertex::e_type const          last_visited_type   = last_visited.top().first;
+    piece::color_t const          last_visited_player = last_visited.top().second;
+
     piece::color_t const next_player = v.type == last_visited_type ? last_visited_player : opponent_color(last_visited_player);
-    zobrist_hasher::hash_t hash = hasher->update(last_hash, v.step->step_sequence_begin(), v.step->step_sequence_end(),
-                                                 last_visited_player, next_player);
-    hashes.push_back(hash);
-
-    last_visited_player = next_player;
-    last_visited_type   = v.type;
+    zobrist_hasher::hash_t hash = hasher->update(
+      last_hash, v.step->step_sequence_begin(), v.step->step_sequence_end(),
+      last_visited_player == next_player ? v.steps_remaining + v.step->steps_used() : MAX_STEPS,
+      v.steps_remaining,
+      last_visited_player, next_player
+    );
+    stack.push_back(hash);
+    last_visited.push(std::make_pair(v.type, next_player));
   }
+}
 
-  return false;
+void hashes_stack::pop() {
+  stack.pop_back();
+  last_visited.pop();
 }
 
 void update_numbers(vertex& v) {
@@ -202,13 +240,12 @@ void update_numbers(vertex& v) {
 }
 
 void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, transposition_table* trans_tbl, 
-            zobrist_hasher& hasher, zobrist_hasher::hash_t leaf_hash, history::records_cont const& history) {
+            hashes_stack& hashes, history_stack::records_cont const& history) {
   assert(leaf->children_count() == 0);  // leaf is a leaf.
   assert(leaf->proof_number != 0 || leaf->disproof_number != 0); // It's not (dis-)proven yet.
 
   // Who plays in this leaf?
   piece::color_t const player = leaf->type == vertex::type_or ? attacker : opponent_color(attacker);
-  piece::color_t const opponent = opponent_color(player);
 
   // Make a list of all possible steps.
   typedef std::vector<std::pair<step, vertex::e_type> > steps_seq;
@@ -239,11 +276,10 @@ void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t a
       child->steps_remaining = MAX_STEPS;
 
     if (trans_tbl) {
-      zobrist_hasher::hash_t child_hash = hasher.update(
-        leaf_hash, child->step->step_sequence_begin(), child->step->step_sequence_end(),
-        player, leaf->type == child->type ? player : opponent
-      );
-      boost::optional<transposition_table::entry_t> values = trans_tbl->query(child_hash);
+      hashes.push(*child);
+      boost::optional<transposition_table::entry_t> values = trans_tbl->query(hashes.top());
+      hashes.pop();
+
       if (values) {
         vertex::number_t pn = values->first;
         vertex::number_t dn = values->second;
@@ -291,11 +327,6 @@ void proof_number_search::do_iterate() {
   assert(game);
   assert(!game->root.step);
 
-  if (finished()) return;
-
-  if (trans_tbl)
-    trans_tbl->tick();
-
   hash_visitor    hash_v(hasher, initial_hash, game->attacker);
   path_visitor    path_v;
   history_visitor history_v(game->attacker);
@@ -311,23 +342,83 @@ void proof_number_search::do_iterate() {
         boost::ref(path_v),
         boost::ref(board_v))));
   
-  assert(hash_v.hashes.size() == path_v.path.size());
+  assert(hash_v.hashes().size() == path_v.path.size());
 
-  expand(leaf, board_v.get_board_stack(), hash_v.hashes.back(), history_v.get_history());
+  expand(leaf, board_v.get_board_stack(), hash_v.stack(), history_v.get_history());
   position_count += leaf->children_count();
 
-  if (trans_tbl && leaf->proof_number != 0 && leaf->disproof_number != 0)
-    trans_tbl->insert(hash_v.hashes.back(), std::make_pair(leaf->proof_number, leaf->disproof_number));
+  update_numbers(path_v.path.rbegin(), path_v.path.rend(), hash_v.hashes().rbegin());
+}
 
-  hash_visitor::hashes_cont::const_reverse_iterator hash = hash_v.hashes.rbegin();
-  for (path_visitor::path_cont::reverse_iterator vertex = path_v.path.rbegin();
-       vertex != path_v.path.rend();
-       ++vertex, ++hash) {
-    update_numbers(**vertex);
+void depth_first_pns::do_iterate() {
+  assert(game);
+  assert(!game->root.step);
 
-    if (trans_tbl && vertex != path_v.path.rbegin() && (*vertex)->proof_number != 0 && (*vertex)->disproof_number != 0)
-      trans_tbl->update(*hash, std::make_pair((*vertex)->proof_number, (*vertex)->disproof_number));
+  assert(path.back()->children_count() == 0);
+  assert(path.back()->proof_number <= limits.back().pn_limit);
+  assert(path.back()->disproof_number <= limits.back().dn_limit);
+
+  assert(hashes.hashes().size() == path.size());
+  assert(limits.size() == path.size());
+
+  expand(path.back(), boards, hashes, history.records());
+  position_count += path.back()->children_count();
+
+  assert(path.size() == hashes.hashes().size());
+  update_numbers(path.rbegin(), path.rend(), hashes.hashes().rbegin());
+
+  // Go up.
+  while (path.back()->proof_number > limits.back().pn_limit || path.back()->disproof_number > limits.back().dn_limit) {
+    position_count -= path.back()->children_count();
+    path.back()->resize(0);
+
+    history.pop(*path.back());
+    hashes.pop();
+    boards.pop(*path.back()->step);
+
+    path.pop_back();
+    limits.pop_back();
   }
+
+  // And go back down.
+  while (path.back()->children_count() > 0) {
+    std::pair<vertex::children_iterator, vertex::children_iterator> best_two = two_best_successors(*path.back());
+    limits_t new_limits = make_limits(
+      *best_two.first,
+      *path.back(),
+      best_two.second ? boost::optional<vertex&>(*best_two.second) : boost::none,
+      limits.back()
+    );
+
+    limits.push_back(new_limits);
+    path.push_back(best_two.first);
+
+    assert(path.back()->proof_number <= limits.back().pn_limit && path.back()->disproof_number <= limits.back().dn_limit);
+
+    boards.push(*path.back()->step);
+    history.push(*path.back(), boards.top());
+    hashes.push(*path.back());
+  }
+}
+
+depth_first_pns::limits_t depth_first_pns::make_limits(vertex& v, vertex& parent, boost::optional<vertex&> second_best,
+                                                       limits_t parent_limits) {
+  vertex::number_t vertex::*    min_num = parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
+  vertex::number_t limits_t::*  min_lim = parent.type == vertex::type_or ? &limits_t::pn_limit : &limits_t::dn_limit;
+  vertex::number_t vertex::*    dif_num = parent.type == vertex::type_or ? &vertex::disproof_number : &vertex::proof_number;
+  vertex::number_t limits_t::*  dif_lim = parent.type == vertex::type_or ? &limits_t::dn_limit : &limits_t::pn_limit;
+
+  limits_t new_limits;
+
+  vertex::number_t second_num = second_best ? (*second_best).*min_num : vertex::infty;
+  new_limits.*min_lim = std::min(parent_limits.*min_lim, second_num);
+
+  if (parent_limits.*dif_lim < vertex::infty)
+    new_limits.*dif_lim = parent_limits.*dif_lim - parent.*dif_num + v.*dif_num;
+  else
+    new_limits.*dif_lim = vertex::infty;
+
+  return new_limits;
 }
 
 } // namespace apns

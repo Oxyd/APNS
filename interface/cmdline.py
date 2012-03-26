@@ -55,6 +55,8 @@ def main():
                       help='File containing the results of a previous search that should be resumed')
   parser.add_argument('-d', '--destination', type=str, required=True,
                       help='Name of the output file')
+  parser.add_argument('-a', '--algorithm', type=str, default='pns', metavar='algorithm', dest='algo',
+                      help='Algorithm to use. Valid values are "pns" and "dfpns"')
   parser.add_argument('-t', '--time', type=int, default=60, metavar='time limit', dest='timeLimit',
                       help='Maximum running time of the algorithm, excluding any I/O operations, in seconds')
   parser.add_argument('-n', '--positions', type=int, default=0, metavar='position limit', dest='posLimit',
@@ -79,6 +81,11 @@ def main():
     print >> sys.stderr, 'Error: Initial position and previous search can\'t be specified at the same time.'
     raise SystemExit(1)
 
+  ALGOS = ('pns', 'dfpns')
+  if args.algo not in ALGOS:
+    print >> sys.stderr, 'Error: Algorithm must be one of', ', '.join(ALGOS)
+    raise SystemExit(1)
+
   if args.transTblSize < 0:
     print >> sys.stderr, 'Error: Size of transposition table must be a nonnegative integer'
     raise SystemExit(1)
@@ -96,6 +103,7 @@ def main():
     raise SystemExit(1)
 
   params = SearchParameters()
+  params.algo = args.algo
   params.timeLimit = args.timeLimit
   params.positionLimit = args.posLimit
   params.memoryLimit = args.memLimit
