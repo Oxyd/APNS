@@ -3,6 +3,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/bind.hpp>
+#include <boost/filesystem.hpp>
 
 #include <algorithm>
 #include <limits>
@@ -346,35 +347,11 @@ struct vertex_counter {
 };
 
 //! Delete a file given by its filename. This is inherently platform-specific.
-void delete_file(std::string const& filename);
-
-} // anonymous namespace
-
-#ifdef POSIX
-#include <unistd.h>
-
-namespace {
-
 void delete_file(std::string const& filename) {
-  ::unlink(filename.c_str());
+  remove(boost::filesystem::path(filename));
 }
 
 } // anonymous namespace
-
-#elif defined(_WIN32)
-#include <windows.h>
-
-namespace {
-
-void delete_file(std::string const& filename) {
-  ::DeleteFile(filename.c_str());
-}
-
-} // anonymous namespace
-
-#else
-# error "Unsupported platform"
-#endif
 
 void save_game(boost::shared_ptr<game> const& game, std::string const& filename, operation_controller& op_ctrl) {
   std::ios_base::sync_with_stdio(false);

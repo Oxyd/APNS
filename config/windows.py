@@ -16,6 +16,7 @@ def config(conf, bits, debug, profile):
 
       'compile-flags': [
         '/EHsc',                    # Enable C++ exception handling.
+        #'/Za',                      # Disable language extensions.
         '/Zc:forScope',             # Standard C++ scoping rules.                                                                                                                                                               
         '/wd4224',                  # Disable an annoying warning. (I believe MSVS is being wrong here.)                                                                                                                        
         '/wd4180',                  # Disable the "C4180: qualifier applied to function type has no meaning; ignored" warning.                                                                                    
@@ -40,24 +41,25 @@ def config(conf, bits, debug, profile):
       ],
 
       'includedirs': {
-        'boost-python':   boostBase,
-        'boost-random':   boostBase,
-        'python':         pythonBase + 'include/',
-        'gtest':          'C:/Users/Oxyd/Development/gtest-1.5.0/include'
+        'boost-python':     boostBase,
+        'boost-random':     boostBase,
+        'boost-filesystem': boostBase,
+        'python':           pythonBase + 'include/',
+        'gtest':            'C:/Users/Oxyd/Development/gtest-1.5.0/include'
       },
       'libdirs': {
-        'boost-python':   boostBase + 'stage/lib/',
-        'boost-random':   boostBase + 'stage/lib/',
-        'python':         pythonBase + 'libs/',
-        'gtest':          'C:/Users/Oxyd/Development/gtest-1.5.0/lib'
+        'boost-python':     boostBase + 'stage/lib/',
+        'boost-random':     boostBase + 'stage/lib/',
+        'boost-filesystem': boostBase + 'stage/lib/',
+        'python':           pythonBase + 'libs/',
+        'gtest':            'C:/Users/Oxyd/Development/gtest-1.5.0/lib'
       },
       'libs': {
-        'python':         'python27',
-        #'boost-python':   'libboost_python-vc100-mt{0}-1_48'.format('-gd' if debug else ''),
-        'boost-python':   '',  # Use the auto-linking feature of MSVC.
-        #'boost-random':   'libboost_random-vc100-mt-{0}-1_48.lib'.format('s' if not debug else 'sgd'),
-        'boost-random':   '',
-        'gtest':          'gtest' if not debug else 'gtestd'
+        'python':           'python27',
+        'boost-python':     '',  # Use the auto-linking feature of MSVC.
+        'boost-random':     '',
+        'boost-filesystem': '',
+        'gtest':            'gtest' if not debug else 'gtestd'
       },
       'extra':            lambda env: _extraSetup(env, bits)
     }
