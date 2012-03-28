@@ -38,7 +38,7 @@ class MainWindow(Observable):
 
   class Command:
     '''Enumeration type that specifies what kind of action the user has selected.'''
-    newSearch, iterate, runSearch, savePosition, loadSearch, saveSearch, close, searchStats = range(8)
+    newSearch, iterate, runSearch, resetSearch, savePosition, loadSearch, saveSearch, close, searchStats = range(9)
 
 
   def __init__(self):
@@ -54,6 +54,8 @@ class MainWindow(Observable):
                                     command=lambda: self.notifyObservers(command=MainWindow.Command.newSearch))
     self._runBtn = ttk.Button(self._toolbar, text='Run Search',
                               command=lambda: self.notifyObservers(command=MainWindow.Command.runSearch))
+    self._resetBtn = ttk.Button(self._toolbar, text='Reset Search',
+                                command=lambda: self.notifyObservers(command=MainWindow.Command.resetSearch))
     self._loadSearchBtn = ttk.Button(self._toolbar, text='Load Search',
                                      command=lambda: self.notifyObservers(command=MainWindow.Command.loadSearch))
     self._saveSearchBtn = ttk.Button(self._toolbar, text='Save Search',
@@ -73,10 +75,11 @@ class MainWindow(Observable):
 
     self._newSearchBtn.grid(row=0, column=0, padx=(0, 3))
     self._runBtn.grid(row=0, column=1, padx=(3, 3))
-    self._loadSearchBtn.grid(row=0, column=2, padx=(3, 3))
-    self._saveSearchBtn.grid(row=0, column=3, padx=(3, 3))
-    self._saveBtn.grid(row=0, column=4, padx=(3, 3))
-    self._statsBtn.grid(row=0, column=5, padx=(3, 0))
+    self._resetBtn.grid(row=0, column=2, padx=(3, 3))
+    self._loadSearchBtn.grid(row=0, column=3, padx=(3, 3))
+    self._saveSearchBtn.grid(row=0, column=4, padx=(3, 3))
+    self._saveBtn.grid(row=0, column=5, padx=(3, 3))
+    self._statsBtn.grid(row=0, column=6, padx=(3, 0))
 
     self._toolbar.grid(row=0, column=0, sticky='W')
     self._resultsDisplay.widget.grid(row=1, column=0, sticky='NSEW')
@@ -94,6 +97,7 @@ class MainWindow(Observable):
     '''Enable the Run Search and Iterate buttons.'''
 
     self._runBtn['state'] = ['!disabled']
+    self._resetBtn['state'] = ['!disabled']
     self._saveSearchBtn['state'] = ['!disabled']
     self._saveBtn['state'] = ['!disabled']
 
@@ -102,6 +106,7 @@ class MainWindow(Observable):
     '''Disable the Run Search and Iterate buttons.'''
 
     self._runBtn['state'] = ['disabled']
+    self._resetBtn['state'] = ['disabled']
     self._saveSearchBtn['state'] = ['disabled']
     self._saveBtn['state'] = ['disabled']
 
@@ -174,6 +179,7 @@ class MainWindowController(object):
         pars.positionLimit = newPrefs.positionLimit if newPrefs.positionLimitCheck else None
         pars.memoryLimit = newPrefs.memLimit if newPrefs.memLimitCheck else None
         pars.transTblSize = newPrefs.transTblSize
+        pars.killersCount = newPrefs.killersCount
 
         #self._search.useTransTbl(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
         dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
@@ -186,6 +192,10 @@ class MainWindowController(object):
 
         self._mainWindowDsply.window.focus_set()
         self._mainWindowDsply.enableStats()
+    
+    elif command == MainWindow.Command.resetSearch:
+      self._controller.resetGame()
+      self._resultsCtrl.updateTree(self._controller)
 
     elif command == MainWindow.Command.savePosition:
       filename = tkFileDialog.asksaveasfilename()
@@ -824,6 +834,8 @@ class RunSearchDialog(Observable):
                            lambda self, val: self.enableMemLimit(val))
   transTblSize = property(lambda self: self._memorySpinVar.get(),
                           lambda self, val: self.setTransTblSize(val))
+  killersCount = property(lambda self: self._killersSpinVar.get(),
+                          lambda self, val: self.setKillers(val))
 
   class Command:
     timeLimitCheck, positionLimitCheck, memLimitCheck, start = range(4)
@@ -876,13 +888,17 @@ class RunSearchDialog(Observable):
                                          textvariable=self._memLimitVar)
     memLimitUnits = ttk.Label(limitsFrame, text='MB')
 
-    transTblFrame = ttk.Labelframe(self._dialog.content, text='Transposition table size', padding=5)
-    sizeLabel = ttk.Label(transTblFrame, text='Size: ')
-    sizeUnits = ttk.Label(transTblFrame, text='MB')
+    algoParamsFrame = ttk.Labelframe(self._dialog.content, text='Algorithm parameters:', padding=5)
+    killersLabel = ttk.Label(algoParamsFrame, text='Killers for each ply: ')
 
+    sizeLabel = ttk.Label(algoParamsFrame, text='Transposition table size: ')
+    sizeUnits = ttk.Label(algoParamsFrame, text='MB')
+
+    self._killersSpinVar = Tkinter.StringVar(value='0')
     self._memorySpinVar = Tkinter.StringVar(value='0')
 
-    self._memorySpin = Tkinter.Spinbox(transTblFrame, from_=1, to=999999999999999999,
+    self._killersSpin = Tkinter.Spinbox(algoParamsFrame, from_=1, to=50, textvariable=self._killersSpinVar)
+    self._memorySpin = Tkinter.Spinbox(algoParamsFrame, from_=1, to=999999999999999999,
                                        textvariable=self._memorySpinVar)
 
     runBtn = ttk.Button(self._dialog.buttonBox, text='Run', command=self._execute)
@@ -908,12 +924,15 @@ class RunSearchDialog(Observable):
     infoLabel.grid(row=0, column=0, pady=5, sticky='W')
     limitsFrame.grid(row=2, column=0, sticky='EW', pady=(5, 5))
 
-    sizeLabel.grid(row=0, column=0, sticky='W')
-    self._memorySpin.grid(row=0, column=1, sticky='WE', padx=5)
-    sizeUnits.grid(row=0, column=2)
+    killersLabel.grid(row=0, column=0, sticky='W')
+    self._killersSpin.grid(row=0, column=1, sticky='WE', padx=5)
 
-    transTblFrame.columnconfigure(1, weight=1)
-    transTblFrame.grid(row=3, column=0, sticky='EW', pady=(5, 0))
+    sizeLabel.grid(row=1, column=0, sticky='W')
+    self._memorySpin.grid(row=1, column=1, sticky='WE', padx=5)
+    sizeUnits.grid(row=1, column=2)
+
+    algoParamsFrame.columnconfigure(1, weight=1)
+    algoParamsFrame.grid(row=3, column=0, sticky='EW', pady=(5, 0))
 
     runBtn.grid(row=0, column=0, padx=5)
     cancelBtn.grid(row=0, column=1)
@@ -996,6 +1015,11 @@ class RunSearchDialog(Observable):
 
     self._memorySpinVar.set(int(value))
 
+  def setKillers(self, value):
+    '''Set the killer count for each ply.'''
+
+    self._killersSpinVar.set(int(value))
+
   def _execute(self):
     '''User has clicked the 'Run' button: Dispatch the command to the controller.'''
 
@@ -1012,6 +1036,7 @@ class RunSearchController(object):
   posLimit = property(lambda self: self._posLimit)
   memLimit = property(lambda self: self._memLimit)
   transTblSize = property(lambda self: self._transTblSize)
+  killersCount = property(lambda self: self._killersCount)
   showTimeLeft = property(lambda self: self._showTimeLeft)
 
   def __init__(self, runSearchDlg, parameters):
@@ -1040,6 +1065,7 @@ class RunSearchController(object):
     self._runSearchDlg.memLimit = get('memLimit', 1500)
     self._runSearchDlg.memLimitCheck = get('memLimitCheck', not is64Bit)
     self._runSearchDlg.transTblSize = get('transTblSize', 32)
+    self._runSearchDlg.killersCount = get('killersCount', 2)
 
     self._doRun = False
     self._lastSetValues = None
@@ -1087,6 +1113,7 @@ class RunSearchController(object):
         self._posLimit = posLimit
         self._memLimit = memLimit
         self._showTimeLeft = showTimeLeft
+        self._killersCont = self._runSearchDlg.killersCount
 
         self._lastSetValues = SearchParameters()
         last = self._lastSetValues
@@ -1099,6 +1126,7 @@ class RunSearchController(object):
         last.memLimit = int(self._runSearchDlg.memLimit)
         last.memLimitCheck = bool(self._runSearchDlg.memLimitCheck)
         last.transTblSize = int(self._runSearchDlg.transTblSize)
+        last.killersCount = int(self._runSearchDlg.killersCount)
 
         self._doRun = True
         self._runSearchDlg.close()
@@ -1133,7 +1161,8 @@ class RunSearchController(object):
     return (checkVar(dlg.timeLimitCheck, dlg.timeLimit, 'Time limit')
             and checkVar(dlg.positionLimitCheck, dlg.positionLimit, 'Position limit')
             and checkVar(dlg.memLimitCheck, dlg.memLimit, 'Memory limit')
-            and checkVar(True, dlg.transTblSize, 'Size of transposition table'))
+            and checkVar(True, dlg.transTblSize, 'Size of transposition table')
+            and checkVar(True, dlg.killersCount, 'Killers count'))
 
 
 class SearchProgressDialog(Observable):

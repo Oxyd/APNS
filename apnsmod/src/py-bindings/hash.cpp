@@ -47,6 +47,8 @@ void export_hash() {
     .add_property("memoryUsage",
         &apns::transposition_table::get_memory_usage,
         "Return the number of bytes used by the transposition table")
+    .add_property("size", &apns::transposition_table::get_table_size,
+                  "Maximal number of elements storeable in this table.")
     .add_property("elements",
         &apns::transposition_table::get_elements,
         "Return the number of elements stored in the table")

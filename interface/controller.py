@@ -141,6 +141,7 @@ class SearchParameters:
     self.memoryLimit      = None
     self.transTblSize     = None
     self.transTblKeepTime = None
+    self.killersCount     = None
 
 
 class SearchProgress:
@@ -218,6 +219,15 @@ class Controller(object):
     else:
       raise RuntimeError('Create or load a game first')
 
+  def resetGame(self):
+    '''Drop the current game and load it again.'''
+
+    if self._game:
+      initialPos = self._game.initialState
+      attacker = self._game.attacker
+      self.dropGame()
+      self.newGame(initialPos, attacker)
+
   def dropGame(self):
     '''Drop the current game and its associated search.'''
 
@@ -238,11 +248,14 @@ class Controller(object):
     if self._search is None or type(self._search) != self._algoType(self.searchParameters.algo):
       self._search = self._algoType(self.searchParameters.algo)(self._game, self._posCount)
 
-    if self.searchParameters.transTblSize > 0:
+    if self.searchParameters.transTblSize > 0 and (
+        self._search.transpositionTable is None or self._search.transpositionTable.size != self.searchParameters.transTblSize):
       mbSize = self.searchParameters.transTblSize
       bSize = mbSize * MB
       elements = bSize / (apnsmod.TranspositionTable.sizeOfElement)
       self._search.useTransTbl(elements, 16)  # XXX: Trans tbl keep time not user-settable.
+
+    self._search.killerCount = self.searchParameters.killersCount
 
     self._searchStart = time.clock()
     self._startPosCount = self._posCount

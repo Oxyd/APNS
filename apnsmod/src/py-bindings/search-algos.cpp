@@ -33,7 +33,7 @@ void export_algo(char const* name, char const* description) {
          "algo.run(msHowLong) -> None\n\nRun the algorithm for msHowLong milliseconds. If msHowLong is 0, the algorithm will run"
          "until it finishes.")
     .def("useTransTbl", &Algo::use_trans_tbl,
-         "pns.useTransTbl(size, keepTime) -> None\n\nMake this algorithm use a transposition table of given size and keep time.")
+         "algo.useTransTbl(size, keepTime) -> None\n\nMake this algorithm use a transposition table of given size and keep time.")
     
     .add_property("transpositionTable", 
                   make_function(&Algo::get_trans_tbl, return_internal_reference<>()),
@@ -41,6 +41,9 @@ void export_algo(char const* name, char const* description) {
     .add_property("positionCount",
                   &Algo::get_position_count,
                   "Total number of vertices currently held by this algorithm")
+    .add_property("killerCount",
+                  &Algo::get_killer_count, &Algo::set_killer_count,
+                  "Maximal number of killers per each ply.");
     ;
 }
 

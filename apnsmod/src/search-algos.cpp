@@ -229,7 +229,8 @@ void killer_db::add(std::size_t ply, vertex::e_type type, step const& step) {
   if (ply >= p.size())
     p.resize(ply + 1, ply_killers_t(killer_count));
 
-  p[ply].push_back(step);
+  if (std::find(p[ply].begin(), p[ply].end(), step) == p[ply].end())
+    p[ply].push_back(step);
 }
 
 bool killer_db::is_killer(std::size_t ply, vertex::e_type type, step const& step) {

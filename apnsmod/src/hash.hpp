@@ -176,10 +176,11 @@ public:
   //! Update the internal iteration-count timer. Call this each iteration of the search algorithm.
   void tick();
 
-  std::size_t get_memory_usage() const;                     //!< Get the amount of memory, in bytes, of this table.
-  std::size_t get_elements() const    { return elements; }  //!< Get the number of elements currently stored in the table.
-  std::size_t get_hits() const        { return hits; }      //!< Get the number of successful retreivals from the table.
-  std::size_t get_misses() const      { return misses; }    //!< Get the number of unsuccessful retreival attempts.
+  std::size_t get_memory_usage() const;                       //!< Get the amount of memory, in bytes, of this table.
+  std::size_t get_table_size() const  { return table_size; }  //!< Get the maximal number of elements storeable in this table.
+  std::size_t get_elements() const    { return elements; }    //!< Get the number of elements currently stored in the table.
+  std::size_t get_hits() const        { return hits; }        //!< Get the number of successful retreivals from the table.
+  std::size_t get_misses() const      { return misses; }      //!< Get the number of unsuccessful retreival attempts.
 
 private:
   static std::size_t const PAGE_SIZE = 1024 * 1024;  //!< One megabyte.

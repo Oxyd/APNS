@@ -240,7 +240,19 @@ public:
   typedef ply_killers_t::const_iterator ply_iterator;
 
   //! Make a killer DB that holds at most killer_count killers for each ply.
-  explicit killer_db(std::size_t const killer_count) : killer_count(killer_count) { }
+  explicit killer_db(std::size_t killer_count) : killer_count(killer_count) { }
+
+  //! Change the maximal number of killers per ply. This will drop all killers stored in this db.
+  void resize_plys(std::size_t new_killer_count) {
+    if (new_killer_count != killer_count) {
+      killers_or.resize(0);
+      killers_and.resize(0);
+      killer_count = new_killer_count;
+    }
+  }
+
+  //! Get the maximal number of killers in each ply.
+  std::size_t plys_size() const { return killer_count; }
 
   //! Add a step to the list of killers for given ply and given parent type.
   void add(std::size_t ply, vertex::e_type type, step const& step);
@@ -265,7 +277,7 @@ public:
 private:
   typedef std::vector<ply_killers_t> plys;
 
-  std::size_t const killer_count;       //!< How many killers at most per ply.
+  std::size_t killer_count;       //!< How many killers at most per ply.
   plys killers_or;
   plys killers_and;
 
@@ -344,6 +356,16 @@ public:
     return trans_tbl.get(); 
   }
 
+  //! Change the number of killers stored for each ply.
+  void set_killer_count(std::size_t new_killer_count) {
+    killers.resize_plys(new_killer_count);
+  }
+
+  //! Get the max. number of killers stored for each ply.
+  std::size_t get_killer_count() const {
+    return killers.plys_size();
+  }
+
   //! Get the total number of vertices currently held by this algorithm.
   std::size_t get_position_count() const {
     return position_count;
@@ -366,8 +388,6 @@ public:
   }
 
 protected:
-  static std::size_t const KILLERS_COUNT = 2;
-
   boost::shared_ptr<apns::game>  game;
   boost::scoped_ptr<transposition_table> trans_tbl;
   zobrist_hasher              hasher;         //!< Hasher to be used during the algorithm.
@@ -378,7 +398,7 @@ protected:
   search_algo(boost::shared_ptr<apns::game> const& game, std::size_t position_count = 1) :
     game(game),
     initial_hash(hasher.generate_initial(game->initial_state, game->attacker)),
-    killers(KILLERS_COUNT),
+    killers(2),
     position_count(position_count)
   { }
 
