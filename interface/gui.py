@@ -1335,9 +1335,21 @@ class SearchProgressController(object):
         if self.progCtrl._timeLimit is not None:
           dlg.showTimeLeft(progress.timeLeft)
         dlg.showTimeElapsed(progress.timeElapsed)
-        dlg.showMemoryAllocated('{0:.2f} MB'.format(progress.memUsed / float(1024 * 1024)))
-        ttSize = '{0:.2f} MB'.format(progress.transTblSize / float(1024 * 1024))
-        dlg.showTransTblStats(memUsed=ttSize, hits=progress.transTblHits, misses=progress.transTblMisses)
+
+        if progress.memUsed < 1024:
+          memUsed = str(progress.memUsed)
+        elif progress.memUsed < 1024 * 1024:
+          memUsed = '{0:.2f} kB'.format(progress.memUsed / float(1024))
+        else:
+          memUsed = '{0:.2f} MB'.format(progress.memUsed / float(1024 * 1024))
+        dlg.showMemoryAllocated(memUsed)
+
+        if progress.transTblSize is not None:
+          ttSize = '{0:.2f} MB'.format(progress.transTblSize / float(1024 * 1024))
+          dlg.showTransTblStats(memUsed=ttSize, hits=progress.transTblHits, misses=progress.transTblMisses)
+        else:
+          dlg.showTransTblStats(memUsed='0 B', hits='0', misses='0')
+
         dlg.showPosCount(posCount=progress.positionCount, posPerSec=progress.positionsPerSecond)
         dlg.showRootPnDn(progress.rootPN, progress.rootDN)
         dlg.updateGui()
@@ -1545,7 +1557,7 @@ class PositionController(object):
 
       if len(filename) > 0:
         try:
-          saveBoard(self._boardController._board, 1, 'g' if self._positionDisplay.color == Piece.Color.gold else 's', filename)
+          saveBoard(self._boardController._board, 1, 'g' if self._positionDisplay.color == apnsmod.Piece.Color.gold else 's', filename)
         except RuntimeError, e:
           tkMessageBox.showerror('Could not write to file: %s' % e.what())
 

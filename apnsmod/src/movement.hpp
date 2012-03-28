@@ -14,6 +14,7 @@
 #include <boost/iterator/reverse_iterator.hpp>
 #include <boost/flyweight.hpp>
 #include <boost/flyweight/no_locking.hpp>
+#include <boost/array.hpp>
 
 #include <vector>
 #include <utility>
@@ -55,6 +56,8 @@ struct elementary_step {
 
   void set_what(boost::optional<piece> new_what);
 
+  bool equal(elementary_step const& other) const;
+
   //! Construct a displacement-kind elementary step.
   static elementary_step displacement(position from, direction where, boost::optional<piece> what = boost::optional<piece>());
   //! Construct a capture-kind elementary step.
@@ -78,11 +81,11 @@ private:
     assert(*(begin + 1) >= 'a' && *(begin + 1) <= 'h');
     assert(*(begin + 2) >= '1' && *(begin + 2) <= '8');
     assert(*(begin + 3) == 'n' || *(begin + 3) == 'e' || *(begin + 3) == 's' || *(begin + 3) == 'w' || *(begin + 3) == 'x');
-    std::copy(begin, end, representation);
+    std::copy(begin, end, representation.begin());
   }
 
   //! Four-character representation of the elementary step. This is a string like "Rc7n" or " d3e" if the piece is not known.
-  char representation[4];
+  boost::array<char, 4> representation;
 };
 
 bool operator == (elementary_step const& lhs, elementary_step const& rhs);
@@ -207,6 +210,12 @@ public:
   //!
   //! \returns Either the corresponding step, or nothing, if the input doesn't describe a valid step.
   static step_holder from_string(std::string const& string);
+
+  //! Revalidate this step for a new board.
+  //!
+  //! \param board New board to use for this validation.
+  //! \param player Player to move in this step.
+  bool revalidate(board const& board, piece::color_t player) const;
 
   //! Does this step cause a capture on the board?
   bool capture() const;

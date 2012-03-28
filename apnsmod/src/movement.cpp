@@ -9,6 +9,7 @@
 #include <boost/lambda/lambda.hpp>
 #include <boost/lambda/bind.hpp>
 #include <boost/function.hpp>
+#include <boost/utility.hpp>
 
 #include <functional>
 #include <sstream>
@@ -249,7 +250,7 @@ boost::optional<piece> elementary_step::get_what() const {
 }
 
 std::string elementary_step::to_string() const {
-  return std::string(representation, representation + 4);
+  return std::string(representation.begin(), representation.end());
 }
 
 void elementary_step::set_what(boost::optional<piece> new_what) {
@@ -258,6 +259,11 @@ void elementary_step::set_what(boost::optional<piece> new_what) {
   } else {
     representation[PIECE_INDEX] = ' ';
   }
+}
+
+bool elementary_step::equal(elementary_step const& other) const {
+  return std::equal(representation.begin(), representation.end(),
+                    other.representation.begin());
 }
 
 elementary_step elementary_step::displacement(position from, direction where, boost::optional<piece> what) {
@@ -283,9 +289,7 @@ elementary_step::elementary_step(position which, boost::optional<piece> what) {
 }
 
 bool operator == (elementary_step const& lhs, elementary_step const& rhs) {
-  return lhs.get_from() == rhs.get_from() && (
-      (lhs.is_capture() && rhs.is_capture())
-      || (!lhs.is_capture() && !rhs.is_capture() && lhs.get_where() == rhs.get_where()));
+  return lhs.equal(rhs);
 }
 
 bool operator != (elementary_step const& lhs, elementary_step const& rhs) {
@@ -381,6 +385,44 @@ step_holder step::from_string(std::string const& string) {
   }
 
   return step_holder::none;
+}
+
+bool step::revalidate(board const& board, piece::color_t player) const {
+  el_steps_iterator second_noncapture = std::find_if(boost::next(step_sequence_begin()), step_sequence_end(),
+                                                     !boost::bind(&elementary_step::is_capture, _1));
+
+  step_holder new_step;
+  switch (step_kind(*this, player, board)) {
+  case ordinary: {
+    new_step = step::validate_ordinary_step(board, *step_sequence_begin());
+    if (new_step) {
+      el_steps_iterator first = new_step->step_sequence_begin();
+      assert(first->get_what());
+
+      if (first->get_what()->get_color() != player)
+        return false;
+    }
+  } break;
+
+  case push: {
+    assert(second_noncapture != step_sequence_end());
+    new_step = step::validate_push(board, *step_sequence_begin(), *second_noncapture);
+  } break;
+
+  case pull: {
+    assert(second_noncapture != step_sequence_end());
+    new_step = step::validate_pull(board, *step_sequence_begin(), *second_noncapture);
+  } break;
+  }
+
+  if (new_step) {
+    std::size_t const old_size = std::distance(step_sequence_begin(), step_sequence_end());
+    std::size_t const new_size = std::distance(new_step->step_sequence_begin(), new_step->step_sequence_end());
+
+    return old_size == new_size && std::equal(step_sequence_begin(), step_sequence_end(), new_step->step_sequence_begin());
+  }
+
+  return false;
 }
 
 bool step::capture() const {
