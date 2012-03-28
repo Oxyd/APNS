@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <cassert>
 #include <iterator>
+#include <stack>
 
 namespace apns {
 
@@ -309,6 +310,48 @@ template <typename TraversalPolicy>
 vertex::children_iterator traverse_postorder(vertex& root, TraversalPolicy traversal_policy) {
   return traverse_postorder(root, traversal_policy, null_visitor(), null_stop_condition());
 }
+
+class backtrack {
+  // A stack of (current vertex on a level, end iterator for that level).
+  typedef std::stack<std::pair<vertex::children_iterator, vertex::children_iterator> > stack_t;
+
+public:
+  vertex::children_iterator operator () (vertex& current) {
+    if (current.children_count() > 0) {
+      // This vertex has any children? Good, go to the first one. Also push this level onto the stack.
+      stack.push(std::make_pair(current.children_begin(), current.children_end()));
+      return current.children_begin();
+
+    } else while (!stack.empty()) {
+        // A leaf? Okay, does it have an unvisited sibling?
+        vertex::children_iterator& cur = stack.top().first;
+        vertex::children_iterator& end = stack.top().second;
+
+        ++cur;
+        if (cur != end)
+          return cur;   // It does, visit that.
+        else
+          stack.pop();  // Nope, try one level above.
+      }
+
+    // No dice either way? Looks like we're done.
+    return vertex::children_iterator();
+  }
+
+private:
+  stack_t stack;
+};
+
+//! A visitor counting the vertices of the tree.
+struct vertex_counter {
+  vertex_counter() : count(0) { }
+
+  void operator () (vertex&) {
+    ++count;
+  }
+
+  std::size_t count;
+};
 
 //! Holds an instance of a concrete traversal policy object and delegates the traversal to it.
 struct virtual_traversal_policy {

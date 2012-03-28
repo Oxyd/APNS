@@ -10,6 +10,8 @@
 #include <boost/utility.hpp>
 #include <boost/timer.hpp>
 #include <boost/ref.hpp>
+#include <boost/circular_buffer.hpp>
+#include <boost/bind.hpp>
 
 #include <vector>
 #include <stack>
@@ -73,7 +75,7 @@ struct history_stack {
 
   explicit history_stack(piece::color_t attacker);
 
-  records_cont const& records() { return current_records; }
+  records_cont const& records() const { return current_records; }
 
   void push(vertex const& vertex, board const& state);
   void pop(vertex const& vertex);
@@ -88,11 +90,12 @@ private:
 struct hashes_stack {
   typedef std::vector<zobrist_hasher::hash_t> hashes_cont;
 
-  hashes_stack(zobrist_hasher const& hasher, zobrist_hasher::hash_t initial_hash, piece::color_t attacker) :
+  hashes_stack(zobrist_hasher const& hasher, zobrist_hasher::hash_t initial_hash, piece::color_t attacker,
+               unsigned steps_remaining = MAX_STEPS) :
     stack(1, initial_hash),
     hasher(&hasher)
   { 
-    last_visited.push(std::make_pair(vertex::type_or, attacker));
+    last_visited.push(last(vertex::type_or, attacker, steps_remaining));
   }
 
   zobrist_hasher::hash_t top() const    { return stack.back(); }
@@ -104,9 +107,21 @@ struct hashes_stack {
   void pop();
 
 private:
+  struct last {
+    vertex::e_type    type;
+    piece::color_t    player;
+    unsigned          steps_remaining;
+
+    last(vertex::e_type t, piece::color_t p, unsigned s) :
+      type(t),
+      player(p),
+      steps_remaining(s)
+    { }
+  };
+
   hashes_cont           stack;
   zobrist_hasher const* hasher;
-  std::stack<std::pair<vertex::e_type, piece::color_t> > last_visited;
+  std::stack<last>      last_visited;
 };
 
 //! A meta visitor that keeps track of the current board state and runs another visitor on both the given vertex and the
@@ -174,6 +189,10 @@ struct history_visitor {
     return h.records();
   }
 
+  history_stack& get_history_stack() {
+    return h;
+  }
+
   void operator () (vertex const& v, board const& board) {
     h.push(v, board);
   }
@@ -213,46 +232,105 @@ struct path_visitor {
   }
 };
 
+//! Killer steps database.
+class killer_db {
+  typedef boost::circular_buffer<step> ply_killers_t;
+
+public:
+  typedef ply_killers_t::const_iterator ply_iterator;
+
+  //! Make a killer DB that holds at most killer_count killers for each ply.
+  explicit killer_db(std::size_t const killer_count) : killer_count(killer_count) { }
+
+  //! Add a step to the list of killers for given ply and given parent type.
+  void add(std::size_t ply, vertex::e_type type, step const& step);
+
+  //! Is the given step a killer for the given ply?
+  bool is_killer(std::size_t ply, vertex::e_type type, step const& step);
+
+  ply_iterator ply_begin(std::size_t ply, vertex::e_type type) const {
+    if (ply < get_plys(type).size()) 
+      return get_plys(type)[ply].begin();
+    else
+      return ply_iterator();
+  }
+
+  ply_iterator ply_end(std::size_t ply, vertex::e_type type) const {
+    if (ply < get_plys(type).size())
+      return get_plys(type)[ply].end();
+    else
+      return ply_iterator();
+  };
+
+private:
+  typedef std::vector<ply_killers_t> plys;
+
+  std::size_t const killer_count;       //!< How many killers at most per ply.
+  plys killers_or;
+  plys killers_and;
+
+  plys& get_plys(vertex::e_type type) {
+    switch (type) {
+    case vertex::type_or:   return killers_or;
+    case vertex::type_and:  return killers_and;
+    }
+
+    assert(!"Won't get here");
+    return killers_or;
+  }
+
+  plys const& get_plys(vertex::e_type type) const {
+    switch (type) {
+    case vertex::type_or:   return killers_or;
+    case vertex::type_and:  return killers_and;
+    }
+
+    assert(!"Wont' get here");
+    return killers_or;
+  }
+};
+
 //! Update proof- and disproof-numbers of a single vertex.
 void update_numbers(vertex& v);
 
-//! Expand a leaf.
-//!
-//! \param leaf The leaf to be expanded.
-//! \param state Board state of the leaf.
-//! \param attacker Attacker.
-//! \param trans_tbl Transposition table to use or NULL.
-//! \param hasher The hasher instance used for this tree.
-//! \param leaf_hash Hash value of leaf_state
-//! \param history Game history gathered during the descend to the leaf.
-void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, transposition_table* trans_tbl,
-            hashes_stack& hashes, history_stack::records_cont const& history);
+namespace detail {
+
+  //! Expand a leaf.
+  //!
+  //! \param leaf The leaf to be expanded.
+  //! \param state Board state of the leaf.
+  //! \param attacker Attacker.
+  //! \param trans_tbl Transposition table to use or NULL.
+  //! \param hasher The hasher instance used for this tree.
+  //! \param leaf_hash Hash value of leaf_state
+  //! \param history Game history gathered during the descend to the leaf.
+  void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, transposition_table* trans_tbl,
+              hashes_stack& hashes, history_stack::records_cont const& history);
+
+  //! Process a newly vertex in the tree.
+  void process_new(vertex& child, vertex const& parent, piece::color_t atatcker, step const& step, 
+                   vertex::e_type type, transposition_table* trans_tbl, hashes_stack& hashes, board_stack& state,
+                   history_stack::records_cont const& history);
+
+  //! Simulate a subtree, if possible.
+  //!
+  //! \returns True if simulation has been successful, and parent has been proved (parent will have children attached, then).
+  //! false otherwise.
+  bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_t attacker, board_stack& boards,
+                hashes_stack& hashes, history_stack& history);
+
+} // namespace apns::detail
 
 //! A CRTP base class for search algorithms.
 template <typename Algo>
-struct search_algo : private boost::noncopyable {
+class search_algo : private boost::noncopyable {
+public:
   boost::shared_ptr<apns::game> get_game() const {
     return game;
   }
 
   bool finished() const {
     return game->root.proof_number == 0 || game->root.disproof_number == 0;
-  }
-
-  void iterate() {
-    if (!finished()) {
-      if (trans_tbl)
-        trans_tbl->tick();
-      static_cast<Algo*>(this)->do_iterate();
-    }
-  }
-
-  //! Run the algorithm for ms_how_long milliseconds.
-  void run(unsigned ms_how_long) {
-    boost::timer timer;
-
-    while (!finished() && (ms_how_long == 0 || timer.elapsed() < ms_how_long / 1000.0))
-      iterate();
   }
 
   //! Make the algorithm use a transposition table.
@@ -271,41 +349,98 @@ struct search_algo : private boost::noncopyable {
     return position_count;
   }
 
+  //! Run the algorithm for ms_how_long milliseconds.
+  void run(unsigned ms_how_long) {
+    boost::timer timer;
+
+    while (!finished() && (ms_how_long == 0 || timer.elapsed() < ms_how_long / 1000.0))
+      iterate();
+  }
+
+  void iterate() {
+    if (!finished()) {
+      if (trans_tbl)
+        trans_tbl->tick();
+      static_cast<Algo*>(this)->do_iterate();
+    }
+  }
+
 protected:
+  static std::size_t const KILLERS_COUNT = 2;
+
   boost::shared_ptr<apns::game>  game;
   boost::scoped_ptr<transposition_table> trans_tbl;
   zobrist_hasher              hasher;         //!< Hasher to be used during the algorithm.
   zobrist_hasher::hash_t      initial_hash;   //!< Hash corresponding to initial_state.
+  killer_db                   killers;
   std::size_t                 position_count;
 
   search_algo(boost::shared_ptr<apns::game> const& game, std::size_t position_count = 1) :
     game(game),
     initial_hash(hasher.generate_initial(game->initial_state, game->attacker)),
+    killers(KILLERS_COUNT),
     position_count(position_count)
   { }
 
-  void expand(vertex::children_iterator leaf, board_stack& state,
-              hashes_stack& hashes, history_stack::records_cont const& history) {
-    apns::expand(leaf, state, game->attacker, trans_tbl.get(), hashes, history);
+  template <typename PathIter>
+  void process_leaf(PathIter path_begin, PathIter path_end,
+                    board_stack& board_stack, hashes_stack& hashes_stack, history_stack& history) {
+    if (path_begin != path_end) {
+      std::size_t const leaf_ply = std::distance(path_begin, path_end) - 1;
+      vertex::children_iterator leaf = *(path_end - 1);
+
+      if (detail::simulate(*leaf, killers, leaf_ply, game->attacker, board_stack, hashes_stack, history)) {
+        vertex_counter counter;
+        traverse(*leaf, backtrack(), boost::ref(counter));
+        position_count += counter.count;
+
+      } else {
+        expand(leaf, board_stack, hashes_stack, history);
+        position_count += leaf->children_count();
+      }
+
+      update_numbers(std::reverse_iterator<PathIter>(path_end), std::reverse_iterator<PathIter>(path_begin),
+                     hashes_stack.hashes().rbegin());
+
+      if ((leaf->type == vertex::type_or && leaf->proof_number == 0)
+          || (leaf->type == vertex::type_and && leaf->disproof_number == 0)) {
+        vertex::number_t vertex::* num = leaf->type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
+        vertex::children_iterator proof = std::find_if(leaf->children_begin(), leaf->children_end(),
+                                                       boost::bind(num, _1) == 0);
+        assert(proof != leaf->children_end());
+        killers.add(leaf_ply + 1, leaf->type, *proof->step);
+      }
+    }
+  }
+
+  void expand(vertex::children_iterator leaf, board_stack& state, hashes_stack& hashes, history_stack const& history) {
+    apns::detail::expand(leaf, state, game->attacker, trans_tbl.get(), hashes, history.records());
   }
 
   template <typename HashesRevIter, typename PathRevIter>
-    void update_numbers(PathRevIter path_begin, PathRevIter path_end, HashesRevIter hashes_begin) {
-      PathRevIter vertex = path_begin;
-      while (vertex != path_end) {
-        apns::update_numbers(**vertex);
+  void update_numbers(PathRevIter path_begin, PathRevIter path_end, HashesRevIter hashes_begin) {
+    std::size_t ply = std::distance(path_begin, path_end) - 1;
+    PathRevIter current = path_begin;
 
-        if (trans_tbl && (*vertex)->proof_number != 0 && (*vertex)->disproof_number != 0) {
-          if (vertex == path_begin)
-            trans_tbl->insert(*hashes_begin, std::make_pair((*vertex)->proof_number, (*vertex)->disproof_number));
-          else
-            trans_tbl->update(*hashes_begin, std::make_pair((*vertex)->proof_number, (*vertex)->disproof_number));
-        }
+    while (current != path_end) {
+      vertex& v = **current;
+      apns::update_numbers(v);
 
-        ++vertex;
-        ++hashes_begin;
+      if (trans_tbl && v.proof_number != 0 && v.disproof_number != 0)
+        trans_tbl->insert(*hashes_begin, std::make_pair(v.proof_number, v.disproof_number));
+
+      if (current + 1 != path_end) {
+        vertex& parent = **(current + 1);
+        if ((parent.type == vertex::type_or && v.proof_number == 0)
+            || (parent.type == vertex::type_and && v.disproof_number == 0))
+          killers.add(ply, parent.type, *v.step);
       }
+
+      ++current;
+      ++hashes_begin;
+      --ply;
     }
+  }
 };
 
 //! The basic variant of the Proof-Number Search algorithm.
@@ -323,7 +458,7 @@ public:
 };
 
 //! Depth-first variant of the Proof-Number Search algorithm.
-struct depth_first_pns : search_algo<depth_first_pns> {
+struct depth_first_pns : public search_algo<depth_first_pns> {
   explicit depth_first_pns(boost::shared_ptr<apns::game> const& game, std::size_t position_count = 1) :
     search_algo(game, position_count),
     path(1, &game->root),

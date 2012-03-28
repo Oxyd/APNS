@@ -35,7 +35,8 @@ apns::zobrist_hasher::zobrist_hasher()
     steps[s] = rand_distrib(prng);
 }
 
-apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(board const& board, piece::color_t on_move) const {
+apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(board const& board, piece::color_t on_move, 
+                                                                    unsigned steps_remaining) const {
   hash_t hash = 0;
 
   for (board::pieces_iterator p = board.pieces_begin(); p != board.pieces_end(); ++p) {
@@ -49,7 +50,7 @@ apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(board const&
   }
 
   hash ^= players[on_move];
-  hash ^= steps[3];
+  hash ^= steps[steps_remaining - 1];
 
   return hash;
 }
@@ -79,13 +80,6 @@ void apns::transposition_table::insert(hash_t hash, entry_t entry) {
     r.entry = entry;
     r.last_accessed = now;
   }
-}
-
-void apns::transposition_table::update(hash_t hash, entry_t entry) {
-  record& r = find_record(hash);
-  assert(r.last_accessed != NEVER);
-  r.entry = entry;
-  r.last_accessed = now;
 }
 
 boost::optional<apns::transposition_table::entry_t> apns::transposition_table::query(hash_t hash) {

@@ -327,6 +327,14 @@ TEST(traverser, stop_condition) {
   EXPECT_EQ(2, found->proof_number);
 }
 
+TEST(traverser, backtracking) {
+  boost::shared_ptr<vertex> tree = make_tree();
+  vertex_counter counter;
+  traverse(*tree, backtrack(), boost::ref(counter));
+
+  EXPECT_EQ(8, counter.count);
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

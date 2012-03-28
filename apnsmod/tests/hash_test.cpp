@@ -34,13 +34,16 @@ TEST(zobrist_test, simple_move_test) {
   ASSERT_TRUE(s);
 
   zobrist_hasher::hash_t initial_hash = hasher.generate_initial(initial, piece::gold);
-  zobrist_hasher::hash_t terminal_hash = hasher.update(initial_hash, s->step_sequence_begin(), s->step_sequence_end(),
-      piece::gold, piece::gold);
+  zobrist_hasher::hash_t terminal_hash = hasher.update(
+    initial_hash, s->step_sequence_begin(), s->step_sequence_end(),
+    4, 3,
+    piece::gold, piece::gold
+  );
 
   board terminal;
   terminal.put(position(2, 'd'), piece(piece::gold, piece::dog));
 
-  EXPECT_EQ(hasher.generate_initial(terminal, piece::gold), terminal_hash);
+  EXPECT_EQ(hasher.generate_initial(terminal, piece::gold, 3), terminal_hash);
 }
 
 TEST(zobrist_test, pull_move_test) {
@@ -60,9 +63,42 @@ TEST(zobrist_test, pull_move_test) {
   apply(*s, terminal);
 
   zobrist_hasher::hash_t initial_h = hasher.generate_initial(initial, piece::gold);
-  zobrist_hasher::hash_t terminal_h = hasher.generate_initial(terminal, piece::silver);
-  zobrist_hasher::hash_t resulting_h = hasher.update(initial_h,
-      s->step_sequence_begin(), s->step_sequence_end(), piece::gold, piece::silver);
+  zobrist_hasher::hash_t terminal_h = hasher.generate_initial(terminal, piece::silver, 2);
+  zobrist_hasher::hash_t resulting_h = hasher.update(
+    initial_h,
+    s->step_sequence_begin(), s->step_sequence_end(), 
+    4, 2,
+    piece::gold, piece::silver
+  );
+
+  EXPECT_EQ(terminal_h, resulting_h);
+}
+
+TEST(zobrist_test, end_turn_test) {
+  using namespace apns;
+
+  zobrist_hasher hasher;
+  board initial;
+  initial.put(position(3, 'e'), piece(piece::gold, piece::elephant));
+  initial.put(position(2, 'e'), piece(piece::silver, piece::cat));
+
+  boost::optional<step> s = step::validate_ordinary_step(
+    initial,
+    elementary_step::displacement(position(3, 'e'), north)
+  );
+  ASSERT_TRUE(s);
+
+  board terminal = initial;
+  apply(*s, terminal);
+
+  zobrist_hasher::hash_t initial_h = hasher.generate_initial(initial, piece::gold, 2);
+  zobrist_hasher::hash_t terminal_h = hasher.generate_initial(terminal, piece::silver, 4);
+  zobrist_hasher::hash_t resulting_h = hasher.update(
+    initial_h,
+    s->step_sequence_begin(), s->step_sequence_end(),
+    2, 4,
+    piece::gold, piece::silver
+  );
 
   EXPECT_EQ(terminal_h, resulting_h);
 }

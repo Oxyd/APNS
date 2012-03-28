@@ -519,6 +519,7 @@ TEST_F(apply_test, pull_capture) {
   EXPECT_TRUE(b == original);
 }
 
+
 class string_test : public testing::Test {
 protected:
   board b;
@@ -596,6 +597,86 @@ TEST_F(string_test, sacrifice) {
   step_holder q = step::from_string("Rf7n Ef6x");
   ASSERT_TRUE(q);
   EXPECT_EQ(*s, *q);
+}
+
+TEST(revalidate_test, identity) {
+  board b;
+  b.put(position(3, 'd'), piece(piece::gold, piece::dog));
+  step_holder s = step::validate_ordinary_step(b, elementary_step::displacement(position(3, 'd'), north));
+  ASSERT_TRUE(s);
+
+  bool const valid = s->revalidate(b, piece::gold);
+  EXPECT_TRUE(valid);
+}
+
+TEST(revalidate_test, different_piece) {
+  board b;
+  b.put(position(3, 'd'), piece(piece::gold, piece::dog));
+  step_holder s = step::validate_ordinary_step(b, elementary_step::displacement(position(3, 'd'), north));
+  ASSERT_TRUE(s);
+
+  b.remove(position(3, 'd'));
+  b.put(position(3, 'd'), piece(piece::gold, piece::elephant));
+  
+  bool const valid = s->revalidate(b, piece::gold);
+  EXPECT_FALSE(valid);
+}
+
+TEST(revalidate_test, no_capture) {
+  board b;
+  b.put(position(3, 'd'), piece(piece::gold, piece::dog));
+  b.put(position(3, 'c'), piece(piece::gold, piece::rabbit));
+
+  step_holder s = step::validate_ordinary_step(b, elementary_step::displacement(position(3, 'd'), north));
+  ASSERT_TRUE(s);
+  EXPECT_TRUE(s->capture());
+
+  b.remove(position(3, 'c'));
+  bool const valid = s->revalidate(b, piece::gold);
+  EXPECT_FALSE(valid);
+}
+
+TEST(revalidate_test, different_player) {
+  board b;
+  b.put(position(3, 'd'), piece(piece::gold, piece::dog));
+  step_holder s = step::validate_ordinary_step(b, elementary_step::displacement(position(3, 'd'), north));
+  ASSERT_TRUE(s);
+
+  bool const valid = s->revalidate(b, piece::silver);
+  EXPECT_FALSE(valid);
+}
+
+TEST(revalidate_test, pull) {
+  board b;
+  b.put(position(3, 'd'), piece(piece::gold, piece::dog));
+  b.put(position(4, 'd'), piece(piece::silver, piece::elephant));
+  step_holder s = step::validate_pull(
+    b,
+    elementary_step::displacement(position(4, 'd'), north),
+    elementary_step::displacement(position(3, 'd'), north)
+  );
+  ASSERT_TRUE(s);
+
+  b.put(position(6, 'h'), piece(piece::gold, piece::rabbit));
+
+  bool const valid = s->revalidate(b, piece::silver);
+  EXPECT_TRUE(valid);
+}
+
+TEST(revalidate, push_capture) {
+  board b;
+  b.put(position(7, 'c'), piece(piece::gold, piece::rabbit));
+  b.put(position(7, 'b'), piece(piece::silver, piece::horse));
+
+  step_holder s = step::validate_push(
+    b,
+    elementary_step::displacement(position(7, 'c'), south),
+    elementary_step::displacement(position(7, 'b'), east)
+  );
+  ASSERT_TRUE(s);
+
+  bool const valid = s->revalidate(b, piece::silver);
+  EXPECT_TRUE(valid);
 }
 
 int main(int argc, char** argv) {

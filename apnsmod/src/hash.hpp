@@ -50,9 +50,10 @@ public:
    *
    * \param board The board for which the hash will be calculated.
    * \param on_move Whose turn is it?
+   * \param steps_remaining How many steps does the player have remaining?
    * \return The hash value.
    */
-  hash_t generate_initial(board const& board, piece::color_t on_move) const;
+  hash_t generate_initial(board const& board, piece::color_t on_move, unsigned steps_remaining = MAX_STEPS) const;
 
   /**
    * Update the hash value after the situation on board has changed.
@@ -164,10 +165,6 @@ public:
    * \param vertex Value of the element.
    */
   void insert(hash_t hash, entry_t entry);
-
-  //! Update an entry in the table. This differs from insert in the fact that this always overwrites the old value, no matter
-  //! when it was last accessed.
-  void update(hash_t hash, entry_t entry);
 
   /**
    * Try to retreive an element from the table.

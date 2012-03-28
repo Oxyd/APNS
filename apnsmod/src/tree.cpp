@@ -216,38 +216,6 @@ void vertex::destroy() {
 
 namespace {
 
-class backtrack {
-  // A stack of (current vertex on a level, end iterator for that level).
-  typedef std::stack<std::pair<vertex::children_iterator, vertex::children_iterator> > stack_t;
-
-public:
-  vertex::children_iterator operator () (vertex& current) {
-    if (current.children_count() > 0) {
-      // This vertex has any children? Good, go to the first one. Also push this level onto the stack.
-      stack.push(std::make_pair(current.children_begin(), current.children_end()));
-      return current.children_begin();
-
-    } else 
-      while (!stack.empty()) {
-        // A leaf? Okay, does it have an unvisited sibling?
-        vertex::children_iterator& cur = stack.top().first;
-        vertex::children_iterator& end = stack.top().second;
-
-        ++cur;
-        if (cur != end)
-          return cur;   // It does, visit that.
-        else
-          stack.pop();  // Nope, try one level above.
-      }
-
-    // No dice either way? Looks like we're done.
-    return vertex::children_iterator();
-  }
-
-private:
-  stack_t stack;
-};
-
 //! A stop condition that just keeps calling op_ctrl.update() to see whether the algorithm should stop.
 struct op_ctrl_stop_cond {
   explicit op_ctrl_stop_cond(operation_controller& op_ctrl) :
@@ -332,17 +300,6 @@ struct reader {
 
 private:
   std::istream& in;
-};
-
-//! A visitor counting the vertices of the tree.
-struct vertex_counter {
-  vertex_counter() : count(0) { }
-
-  void operator () (vertex&) {
-    ++count;
-  }
-
-  std::size_t count;
 };
 
 //! Delete a file given by its filename. This is inherently platform-specific.
