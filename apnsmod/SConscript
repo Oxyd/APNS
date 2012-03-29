@@ -14,18 +14,21 @@ env.Append(CPPPATH=[
   config['includedirs']['boost-python'],
   config['includedirs']['boost-random'],
   config['includedirs']['boost-filesystem'],
+  config['includedirs']['boost-system'],
   config['includedirs']['python']
 ])
 env.Append(LIBPATH=[
   config['libdirs']['boost-python'],
   config['libdirs']['boost-random'],
   config['libdirs']['boost-filesystem'],
+  config['libdirs']['boost-system'],
   config['libdirs']['python']
 ])
 env.Append(LIBS=[
   config['libs']['boost-python'],
   config['libs']['boost-random'],
   config['libs']['boost-filesystem'],
+  config['libs']['boost-system'],
   config['libs']['python']
 ])
 

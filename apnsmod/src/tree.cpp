@@ -14,50 +14,6 @@
 #include <stack>
 #include <utility>
 
-namespace {
-
-//! Postorder traveral policy for traverse_postorder. Do note that this never traverses the root vertex.
-class postorder {
-  typedef std::stack<std::pair<apns::vertex::children_iterator, apns::vertex::children_iterator> > stack_t;
-
-public:
-  apns::vertex::children_iterator operator () (apns::vertex& v) {
-    using namespace apns;
-
-    if (stack.empty())
-      return recurse(&v)++;
-
-    if (stack.top().first != stack.top().second)
-      return recurse(stack.top().first)++;
-    else {
-      while (!stack.empty() && stack.top().first == stack.top().second)
-        stack.pop();
-
-      if (!stack.empty())
-        return stack.top().first++;
-      else
-        return vertex::children_iterator();
-    }
-  }
-
-private:
-  stack_t stack;
-
-  apns::vertex::children_iterator& recurse(apns::vertex::children_iterator from) {
-    using namespace apns;
-
-    vertex::children_iterator current = from;
-    while (current->children_count() > 0) {
-      stack.push(std::make_pair(current->children_begin(), current->children_end()));
-      current = current->children_begin();
-    }
-
-    return stack.top().first;
-  }
-};
-
-} // anonymous namespace
-
 namespace apns {
 
 vertex::number_t const vertex::max_num = std::numeric_limits<vertex::number_t>::max();

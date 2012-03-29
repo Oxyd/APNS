@@ -43,7 +43,10 @@ void export_algo(char const* name, char const* description) {
                   "Total number of vertices currently held by this algorithm")
     .add_property("killerCount",
                   &Algo::get_killer_count, &Algo::set_killer_count,
-                  "Maximal number of killers per each ply.");
+                  "Maximal number of killers per each ply.")
+    .add_property("maxSize",
+                  &Algo::get_max_size, &Algo::set_max_size,
+                  "Target maximal number of vertices in this tree. May be ignored by the algorithm.")
     ;
 }
 

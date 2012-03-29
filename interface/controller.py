@@ -142,6 +142,7 @@ class SearchParameters:
     self.transTblSize     = None
     self.transTblKeepTime = None
     self.killersCount     = None
+    self.maxSize          = None
 
 
 class SearchProgress:
@@ -256,6 +257,7 @@ class Controller(object):
       self._search.useTransTbl(elements, 16)  # XXX: Trans tbl keep time not user-settable.
 
     self._search.killerCount = self.searchParameters.killersCount
+    self._search.maxSize = self.searchParameters.maxSize
 
     self._searchStart = time.clock()
     self._startPosCount = self._posCount

@@ -257,10 +257,10 @@ vertex::children_iterator traverse(vertex& root, TraversalPolicy traversal_polic
                                    Visitor visitor, StopCondition stop_condition) {
   // This internally assumes that vertex::children_iterator is vertex*. If that changes, this function will have to be
   // rewritten.
-  vertex* previous = &root;
+  vertex* previous = 0;
   vertex* current = &root;
 
-  while (current) {
+  while (current && (!previous || current != previous->children_end())) {
     boost::unwrap_ref(visitor)(*current);
     if (boost::unwrap_ref(stop_condition)(*current))
       return current;
@@ -289,7 +289,7 @@ vertex::children_iterator traverse_postorder(vertex& root, TraversalPolicy trave
                                              Visitor visitor, StopCondition stop_condition) {
   vertex::children_iterator previous = &root;
   vertex::children_iterator current = boost::unwrap_ref(traversal_policy)(root);
-  while (current) {
+  while (current && current != previous->children_end()) {
     boost::unwrap_ref(visitor)(*current);
     if (boost::unwrap_ref(stop_condition)(*current))
       return current;
@@ -340,6 +340,46 @@ public:
 
 private:
   stack_t stack;
+};
+
+//! Postorder traveral policy for traverse_postorder. Do note that this never traverses the root vertex.
+class postorder {
+  typedef std::stack<std::pair<apns::vertex::children_iterator, apns::vertex::children_iterator> > stack_t;
+
+public:
+  vertex::children_iterator operator () (apns::vertex& v) {
+    using namespace apns;
+
+    if (stack.empty())
+      return recurse(&v)++;
+
+    if (stack.top().first != stack.top().second)
+      return recurse(stack.top().first)++;
+    else {
+      while (!stack.empty() && stack.top().first == stack.top().second)
+        stack.pop();
+
+      if (!stack.empty())
+        return stack.top().first++;
+      else
+        return vertex::children_iterator();
+    }
+  }
+
+private:
+  stack_t stack;
+
+  vertex::children_iterator& recurse(apns::vertex::children_iterator from) {
+    using namespace apns;
+
+    vertex::children_iterator current = from;
+    while (current->children_count() > 0) {
+      stack.push(std::make_pair(current->children_begin(), current->children_end()));
+      current = current->children_begin();
+    }
+
+    return stack.top().first;
+  }
 };
 
 //! A visitor counting the vertices of the tree.

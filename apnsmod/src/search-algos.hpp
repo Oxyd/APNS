@@ -28,6 +28,34 @@ namespace apns {
  */
 boost::optional<piece::color_t> winner(board const& board, piece::color_t player);
 
+//! Compare children of a vertex according to the apropriate number.
+struct vertex_comparator {
+  explicit vertex_comparator(vertex const& parent) :
+    number(parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number)
+  { }
+
+  bool operator () (vertex const& lhs, vertex const& rhs) {
+    return lhs.*number < rhs.*number;
+  }
+
+private:
+  vertex::number_t vertex::* number;
+};
+
+//! Compare pointers to children of a vertex according to the apropriate number.
+struct vertex_ptr_comparator {
+  explicit vertex_ptr_comparator(vertex const* parent) :
+    number(parent->type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number)
+    { }
+
+  bool operator () (vertex const* lhs, vertex const* rhs) {
+    return lhs->*number < rhs->*number;
+  }
+
+private:
+  vertex::number_t vertex::* number;
+};
+
 //! Return the best successor of a vertex. Can be used as a traversal policy.
 vertex::children_iterator best_successor(vertex& parent);
 
@@ -319,6 +347,9 @@ namespace detail {
   void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, transposition_table* trans_tbl,
               hashes_stack& hashes, history_stack::records_cont const& history);
 
+  //! Cut non-proving (-disproving) children of a vertex.
+  std::size_t cut(vertex& parent);
+
   //! Process a newly vertex in the tree.
   void process_new(vertex& child, vertex const& parent, piece::color_t atatcker, step const& step, 
                    vertex::e_type type, transposition_table* trans_tbl, hashes_stack& hashes, board_stack& state,
@@ -366,6 +397,16 @@ public:
     return killers.plys_size();
   }
 
+  //! Set maximal tree size for lazy deallocations.
+  void set_max_size(std::size_t new_max) {
+    static_cast<Algo*>(this)->do_set_max_size(new_max);
+  }
+
+  //! Get maximal tree size for lazy deallocations.
+  std::size_t get_max_size() const {
+    return static_cast<Algo const*>(this)->do_get_max_size();
+  }
+
   //! Get the total number of vertices currently held by this algorithm.
   std::size_t get_position_count() const {
     return position_count;
@@ -386,6 +427,9 @@ public:
       static_cast<Algo*>(this)->do_iterate();
     }
   }
+
+  void        do_set_max_size(std::size_t) { }
+  std::size_t do_get_max_size() const { return 0; }
 
 protected:
   boost::shared_ptr<apns::game>  game;
@@ -412,9 +456,9 @@ protected:
       if (detail::simulate(*leaf, killers, leaf_ply, game->attacker, board_stack, hashes_stack, history)) {
         vertex_counter counter;
         traverse(*leaf, backtrack(), boost::ref(counter));
-        position_count += counter.count;
-
-      } else {
+        position_count += counter.count - 1;  // *leaf itself should not be added as it's already in position_count.
+      } 
+      else {
         expand(leaf, board_stack, hashes_stack, history);
         position_count += leaf->children_count();
       }
@@ -485,10 +529,19 @@ struct depth_first_pns : public search_algo<depth_first_pns> {
     limits(1, limits_t(vertex::infty, vertex::infty)),
     history(game->attacker),
     hashes(hasher, initial_hash, game->attacker),
-    boards(game->initial_state)
+    boards(game->initial_state),
+    max_size(0)
   { }
 
   void do_iterate();
+
+  void do_set_max_size(std::size_t new_max) {
+    max_size = new_max;
+  }
+
+  std::size_t do_get_max_size() const {
+    return max_size;
+  }
   
 private:
   struct limits_t {
@@ -507,8 +560,10 @@ private:
   history_stack   history;
   hashes_stack    hashes;
   board_stack     boards;
+  std::size_t     max_size;
 
   limits_t make_limits(vertex& v, vertex& parent, boost::optional<vertex&> second_best, limits_t parent_limits);
+  void garbage_collect();
 };
 
 } // namespace apns

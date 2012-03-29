@@ -308,6 +308,14 @@ private:
   apns::step step;
 };
 
+inline bool operator == (step_holder const& lhs, step_holder const& rhs) {
+  return (lhs.empty() && rhs.empty()) || (*lhs == *rhs);
+}
+
+inline bool operator != (step_holder const& lhs, step_holder const& rhs) {
+  return !operator == (lhs, rhs);
+}
+
 //! Kind of a step.
 enum e_step_kind {
   ordinary,

@@ -7,6 +7,7 @@
 
 #include <cassert>
 #include <limits>
+#include <vector>
 
 #include <iostream>
 
@@ -35,44 +36,6 @@ bool repetition(apns::board const& board, apns::piece::color_t player, apns::his
   }
 
   return lose;
-}
-
-//! Cut the children of a vertex. This only cuts those children that do not constitute a proof or disproof. This function
-//! assumes that parent's numbers have already been updated.
-//!
-//! \returns Number of children that were cut.
-std::size_t cut(apns::vertex& parent) {
-  using namespace apns;
-
-  if ((parent.type == vertex::type_or && parent.proof_number == 0)
-      || (parent.type == vertex::type_and && parent.disproof_number == 0)) {
-    vertex::number_t vertex::* num = parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
-    vertex_counter counter;
-
-    vertex::children_iterator proof = parent.children_end();
-    for (vertex::children_iterator child = parent.children_begin(); child != parent.children_end(); ++child)
-      if (proof == parent.children_end() && child->*num == 0)
-        proof = child;
-      else
-        traverse(*child, backtrack(), boost::ref(counter));
-
-    if (proof != parent.children_begin())
-      parent.children_begin()->swap(*proof);
-
-    parent.resize(1);
-    parent.pack();
-    return counter.count;
-  } else if (parent.proof_number == 0 || parent.disproof_number == 0)
-    return 0;
-  else {
-    vertex_counter counter;
-    traverse(parent, backtrack(), boost::ref(counter));
-
-    parent.resize(0);
-    parent.pack();
-
-    return counter.count - 1;
-  }
 }
 
 } // anonymous namespace
@@ -270,13 +233,8 @@ void update_numbers(vertex& v) {
     assert(sum <= vertex::infty);
   }
 
-  if (v.type == vertex::type_or) {
-    v.proof_number    = min;
-    v.disproof_number = sum;
-  } else {
-    v.proof_number    = sum;
-    v.disproof_number = min;
-  }
+  v.*minimise_num = min;
+  v.*sum_num      = sum;
 
   if (v.proof_number == 0)
     v.disproof_number = vertex::infty;
@@ -322,7 +280,49 @@ void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t a
     vertex::children_iterator child = leaf->add_child();
 
     process_new(*child, *leaf, attacker, step, type, trans_tbl, hashes, state, history);
+    assert(child->step);
   }
+}
+
+//! Cut non-(dis-)proof children of this vertex.
+//!
+//! \returns Number of vertices cut.
+std::size_t cut(vertex& parent) {
+  vertex_counter cut_counter;
+
+  if ((parent.type == vertex::type_or && parent.proof_number == 0)
+      || (parent.type == vertex::type_and && parent.disproof_number == 0)) {
+    vertex::number_t vertex::* num = parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
+
+    // Only one child is required as a proof here.
+    vertex::children_iterator proof = parent.children_end();
+    for (vertex::children_iterator child = parent.children_begin(); child != parent.children_end(); ++child)
+      if (proof == parent.children_end() && child->*num == 0)
+        proof = child;
+      else
+        traverse(*child, backtrack(), boost::ref(cut_counter));
+
+    if (proof != parent.children_begin())
+      proof->swap(*parent.children_begin());
+
+    parent.resize(1);
+    parent.pack();
+    return cut_counter.count;
+  }
+  else if (parent.proof_number == 0 || parent.disproof_number == 0)
+    // All children constitute a proof here.
+    return 0;
+  else {
+    // No proof.
+    vertex_counter counter;
+    traverse(parent, backtrack(), boost::ref(counter));
+
+    parent.resize(0);
+    parent.pack();
+    return counter.count - 1;  // parent has not been removed, but it's been counted.
+  }
+
+  return cut_counter.count;
 }
 
 void process_new(vertex& child, vertex const& parent, piece::color_t attacker, step const& step, 
@@ -408,8 +408,10 @@ bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_
       process_new(*child, parent, attacker, *killer, type, 0, hashes, boards, history.records());
 
       if ((parent.type == vertex::type_or && child->proof_number == 0)
-          || (parent.type == vertex::type_and && child->disproof_number == 0))
+          || (parent.type == vertex::type_and && child->disproof_number == 0)) {
+        update_numbers(parent);
         return true;
+      }
 
       else if (parent.type == child->type) {
         boards.push(*killer);
@@ -422,8 +424,10 @@ bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_
         hashes.pop();
         boards.pop(*killer);
 
-        if (success)
+        if (success) {
+          update_numbers(parent);
           return true;
+        }
       }
 
       parent.resize(0);
@@ -461,12 +465,14 @@ void proof_number_search::do_iterate() {
 }
 
 void depth_first_pns::do_iterate() {
+  using detail::cut;
+
   assert(game);
   assert(!game->root.step);
 
-  assert(path.back()->children_count() == 0);
-  assert(path.back()->proof_number <= limits.back().pn_limit);
-  assert(path.back()->disproof_number <= limits.back().dn_limit);
+  assert(path.empty() || path.back()->children_count() == 0);
+  assert(path.empty() || path.back()->proof_number <= limits.back().pn_limit);
+  assert(path.empty() || path.back()->disproof_number <= limits.back().dn_limit);
 
   assert(hashes.hashes().size() == path.size());
   assert(limits.size() == path.size());
@@ -474,20 +480,28 @@ void depth_first_pns::do_iterate() {
   process_leaf(path.begin(), path.end(), boards, hashes, history);
 
   // Go up.
-  while (path.back()->proof_number > limits.back().pn_limit || path.back()->disproof_number > limits.back().dn_limit) {
-    position_count -= cut(*path.back());
+  while (!path.empty() 
+         && (path.back()->proof_number == 0 || path.back()->proof_number > limits.back().pn_limit 
+             || path.back()->disproof_number > limits.back().dn_limit)) {
+    if (max_size == 0 || path.back()->proof_number == 0 || path.back()->disproof_number == 0)
+      position_count -= cut(*path.back());
 
     history.pop(*path.back());
     hashes.pop();
-    boards.pop(*path.back()->step);
+    if (path.back()->step)
+      boards.pop(*path.back()->step);
 
     path.pop_back();
     limits.pop_back();
   }
 
+  assert(path.empty() || (path.back()->proof_number > 0 && path.back()->disproof_number > 0));
+
   // And go back down.
-  while (path.back()->children_count() > 0) {
+  while (!path.empty() && path.back()->children_count() > 0) {
     std::pair<vertex::children_iterator, vertex::children_iterator> best_two = two_best_successors(*path.back());
+    assert(best_two.first->proof_number > 0 && best_two.first->disproof_number > 0);
+
     limits_t new_limits = make_limits(
       *best_two.first,
       *path.back(),
@@ -500,10 +514,14 @@ void depth_first_pns::do_iterate() {
 
     assert(path.back()->proof_number <= limits.back().pn_limit && path.back()->disproof_number <= limits.back().dn_limit);
 
-    boards.push(*path.back()->step);
+    if (path.back()->step)
+      boards.push(*path.back()->step);
     history.push(*path.back(), boards.top());
     hashes.push(*path.back());
   }
+
+  if (max_size > 0 && position_count > max_size)
+    garbage_collect();
 }
 
 depth_first_pns::limits_t depth_first_pns::make_limits(vertex& v, vertex& parent, boost::optional<vertex&> second_best,
@@ -524,6 +542,40 @@ depth_first_pns::limits_t depth_first_pns::make_limits(vertex& v, vertex& parent
     new_limits.*dif_lim = vertex::infty;
 
   return new_limits;
+}
+
+void depth_first_pns::garbage_collect() {
+  using detail::cut;
+
+  std::stack<vertex::children_iterator> stack;
+  vertex* current = &game->root;
+  path_cont::iterator on_path = path.begin();
+
+  while (position_count > max_size) {
+    ++on_path;
+    if (on_path == path.end())
+      break;
+
+    typedef std::vector<vertex*> level_t;
+    std::vector<vertex*> level;
+    for (vertex::children_iterator child = current->children_begin(); child != current->children_end(); ++child)
+      if (child != *on_path && child->children_count() > 0 && child->proof_number != 0 && child->disproof_number != 0)
+        level.push_back(child);
+
+    std::sort(level.begin(), level.end(), vertex_ptr_comparator(current));
+
+    level_t::reverse_iterator child = level.rbegin();
+    while (child != level.rend() && position_count > max_size)
+      position_count -= cut(**child++);
+
+    current = *on_path;
+  }
+
+#ifndef NDEBUG
+    vertex_counter counter;
+    traverse(game->root, backtrack(), boost::ref(counter));
+    assert(counter.count == position_count);
+#endif
 }
 
 } // namespace apns
