@@ -75,59 +75,6 @@ TEST(traversing, find_best_vertex_test) {
   EXPECT_EQ(vertex::type_and, found->type);
 }
 
-TEST(traversing, hash_test) {
-  board target;
-  boost::shared_ptr<game> g = make_game(target);
-
-  zobrist_hasher hasher;
-  zobrist_hasher::hash_t initial_hash = hasher.generate_initial(g->initial_state, g->attacker);
-
-  hash_visitor hash_v(hasher, initial_hash, g->attacker);
-  traverse(g->root, &best_successor, boost::ref(hash_v));
-
-  EXPECT_EQ(hasher.generate_initial(target, piece::silver), hash_v.hashes().back());
-}
-
-TEST(traversing, board_test) {
-  board target;
-  boost::shared_ptr<game> g = make_game(target);
-
-  board_visitor<> board_v(g->initial_state);
-  traverse(g->root, &best_successor, boost::ref(board_v));
-
-  EXPECT_EQ(target, board_v.get_board());
-}
-
-TEST(traversing, history_test) {
-  board target;
-  boost::shared_ptr<game> g = make_game(target);
-
-  history_visitor history_v(g->attacker);
-  board_visitor<boost::reference_wrapper<history_visitor> > board_v(g->initial_state, boost::ref(history_v));
-  traverse(g->root, &best_successor, boost::ref(board_v));
-
-  history_stack::records_cont const& h = history_v.get_history();
-
-  ASSERT_EQ(2, h.size());
-  EXPECT_EQ(g->initial_state, h[0].position);
-  EXPECT_EQ(target, h[1].position);
-
-  EXPECT_EQ(piece::gold, h[0].player);
-  EXPECT_EQ(piece::silver, h[1].player);
-}
-
-TEST(traversing, path_test) {
-  boost::shared_ptr<game> g = make_game();
-
-  path_visitor path_v;
-  traverse(g->root, &best_successor, boost::ref(path_v));
-
-  EXPECT_EQ(4, path_v.path.size());
-  vertex::number_t dn = 3;
-  for (path_visitor::path_cont::iterator it = path_v.path.begin(); it != path_v.path.end(); ++it)
-    EXPECT_EQ(++dn, (*it)->disproof_number);
-}
-
 TEST(algorithm, update_numbers_test) {
   vertex v;
   v.proof_number = 1;
