@@ -397,14 +397,24 @@ public:
     return killers.plys_size();
   }
 
-  //! Set maximal tree size for lazy deallocations.
-  void set_max_size(std::size_t new_max) {
-    static_cast<Algo*>(this)->do_set_max_size(new_max);
+  //! Set upper GC treshold. If the tree size exceeds this value, GC will be run.
+  void set_gc_high(std::size_t new_max) {
+    static_cast<Algo*>(this)->do_set_gc_high(new_max);
   }
 
-  //! Get maximal tree size for lazy deallocations.
-  std::size_t get_max_size() const {
-    return static_cast<Algo const*>(this)->do_get_max_size();
+  //! Get upper GC treshold.
+  std::size_t get_gc_high() const {
+    return static_cast<Algo const*>(this)->do_get_gc_high();
+  }
+
+  //! Set lower GC treshold. GC will stop collecting once the tree size falls below this value.
+  void set_gc_low(std::size_t new_min) {
+    static_cast<Algo*>(this)->do_set_gc_low(new_min);
+  }
+
+  //! Get lower GC treshold.
+  std::size_t get_gc_low() const {
+    return static_cast<Algo const*>(this)->do_get_gc_low();
   }
 
   //! Get the total number of vertices currently held by this algorithm.
@@ -428,8 +438,10 @@ public:
     }
   }
 
-  void        do_set_max_size(std::size_t) { }
-  std::size_t do_get_max_size() const { return 0; }
+  void        do_set_gc_high(std::size_t) { }
+  std::size_t do_get_gc_high() const { return 0; }
+  void        do_set_gc_low(std::size_t) { }
+  std::size_t do_get_gc_low() const  { return 0; }
 
 protected:
   boost::shared_ptr<apns::game>  game;
@@ -465,15 +477,6 @@ protected:
 
       update_numbers(std::reverse_iterator<PathIter>(path_end), std::reverse_iterator<PathIter>(path_begin),
                      hashes_stack.hashes().rbegin());
-
-      if ((leaf->type == vertex::type_or && leaf->proof_number == 0)
-          || (leaf->type == vertex::type_and && leaf->disproof_number == 0)) {
-        vertex::number_t vertex::* num = leaf->type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
-        vertex::children_iterator proof = std::find_if(leaf->children_begin(), leaf->children_end(),
-                                                       boost::bind(num, _1) == 0);
-        assert(proof != leaf->children_end());
-        killers.add(leaf_ply + 1, leaf->type, *proof->step);
-      }
     }
   }
 
@@ -484,6 +487,7 @@ protected:
   template <typename HashesRevIter, typename PathRevIter>
   void update_numbers(PathRevIter path_begin, PathRevIter path_end, HashesRevIter hashes_begin) {
     std::size_t ply = std::distance(path_begin, path_end) - 1;
+    PathRevIter prev = path_end;
     PathRevIter current = path_begin;
 
     while (current != path_end) {
@@ -500,6 +504,10 @@ protected:
           killers.add(ply, parent.type, *v.step);
       }
 
+      if (prev != path_end)
+        *prev = resort_children(**current, *prev, vertex_comparator(**current));
+
+      prev = current;
       ++current;
       ++hashes_begin;
       --ply;
@@ -530,17 +538,26 @@ struct depth_first_pns : public search_algo<depth_first_pns> {
     history(game->attacker),
     hashes(hasher, initial_hash, game->attacker),
     boards(game->initial_state),
-    max_size(0)
+    gc_high(0),
+    gc_low(0)
   { }
 
   void do_iterate();
 
-  void do_set_max_size(std::size_t new_max) {
-    max_size = new_max;
+  void do_set_gc_high(std::size_t new_max) {
+    gc_high = new_max;
   }
 
-  std::size_t do_get_max_size() const {
-    return max_size;
+  std::size_t do_get_gc_high() const {
+    return gc_high;
+  }
+  
+  void do_set_gc_low(std::size_t new_min) {
+    gc_low = new_min;
+  }
+
+  std::size_t do_get_gc_low() const {
+    return gc_low;
   }
   
 private:
@@ -560,7 +577,8 @@ private:
   history_stack   history;
   hashes_stack    hashes;
   board_stack     boards;
-  std::size_t     max_size;
+  std::size_t     gc_high;
+  std::size_t     gc_low;
 
   limits_t make_limits(vertex& v, vertex& parent, boost::optional<vertex&> second_best, limits_t parent_limits);
   void garbage_collect();

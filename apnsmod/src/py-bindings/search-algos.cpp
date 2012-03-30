@@ -44,9 +44,13 @@ void export_algo(char const* name, char const* description) {
     .add_property("killerCount",
                   &Algo::get_killer_count, &Algo::set_killer_count,
                   "Maximal number of killers per each ply.")
-    .add_property("maxSize",
-                  &Algo::get_max_size, &Algo::set_max_size,
-                  "Target maximal number of vertices in this tree. May be ignored by the algorithm.")
+    .add_property("gcHigh",
+                  &Algo::get_gc_high, &Algo::set_gc_high,
+                  "When the number of vertices in the tree exceeds this threshold, GC will be run. This value may be ignored "
+                  "by the algorithm. Value of 0 disables GC completely.")
+    .add_property("gcLow",
+                  &Algo::get_gc_low, &Algo::set_gc_low,
+                  "Running GC will stop once the number of vertices falls below this threshold.")
     ;
 }
 

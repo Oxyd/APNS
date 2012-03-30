@@ -141,8 +141,9 @@ class SearchParameters:
     self.memoryLimit      = None
     self.transTblSize     = None
     self.transTblKeepTime = None
-    self.killersCount     = None
-    self.maxSize          = None
+    self.killersCount     = 2
+    self.gcHigh           = 0
+    self.gcLow            = 0
 
 
 class SearchProgress:
@@ -257,10 +258,14 @@ class Controller(object):
       self._search.useTransTbl(elements, 16)  # XXX: Trans tbl keep time not user-settable.
 
     self._search.killerCount = self.searchParameters.killersCount
-    self._search.maxSize = self.searchParameters.maxSize
+    self._search.gcHigh = self.searchParameters.gcHigh
+    self._search.gcLow  = self.searchParameters.gcLow
 
     self._searchStart = time.clock()
-    self._startPosCount = self._posCount
+    self._lastMeasurement = time.clock()
+    self._lastPosCount = self._posCount
+    self._lastPosPerSec = 0
+
     while not self._search.finished and not self._limitsExceeded() and not self._cancel:
       self._search.run(burst)
       self._updateProgress()
@@ -284,7 +289,7 @@ class Controller(object):
     self.searchProgressCallbacks.call(self, progress)
 
   def _limitsExceeded(self):
-    timeExceeded = self.searchParameters.timeLimit and time.clock() - self._searchStart > self.searchParameters.timeLimit
+    timeExceeded = self.searchParameters.timeLimit and time.clock() - self._searchStart >= self.searchParameters.timeLimit
     memExceeded = self.searchParameters.memoryLimit and apnsmod.Vertex.allocSize / float(MB) > self.searchParameters.memoryLimit
     return timeExceeded or memExceeded
 
@@ -298,10 +303,12 @@ class Controller(object):
     progress.rootPN = self._game.root.proofNumber
     progress.rootDN = self._game.root.disproofNumber
     self._posCount = progress.positionCount = self._search.positionCount
-    if now - self._searchStart > 0.0:
-      progress.positionsPerSecond = (self._posCount - self._startPosCount) / (now - self._searchStart)
+    if now - self._lastMeasurement >= 1.0:
+      self._lastPosPerSec = progress.positionsPerSecond = (self._posCount - self._lastPosCount) / (now - self._lastMeasurement)
+      self._lastMeasurement = now
+      self._lastPosCount = self._posCount
     else:
-      progress.positionsPerSecond = 0
+      progress.positionsPerSecond = self._lastPosPerSec
 
     tt = self._search.transpositionTable
     if tt:

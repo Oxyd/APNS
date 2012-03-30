@@ -11,8 +11,6 @@ void export_util();
 
 namespace apns {
 
-class vertex;
-
 /**
  * Controller for long-running operations. It serves as a simple interface between the algorithm and the user interface.
  * This class periodically calls a given callback which can be used to refresh the user interface with progress information.

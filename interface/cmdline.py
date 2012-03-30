@@ -71,9 +71,10 @@ def main():
                       'entries')
   parser.add_argument('-l', '--killer-count', type=int, default=2, metavar='number of killers', dest='killerCount',
                       help='How many killers should be kept for each ply')
-  parser.add_argument('-x', '--max-tree-size', type=int, default=0, metavar='max tree size', dest='maxSize',
-                      help='Maximal size of the tree before the algorithm starts to garbage-collect branches. This currently '
-                          +'only has effect with the dfpn algorithm.')
+  parser.add_argument('-G', '--gc-high', type=int, default=0, metavar='GC high', dest='gcHigh',
+                      help='Each time the number of vertices exceeds this threshold, GC will be run. Value of 0 disables GC.')
+  parser.add_argument('-g', '--gc-low', type=int, default=0, metavar='GC low', dest='gcLow',
+                      help='Running GC will stop once the number of vertices falls below this threshold.')
   parser.add_argument('-q', '--quiet', const=True, default=False, action='store_const', dest='quiet',
                       help='Don\'t print any messages to standard output.')
   args = parser.parse_args()
@@ -91,27 +92,19 @@ def main():
     print >> sys.stderr, 'Error: Algorithm must be one of', ', '.join(ALGOS)
     raise SystemExit(1)
 
-  if args.transTblSize < 0:
-    print >> sys.stderr, 'Error: Size of transposition table must be a nonnegative integer'
-    raise SystemExit(1)
-  if args.killerCount < 0:
-    print >> sys.stderr, 'Error: Number of killers must be a nonnegative integer'
-    raise SystemExit(1)
-  if args.transTblKeepTime < 0:
-    print >> sys.stderr, 'Error: Transposition table keep time must be a nonnegative integer'
-    raise SystemExit(1)
-  if args.maxSize < 0:
-    print >> sys.stderr, 'Error: Maximal tree size must be a nonnegative integer'
-    raise SystemExit(1)
-  if args.timeLimit < 0:
-    print >> sys.stderr, 'Error: Time limit must be a nonnegative integer'
-    raise SystemExit(1)
-  if args.posLimit < 0:
-    print >> sys.stderr, 'Error: Position limit must be a nonnegative integer'
-    raise SystemExit(1)
-  if args.memLimit < 0:
-    print >> sys.stderr, 'Error: Memory limit must be a nonnegative integer'
-    raise SystemExit(1)
+  def checkNum(value, name):
+    if value < 0:
+      print >> sys.stderr, 'Error: {0} must be a nonnegative integer'.format(name)
+      raise SystemExit(1)
+
+  checkNum(args.transTblSize, 'Size of transposition table')
+  checkNum(args.transTblKeepTime, 'Transposition table keep time')
+  checkNum(args.killerCount, 'Number of killers')
+  checkNum(args.gcHigh, 'GC high threshold')
+  checkNum(args.gcLow, 'GC low threshold')
+  checkNum(args.timeLimit, 'Time limit')
+  checkNum(args.posLimit, 'Position limit')
+  checkNum(args.memLimit, 'Memory limit')
 
   params = SearchParameters()
   params.algo = args.algo
@@ -121,7 +114,8 @@ def main():
   params.transTblSize = args.transTblSize
   params.transTblKeepTime = args.transTblKeepTime
   params.killersCount = args.killerCount
-  params.maxSize = args.maxSize
+  params.gcHigh = args.gcHigh
+  params.gcLow = args.gcLow
 
   controller = Controller()
   controller.searchParameters = params

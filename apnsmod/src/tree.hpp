@@ -186,6 +186,75 @@ inline vertex::e_type opposite_type(vertex::e_type t) {
   return t == vertex::type_or ? vertex::type_and : vertex::type_or;
 }
 
+namespace detail {
+
+template <typename Compare>
+struct ptr_compare {
+  explicit ptr_compare(Compare comp = Compare()) : comp(comp) { }
+  bool operator () (vertex const* lhs, vertex const* rhs) {
+    return comp(*lhs, *rhs);
+  }
+
+private:
+  Compare comp;
+};
+
+} // namespace detail
+
+//! Sort the children of a vertex according to a comparator.
+template <typename Compare>
+void sort_children(vertex& parent, Compare comp = Compare()) {
+  std::vector<vertex*> temp;
+  temp.reserve(parent.children_count());
+  for (vertex::children_iterator c = parent.children_begin(); c != parent.children_end(); ++c)
+    temp.push_back(&*c);
+
+  std::sort(temp.begin(), temp.end(), detail::ptr_compare<Compare>(comp));
+
+  vertex new_parent;
+  new_parent.proof_number     = parent.proof_number;
+  new_parent.disproof_number  = parent.disproof_number;
+  new_parent.step             = parent.step;
+  new_parent.steps_remaining  = parent.steps_remaining;
+  new_parent.type             = parent.type;
+  new_parent.resize(parent.children_count());
+
+  vertex::children_iterator dest = new_parent.children_begin();
+  for (std::vector<vertex*>::const_iterator src = temp.begin(); src != temp.end(); ++src, ++dest)
+    std::swap(*dest, **src);
+
+  std::swap(parent, new_parent);
+}
+
+//! Update the order of children of a vertex assuming it was sorted previously but child is now out of order.
+//!
+//! \returns Iterator to the given child in its new position.
+template <typename Compare>
+vertex::children_iterator resort_children(vertex& parent, vertex::children_iterator child, Compare comp = Compare()) {
+  // So long as the child is greater than its sibling to the right, bubble it right.
+  while (boost::next(child) != parent.children_end() && comp(*boost::next(child), *child)) {
+    vertex::children_iterator equal_range_end = boost::next(child);
+    while (boost::next(equal_range_end) != parent.children_end() && !comp(*equal_range_end, *boost::next(equal_range_end)))
+      ++equal_range_end;
+
+    std::swap(*child, *equal_range_end);
+    child = equal_range_end;
+  }
+
+  // And conversly, so long as the sibling to the left is greater or equal than the child, bubble left. Note that this won't do
+  // anything if the previous loop already re-sorted the children.
+  while (child != parent.children_begin() && !comp(*boost::prior(child), *child)) {
+    vertex::children_iterator equal_range_begin = boost::prior(child);
+    while (boost::prior(equal_range_begin) != parent.children_begin() && !comp(*boost::prior(equal_range_begin), *equal_range_begin))
+      --equal_range_begin;
+
+    std::swap(*child, *boost::prior(child));
+    --child;
+  }
+
+  return child;
+}
+
 //! A container for the game and its search tree.
 class game : boost::noncopyable {
 public:
@@ -351,10 +420,10 @@ public:
     using namespace apns;
 
     if (stack.empty())
-      return recurse(&v)++;
+      return inc(recurse(&v));
 
     if (stack.top().first != stack.top().second)
-      return recurse(stack.top().first)++;
+      return inc(recurse(stack.top().first));
     else {
       while (!stack.empty() && stack.top().first == stack.top().second)
         stack.pop();
@@ -369,7 +438,15 @@ public:
 private:
   stack_t stack;
 
-  vertex::children_iterator& recurse(apns::vertex::children_iterator from) {
+  //! If an iterator is given, increments it and returns the original. If boost::none is given, returns a singular iterator.
+  vertex::children_iterator inc(boost::optional<vertex::children_iterator&> i) {
+    if (i)
+      return (*i)++;
+    else
+      return vertex::children_iterator();
+  }
+
+  boost::optional<vertex::children_iterator&> recurse(apns::vertex::children_iterator from) {
     using namespace apns;
 
     vertex::children_iterator current = from;
@@ -378,7 +455,10 @@ private:
       current = current->children_begin();
     }
 
-    return stack.top().first;
+    if (!stack.empty())
+      return stack.top().first;
+    else
+      return boost::none;
   }
 };
 

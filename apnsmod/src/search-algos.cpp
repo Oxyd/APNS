@@ -106,6 +106,8 @@ boost::optional<piece::color_t> winner(board const& board, piece::color_t player
 
 
 vertex::children_iterator best_successor(vertex& parent) {
+  return parent.children_begin();
+
   vertex::number_t vertex::*  number      = parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
   vertex::number_t            min_value   = vertex::max_num;
   vertex::children_iterator   min_vertex  = parent.children_end();
@@ -120,6 +122,11 @@ vertex::children_iterator best_successor(vertex& parent) {
 }
 
 std::pair<vertex::children_iterator, vertex::children_iterator> two_best_successors(vertex& parent) {
+  if (parent.children_count() >= 1)
+    return std::make_pair(parent.children_begin(), boost::next(parent.children_begin()));
+  else
+    return std::make_pair(parent.children_end(), parent.children_end());
+
   vertex::number_t vertex::*  number            = parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
   vertex::number_t            min_value         = vertex::max_num;
   vertex::number_t            second_min_value  = vertex::max_num;
@@ -282,17 +289,19 @@ void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t a
     process_new(*child, *leaf, attacker, step, type, trans_tbl, hashes, state, history);
     assert(child->step);
   }
+
+  sort_children(*leaf, vertex_comparator(*leaf));
 }
 
 //! Cut non-(dis-)proof children of this vertex.
 //!
 //! \returns Number of vertices cut.
 std::size_t cut(vertex& parent) {
-  vertex_counter cut_counter;
-
-  if ((parent.type == vertex::type_or && parent.proof_number == 0)
-      || (parent.type == vertex::type_and && parent.disproof_number == 0)) {
+  if (parent.children_count() > 0 &&
+      ((parent.type == vertex::type_or && parent.proof_number == 0)
+       || (parent.type == vertex::type_and && parent.disproof_number == 0))) {
     vertex::number_t vertex::* num = parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
+    vertex_counter cut_counter;
 
     // Only one child is required as a proof here.
     vertex::children_iterator proof = parent.children_end();
@@ -316,13 +325,10 @@ std::size_t cut(vertex& parent) {
     // No proof.
     vertex_counter counter;
     traverse(parent, backtrack(), boost::ref(counter));
-
     parent.resize(0);
     parent.pack();
     return counter.count - 1;  // parent has not been removed, but it's been counted.
   }
-
-  return cut_counter.count;
 }
 
 void process_new(vertex& child, vertex const& parent, piece::color_t attacker, step const& step, 
@@ -483,7 +489,7 @@ void depth_first_pns::do_iterate() {
   while (!path.empty() 
          && (path.back()->proof_number == 0 || path.back()->proof_number > limits.back().pn_limit 
              || path.back()->disproof_number > limits.back().dn_limit)) {
-    if (max_size == 0 || path.back()->proof_number == 0 || path.back()->disproof_number == 0)
+    if (gc_high == 0 || path.back()->proof_number == 0 || path.back()->disproof_number == 0)
       position_count -= cut(*path.back());
 
     history.pop(*path.back());
@@ -520,8 +526,7 @@ void depth_first_pns::do_iterate() {
     hashes.push(*path.back());
   }
 
-  if (max_size > 0 && position_count > max_size)
-    garbage_collect();
+  garbage_collect();
 }
 
 depth_first_pns::limits_t depth_first_pns::make_limits(vertex& v, vertex& parent, boost::optional<vertex&> second_best,
@@ -544,38 +549,106 @@ depth_first_pns::limits_t depth_first_pns::make_limits(vertex& v, vertex& parent
   return new_limits;
 }
 
-void depth_first_pns::garbage_collect() {
-  using detail::cut;
+namespace detail {
 
-  std::stack<vertex::children_iterator> stack;
-  vertex* current = &game->root;
-  path_cont::iterator on_path = path.begin();
+//! Traversal policy that backtracks the tree in a post-order, worst-first manner and leaves out the best N children of each
+//! subtree. It never traverses the root vertex.
+struct gc_traversal {
+  static std::size_t const LEAVE_OUT = 2; //!< How many best vertices are to be left out in each ply.
 
-  while (position_count > max_size) {
-    ++on_path;
-    if (on_path == path.end())
-      break;
+  typedef std::stack<std::pair<apns::vertex::reverse_children_iterator, apns::vertex::reverse_children_iterator> > stack_t;
 
-    typedef std::vector<vertex*> level_t;
-    std::vector<vertex*> level;
-    for (vertex::children_iterator child = current->children_begin(); child != current->children_end(); ++child)
-      if (child != *on_path && child->children_count() > 0 && child->proof_number != 0 && child->disproof_number != 0)
-        level.push_back(child);
+public:
+  vertex::children_iterator operator () (apns::vertex& v) {
+    using namespace apns;
 
-    std::sort(level.begin(), level.end(), vertex_ptr_comparator(current));
+    if (stack.empty())
+      return inc(recurse(v));
 
-    level_t::reverse_iterator child = level.rbegin();
-    while (child != level.rend() && position_count > max_size)
-      position_count -= cut(**child++);
+    if (stack.top().first != stack.top().second)
+      return inc(recurse(*stack.top().first));
+    else {
+      while (!stack.empty() && stack.top().first == stack.top().second)
+        stack.pop();
 
-    current = *on_path;
+      if (!stack.empty())
+        return forward_from_backward(stack.top().first++);
+      else
+        return vertex::children_iterator();
+    }
   }
 
-#ifndef NDEBUG
-    vertex_counter counter;
-    traverse(game->root, backtrack(), boost::ref(counter));
-    assert(counter.count == position_count);
-#endif
+private:
+  stack_t stack;
+
+  //! Convert a reverse iterator to a forward one pointing to the same position.
+  vertex::children_iterator forward_from_backward(vertex::reverse_children_iterator i) {
+    return i.base() - 1;
+  }
+
+  //! If an iterator is given, increment it and return the original. If boost::none is given, return a singular iterator.
+  vertex::children_iterator inc(boost::optional<vertex::reverse_children_iterator&> v) {
+    if (v)
+      return forward_from_backward((*v)++);
+    else
+      return vertex::children_iterator();
+  }
+
+  //! Recurse to subtree.
+  boost::optional<vertex::reverse_children_iterator&> recurse(vertex& from) {
+    using namespace apns;
+
+    vertex* current = &from;
+    while (current->children_count() > LEAVE_OUT) {
+      stack.push(std::make_pair(current->children_rbegin(), current->children_rend() - LEAVE_OUT));
+      current = &*current->children_rbegin();
+    }
+
+    if (!stack.empty())
+      return stack.top().first;
+    else
+      return boost::none;
+  }
+};
+
+//! Visitor that cuts children of the visited vertex and decreases the position count.
+struct cutter {
+  std::size_t* count;  //!< Pointer to the total position count in the tree.
+
+  explicit cutter(std::size_t& count) : count(&count) { }
+  void operator () (vertex& v) { *count -= detail::cut(v); }
+};
+
+//! Traversal stop policy that stops the algorithm when the position count drops below the given level.
+struct gc_stop {
+  gc_stop(std::size_t& count, std::size_t low) :
+    count(&count),
+    low(low)
+  { }
+
+  bool operator () (vertex&) {
+    return *count <= low;
+  }
+
+private:
+  std::size_t* count;
+  std::size_t  low;
+};
+
+}  // namespace detail
+
+void depth_first_pns::garbage_collect() {
+  using detail::cutter;
+  using detail::gc_traversal;
+  using detail::gc_stop;
+
+  if (gc_high > 0 && position_count > gc_high) {
+    path_cont::iterator start = path.begin();
+    while (position_count > gc_low && start != path.end()) {
+      traverse_postorder(**start, gc_traversal(), cutter(position_count), gc_stop(position_count, gc_low));
+      ++start;
+    }
+  }
 }
 
 } // namespace apns
