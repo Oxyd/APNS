@@ -142,8 +142,8 @@ class SearchParameters:
     self.transTblSize       = None
     self.transTblKeepTime   = None
     self.killersCount       = 2
-    self.gcHigh             = 0
-    self.gcLow              = 0
+    self.gcHigh             = 5000000
+    self.gcLow              = 3000000
 
 
 class SearchProgress:

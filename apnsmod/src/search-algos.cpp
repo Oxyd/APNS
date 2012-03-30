@@ -498,7 +498,7 @@ void depth_first_pns::do_iterate() {
   while (!path.empty() 
          && (path.back()->proof_number == 0 || path.back()->proof_number > limits.back().pn_limit 
              || path.back()->disproof_number > limits.back().dn_limit)) {
-    if (gc_high == 0 || path.back()->proof_number == 0 || path.back()->disproof_number == 0)
+    if (gc_high == 0)
       position_count -= cut(*path.back());
 
     history.pop(*path.back());

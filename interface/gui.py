@@ -180,6 +180,8 @@ class MainWindowController(object):
         pars.memoryLimit = newPrefs.memLimit if newPrefs.memLimitCheck else None
         pars.transTblSize = newPrefs.transTblSize
         pars.killersCount = newPrefs.killersCount
+        pars.gcHigh = newPrefs.gcHigh if newPrefs.gcCheck else 0
+        pars.gcLow = newPrefs.gcLow if newPrefs.gcCheck else 0
 
         #self._search.useTransTbl(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
         dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
@@ -192,10 +194,12 @@ class MainWindowController(object):
 
         self._mainWindowDsply.window.focus_set()
         self._mainWindowDsply.enableStats()
-    
+
     elif command == MainWindow.Command.resetSearch:
-      self._controller.resetGame()
-      self._resultsCtrl.updateTree(self._controller)
+      if tkMessageBox.askyesno('Reset', 'Discard whole search?'):
+        self._controller.resetGame()
+        self._resultsCtrl.updateTree(self._controller)
+        self._mainWindowDsply.disableStats()
 
     elif command == MainWindow.Command.savePosition:
       filename = tkFileDialog.asksaveasfilename()
@@ -228,18 +232,6 @@ class MainWindowController(object):
 
     elif command == MainWindow.Command.close:
       self._mainWindowDsply.destroy()
-
-
-  def _resetSearch(self, newSearch):
-    '''Make the interface control a new search.'''
-
-    self._search = newSearch
-    self._resultsCtrl.attachToSearch(self._search)
-    if self._search is not None:
-      self._mainWindowDsply.enableSearch()
-    else:
-      self._mainWindowDsply.disableSearch()
-    self._searchTotalTime = 0
 
 
 class ResultsDisplay(Observable):
@@ -836,9 +828,15 @@ class RunSearchDialog(Observable):
                           lambda self, val: self.setTransTblSize(val))
   killersCount = property(lambda self: self._killersSpinVar.get(),
                           lambda self, val: self.setKillers(val))
+  gcCheck = property(lambda self: self._gcCheckVar.get() == '1',
+                     lambda self, val: self.enableGC(val))
+  gcHigh = property(lambda self: self._gcHigh.get(),
+                    lambda self, val: self.setGCHigh(val))
+  gcLow = property(lambda self: self._gcLow.get(),
+                   lambda self, val: self.setGCLow(val))
 
   class Command:
-    timeLimitCheck, positionLimitCheck, memLimitCheck, start = range(4)
+    timeLimitCheck, positionLimitCheck, memLimitCheck, gcCheck, start = range(5)
 
   def __init__(self, parent):
     '''Create the dialog.'''
@@ -854,8 +852,30 @@ class RunSearchDialog(Observable):
     pnsRadio = ttk.Radiobutton(algoFrame, text='Proof-Number Search', variable=self._algoVar, value='pns')
     dfPnRadio = ttk.Radiobutton(algoFrame, text='Depth-First Proof-Number Search', variable=self._algoVar, value='dfpns')
 
-    pnsRadio.grid(row=0, column=0, sticky='WE')
-    dfPnRadio.grid(row=1, column=0, sticky='WE')
+    pnsRadio.grid(row=0, column=0, columnspan=3, sticky='WE')
+    dfPnRadio.grid(row=1, column=0, columnspan=3, sticky='WE')
+
+    self._gcCheckVar = Tkinter.StringVar(value='1')
+    gcCheck = ttk.Checkbutton(algoFrame, text='Garbage Collector', variable=self._gcCheckVar,
+                              command=lambda: self.notifyObservers(command=RunSearchDialog.Command.gcCheck))
+    gcHighLabel = ttk.Label(algoFrame, text='High threshold:')
+    gcLowLabel = ttk.Label(algoFrame, text='Low threshold:')
+    gcHighUnits = ttk.Label(algoFrame, text='positions')
+    gcLowUnits = ttk.Label(algoFrame, text='positions')
+
+    self._gcHigh = Tkinter.StringVar(value='5000000')
+    self._gcLow = Tkinter.StringVar(value='1000000')
+
+    self._gcHighSpin = Tkinter.Spinbox(algoFrame, from_=1, to=9999999999, textvariable=self._gcHigh)
+    self._gcLowSpin = Tkinter.Spinbox(algoFrame, from_=1, to=9999999999, textvariable=self._gcLow)
+
+    gcCheck.grid(row=2, column=0, columnspan=3, sticky='WE', pady=(5, 0))
+    gcHighLabel.grid(row=3, column=0, sticky='E', padx=(30, 0))
+    self._gcHighSpin.grid(row=3, column=1, sticky='WE', padx=5)
+    gcHighUnits.grid(row=3, column=2, sticky='W')
+    gcLowLabel.grid(row=4, column=0, sticky='E', padx=(30, 0))
+    self._gcLowSpin.grid(row=4, column=1, sticky='WE', padx=5)
+    gcLowUnits.grid(row=4, column=2, sticky='W')
 
     limitsFrame = ttk.Labelframe(self._dialog.content, text='Search limits:', padding=5)
 
@@ -875,7 +895,7 @@ class RunSearchDialog(Observable):
                                                command=lambda: self.notifyObservers(
                                                                       command=RunSearchDialog.Command.positionLimitCheck))
     self._positionLimitVar = Tkinter.StringVar(value='0')
-    self._positionLimitSpin = Tkinter.Spinbox(limitsFrame, from_=1, to=99999999999999999,
+    self._positionLimitSpin = Tkinter.Spinbox(limitsFrame, from_=1, to=99999999999,
                                               textvariable=self._positionLimitVar)
     positionLimitUnits = ttk.Label(limitsFrame, text='positions')
 
@@ -884,7 +904,7 @@ class RunSearchDialog(Observable):
                                           variable=self._memLimitCheckVar,
                                           command=lambda: self.notifyObservers(command=RunSearchDialog.Command.memLimitCheck))
     self._memLimitVar = Tkinter.StringVar(value='0')
-    self._memLimitSpin = Tkinter.Spinbox(limitsFrame, from_=1, to=99999999999999999,
+    self._memLimitSpin = Tkinter.Spinbox(limitsFrame, from_=1, to=999999999999,
                                          textvariable=self._memLimitVar)
     memLimitUnits = ttk.Label(limitsFrame, text='MB')
 
@@ -898,7 +918,7 @@ class RunSearchDialog(Observable):
     self._memorySpinVar = Tkinter.StringVar(value='0')
 
     self._killersSpin = Tkinter.Spinbox(algoParamsFrame, from_=1, to=50, textvariable=self._killersSpinVar)
-    self._memorySpin = Tkinter.Spinbox(algoParamsFrame, from_=1, to=999999999999999999,
+    self._memorySpin = Tkinter.Spinbox(algoParamsFrame, from_=1, to=99999999,
                                        textvariable=self._memorySpinVar)
 
     runBtn = ttk.Button(self._dialog.buttonBox, text='Run', command=self._execute)
@@ -916,7 +936,7 @@ class RunSearchDialog(Observable):
     self._memLimitSpin.grid(row=2, column=1, sticky='WE', padx=5)
     memLimitUnits.grid(row=2, column=2, sticky='W')
 
-    algoFrame.columnconfigure(0, weight=1)
+    algoFrame.columnconfigure(1, weight=1)
     algoFrame.grid(row=1, column=0, sticky='WE', pady=(0, 5))
 
     limitsFrame.columnconfigure(1, weight=1)
@@ -1010,6 +1030,31 @@ class RunSearchDialog(Observable):
     self._memLimitVar.set(int(value))
 
 
+  def enableGC(self, enable):
+    '''Enable or disable garbage collector.'''
+
+    if enable:
+      self._gcHighSpin['state'] = ['normal']
+      self._gcLowSpin['state'] = ['normal']
+      self._gcCheckVar.set('1')
+    else:
+      self._gcHighSpin['state'] = ['disabled']
+      self._gcLowSpin['state'] = ['disabled']
+      self._gcCheckVar.set('0')
+
+
+  def setGCHigh(self, val):
+    '''Set GC high threshold.'''
+
+    self._gcHigh.set(val)
+
+
+  def setGCLow(self, val):
+    '''Set GC low threshold.'''
+
+    self._gcLow.set(val)
+
+
   def setTransTblSize(self, value):
     '''Set the transposition table size spinbox to the given value.'''
 
@@ -1038,6 +1083,8 @@ class RunSearchController(object):
   transTblSize = property(lambda self: self._transTblSize)
   killersCount = property(lambda self: self._killersCount)
   showTimeLeft = property(lambda self: self._showTimeLeft)
+  gcHigh = property(lambda self: self._gcHigh)
+  gcLow = property(lambda self: self._gcLow)
 
   def __init__(self, runSearchDlg, parameters):
     '''Create the controller and attach it to the dialog and search.
@@ -1058,9 +1105,12 @@ class RunSearchController(object):
 
     self._runSearchDlg.addObserver(self)
     self._runSearchDlg.algo = get('algo', 'pns')
+    self._runSearchDlg.gcHigh = get('gcHigh', '5000000')
+    self._runSearchDlg.gcLow = get('gcLow', '1000000')
+    self._runSearchDlg.gcCheck = get('gcCheck', True)
     self._runSearchDlg.timeLimit = get('timeLimit', 60)
     self._runSearchDlg.timeLimitCheck = get('timeLimitCheck', True)
-    self._runSearchDlg.positionLimit = get('positionLimit', 10000)
+    self._runSearchDlg.positionLimit = get('positionLimit', 10000000)
     self._runSearchDlg.positionLimitCheck = get('positionLimitCheck', False)
     self._runSearchDlg.memLimit = get('memLimit', 1500)
     self._runSearchDlg.memLimitCheck = get('memLimitCheck', not is64Bit)
@@ -1107,6 +1157,13 @@ class RunSearchController(object):
         else:
           memLimit = None
 
+        if self._runSearchDlg.gcCheck:
+          gcHigh = int(self._runSearchDlg.gcHigh)
+          gcLow = int(self._runSearchDlg.gcLow)
+        else:
+          gcHigh = None
+          gcLow = None
+
         self._algo = self._runSearchDlg.algo
         self._transTblSize = (int(self._runSearchDlg.transTblSize) * MB) / apnsmod.TranspositionTable.sizeOfElement
         self._timeLimit = sTimeLimit
@@ -1114,6 +1171,8 @@ class RunSearchController(object):
         self._memLimit = memLimit
         self._showTimeLeft = showTimeLeft
         self._killersCont = self._runSearchDlg.killersCount
+        self._gcHigh = gcHigh
+        self._gcLow = gcLow
 
         self._lastSetValues = SearchParameters()
         last = self._lastSetValues
@@ -1127,6 +1186,9 @@ class RunSearchController(object):
         last.memLimitCheck = bool(self._runSearchDlg.memLimitCheck)
         last.transTblSize = int(self._runSearchDlg.transTblSize)
         last.killersCount = int(self._runSearchDlg.killersCount)
+        last.gcCheck = bool(self._runSearchDlg.gcCheck)
+        last.gcHigh = int(self._runSearchDlg.gcHigh)
+        last.gcLow = int(self._runSearchDlg.gcLow)
 
         self._doRun = True
         self._runSearchDlg.close()
@@ -1139,6 +1201,9 @@ class RunSearchController(object):
 
     elif command == RunSearchDialog.Command.memLimitCheck:
       self._runSearchDlg.enableMemLimit(self._runSearchDlg.memLimitCheck)
+
+    elif command == RunSearchDialog.Command.gcCheck:
+      self._runSearchDlg.enableGC(self._runSearchDlg.gcCheck)
 
 
   def _validateInput(self):
@@ -1162,7 +1227,9 @@ class RunSearchController(object):
             and checkVar(dlg.positionLimitCheck, dlg.positionLimit, 'Position limit')
             and checkVar(dlg.memLimitCheck, dlg.memLimit, 'Memory limit')
             and checkVar(True, dlg.transTblSize, 'Size of transposition table')
-            and checkVar(True, dlg.killersCount, 'Killers count'))
+            and checkVar(True, dlg.killersCount, 'Killers count')
+            and checkVar(dlg.gcCheck, dlg.gcHigh, 'GC high threshold')
+            and checkVar(dlg.gcCheck, dlg.gcLow, 'GC low threshold'))
 
 
 class SearchProgressDialog(Observable):
@@ -1189,7 +1256,7 @@ class SearchProgressDialog(Observable):
 
     stats = ttk.Labelframe(self._dialog.content, text='Statistics:', padding=3)
 
-    memoryAllocLbl = ttk.Label(stats, text='Search memory usage:')
+    memoryAllocLbl = ttk.Label(stats, text='Tree memory usage:')
     transTblSizeLbl = ttk.Label(stats, text='Transposition table size:')
     transTblHitsLbl = ttk.Label(stats, text='Transposition table hits:')
     transTblMissesLbl = ttk.Label(stats, text='Transposition table misses:')
