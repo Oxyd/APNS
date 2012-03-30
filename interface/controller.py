@@ -135,15 +135,15 @@ def saveBoard(board, moveNumber, player, filename):
 
 class SearchParameters:
   def __init__(self):
-    self.algo             = None
-    self.timeLimit        = None
-    self.positionLimit    = None
-    self.memoryLimit      = None
-    self.transTblSize     = None
-    self.transTblKeepTime = None
-    self.killersCount     = 2
-    self.gcHigh           = 0
-    self.gcLow            = 0
+    self.algo               = None
+    self.timeLimit          = None
+    self.positionLimit      = None
+    self.memoryLimit        = None
+    self.transTblSize       = None
+    self.transTblKeepTime   = None
+    self.killersCount       = 2
+    self.gcHigh             = 0
+    self.gcLow              = 0
 
 
 class SearchProgress:
@@ -250,12 +250,13 @@ class Controller(object):
     if self._search is None or type(self._search) != self._algoType(self.searchParameters.algo):
       self._search = self._algoType(self.searchParameters.algo)(self._game, self._posCount)
 
+    def numElementsFromMbSize(mbSize, tableType):
+      bSize = mbSize * MB
+      return bSize / (tableType.sizeOfElement)
+
     if self.searchParameters.transTblSize > 0 and (
         self._search.transpositionTable is None or self._search.transpositionTable.size != self.searchParameters.transTblSize):
-      mbSize = self.searchParameters.transTblSize
-      bSize = mbSize * MB
-      elements = bSize / (apnsmod.TranspositionTable.sizeOfElement)
-      self._search.useTransTbl(elements, 16)  # XXX: Trans tbl keep time not user-settable.
+      self._search.useTransTbl(numElementsFromMbSize(self.searchParameters.transTblSize, apnsmod.TranspositionTable), 16)
 
     self._search.killerCount = self.searchParameters.killersCount
     self._search.gcHigh = self.searchParameters.gcHigh

@@ -21,13 +21,13 @@ bool repetition(apns::board const& board, apns::piece::color_t player, apns::his
   bool lose = false;
 
   if (!history.empty()) {
-    if (history.back().player == player && history.back().position == board)
+    if (history.back().on_move == player && history.back().position == board)
       lose = true;  // Lead doesn't move to a net change in overall position.
     else {
       // Check for third-time repetitions.
       unsigned count = 0;
       for (history_stack::records_cont::const_iterator h = history.begin(); h != history.end(); ++h)
-        if (h->player == player && h->position == board)
+        if (h->on_move == player && h->position == board)
           ++count;
 
       if (count >= 3)
@@ -259,7 +259,7 @@ void update_numbers(vertex& v) {
 namespace detail {
 
 void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, transposition_table* trans_tbl, 
-            hashes_stack& hashes, history_stack::records_cont const& history) {
+            hashes_stack& hashes, history_stack const& history) {
   assert(leaf->children_count() == 0);  // leaf is a leaf.
   assert(leaf->proof_number != 0 || leaf->disproof_number != 0); // It's not (dis-)proven yet.
 
@@ -333,7 +333,7 @@ std::size_t cut(vertex& parent) {
 
 void process_new(vertex& child, vertex const& parent, piece::color_t attacker, step const& step, 
                  vertex::e_type type, transposition_table* trans_tbl, hashes_stack& hashes, board_stack& state,
-                 history_stack::records_cont const& history) {
+                 history_stack const& history) {
   piece::color_t const player = parent.type == vertex::type_or ? attacker : opponent_color(attacker);
 
   child.step = step;
@@ -382,7 +382,7 @@ void process_new(vertex& child, vertex const& parent, piece::color_t attacker, s
     }
   } else {
     // Check for repetitions.
-    if (type == parent.type || !repetition(state.top(), player, history)) {
+    if (type == parent.type || !repetition(state.top(), player, history.records())) {
       child.proof_number    = 1;
       child.disproof_number = 1;
     } else {
@@ -402,6 +402,7 @@ bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_
 
   for (killer_db::ply_iterator killer = killers.ply_begin(ply + 1, parent.type); killer != killers.ply_end(ply + 1, parent.type); ++killer)
     if (killer->revalidate(boards.top(), player)) {
+
       vertex::e_type type;
       if (parent.steps_remaining - static_cast<signed>(killer->steps_used()) >= 1)
         type = parent.type;
@@ -411,7 +412,7 @@ bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_
         continue;
 
       vertex::children_iterator child = parent.add_child();
-      process_new(*child, parent, attacker, *killer, type, 0, hashes, boards, history.records());
+      process_new(*child, parent, attacker, *killer, type, 0, hashes, boards, history);
 
       if ((parent.type == vertex::type_or && child->proof_number == 0)
           || (parent.type == vertex::type_and && child->disproof_number == 0)) {
@@ -448,26 +449,34 @@ void proof_number_search::do_iterate() {
   assert(game);
   assert(!game->root.step);
 
-  hash_visitor    hash_v(hasher, initial_hash, game->attacker);
-  path_visitor    path_v;
-  history_visitor history_v(game->attacker);
-  board_visitor<
-    boost::reference_wrapper<history_visitor>
-  > board_v(game->initial_state, boost::ref(history_v));
+  board_stack     boards(game->initial_state);
+  history_stack   history(game->attacker);
+  hashes_stack    hashes(hasher, initial_hash, game->attacker);
 
-  traverse(
-    game->root,
-    &best_successor,
-    make_composite_visitor(
-      boost::ref(hash_v),
-      make_composite_visitor(
-        boost::ref(path_v),
-        boost::ref(board_v))));
-  
-  assert(hash_v.hashes().size() == path_v.path.size());
+  typedef std::vector<vertex*> path_cont;
+  path_cont path;
 
-  process_leaf(path_v.path.begin(), path_v.path.end(), board_v.get_board_stack(), hash_v.stack(), 
-               history_v.get_history_stack());
+  vertex* current = &game->root;
+
+  do {
+    path.push_back(current);
+    if (current->step)
+      boards.push(*current->step);
+    hashes.push(*current);
+    history.push(*current, boards.top());
+
+    vertex::children_iterator next = best_successor(*current);
+    if (next != current->children_end())
+      current = &*next;
+    else
+      current = 0;
+  } while (current);
+
+  assert(path.size() == hashes.hashes().size());
+
+  process_leaf(path.begin(), path.end(), boards, hashes, history);
+
+  garbage_collect();
 }
 
 void depth_first_pns::do_iterate() {
@@ -522,8 +531,8 @@ void depth_first_pns::do_iterate() {
 
     if (path.back()->step)
       boards.push(*path.back()->step);
-    history.push(*path.back(), boards.top());
     hashes.push(*path.back());
+    history.push(*path.back(), boards.top());
   }
 
   garbage_collect();
@@ -547,108 +556,6 @@ depth_first_pns::limits_t depth_first_pns::make_limits(vertex& v, vertex& parent
     new_limits.*dif_lim = vertex::infty;
 
   return new_limits;
-}
-
-namespace detail {
-
-//! Traversal policy that backtracks the tree in a post-order, worst-first manner and leaves out the best N children of each
-//! subtree. It never traverses the root vertex.
-struct gc_traversal {
-  static std::size_t const LEAVE_OUT = 2; //!< How many best vertices are to be left out in each ply.
-
-  typedef std::stack<std::pair<apns::vertex::reverse_children_iterator, apns::vertex::reverse_children_iterator> > stack_t;
-
-public:
-  vertex::children_iterator operator () (apns::vertex& v) {
-    using namespace apns;
-
-    if (stack.empty())
-      return inc(recurse(v));
-
-    if (stack.top().first != stack.top().second)
-      return inc(recurse(*stack.top().first));
-    else {
-      while (!stack.empty() && stack.top().first == stack.top().second)
-        stack.pop();
-
-      if (!stack.empty())
-        return forward_from_backward(stack.top().first++);
-      else
-        return vertex::children_iterator();
-    }
-  }
-
-private:
-  stack_t stack;
-
-  //! Convert a reverse iterator to a forward one pointing to the same position.
-  vertex::children_iterator forward_from_backward(vertex::reverse_children_iterator i) {
-    return i.base() - 1;
-  }
-
-  //! If an iterator is given, increment it and return the original. If boost::none is given, return a singular iterator.
-  vertex::children_iterator inc(boost::optional<vertex::reverse_children_iterator&> v) {
-    if (v)
-      return forward_from_backward((*v)++);
-    else
-      return vertex::children_iterator();
-  }
-
-  //! Recurse to subtree.
-  boost::optional<vertex::reverse_children_iterator&> recurse(vertex& from) {
-    using namespace apns;
-
-    vertex* current = &from;
-    while (current->children_count() > LEAVE_OUT) {
-      stack.push(std::make_pair(current->children_rbegin(), current->children_rend() - LEAVE_OUT));
-      current = &*current->children_rbegin();
-    }
-
-    if (!stack.empty())
-      return stack.top().first;
-    else
-      return boost::none;
-  }
-};
-
-//! Visitor that cuts children of the visited vertex and decreases the position count.
-struct cutter {
-  std::size_t* count;  //!< Pointer to the total position count in the tree.
-
-  explicit cutter(std::size_t& count) : count(&count) { }
-  void operator () (vertex& v) { *count -= detail::cut(v); }
-};
-
-//! Traversal stop policy that stops the algorithm when the position count drops below the given level.
-struct gc_stop {
-  gc_stop(std::size_t& count, std::size_t low) :
-    count(&count),
-    low(low)
-  { }
-
-  bool operator () (vertex&) {
-    return *count <= low;
-  }
-
-private:
-  std::size_t* count;
-  std::size_t  low;
-};
-
-}  // namespace detail
-
-void depth_first_pns::garbage_collect() {
-  using detail::cutter;
-  using detail::gc_traversal;
-  using detail::gc_stop;
-
-  if (gc_high > 0 && position_count > gc_high) {
-    path_cont::iterator start = path.begin();
-    while (position_count > gc_low && start != path.end()) {
-      traverse_postorder(**start, gc_traversal(), cutter(position_count), gc_stop(position_count, gc_low));
-      ++start;
-    }
-  }
 }
 
 } // namespace apns

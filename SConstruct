@@ -44,7 +44,7 @@ if platform == 'win32':
 
   Alias('doc', doc)
 
-Export('debug', 'bits', 'toolchain', config=config[platform][toolchain])
+Export('debug', 'profile', 'bits', 'toolchain', config=config[platform][toolchain])
 
 subTargets = SConscript('apnsmod/SConscript')
 apnslib = subTargets['apnslib']

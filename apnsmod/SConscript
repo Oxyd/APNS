@@ -1,7 +1,7 @@
 from sys import platform
 from os import environ
 
-Import(['debug', 'config', 'bits', 'toolchain'])
+Import(['debug', 'profile', 'config', 'bits', 'toolchain'])
 
 envArgs = dict()
 envArgs['ENV'] = environ
@@ -41,12 +41,22 @@ if 'link-flags' in config:    env.Append(LINKFLAGS=config['link-flags'])
 # Process any extra configuration that needs to be done for this platform.
 if 'extra' in config: config['extra'](env)
 
-sources = Glob('src/*.cpp') + Glob('src/py-bindings/*.cpp')
-results = dict()
-
 buildEnv = env.Clone()
 buildEnv.Append(CPPPATH=['src/'])
-buildEnv.VariantDir('build', 'src', duplicate=0)
+
+if debug == 0 and profile == 0:
+  buildDir = 'release'
+elif debug == 1:
+  buildDir = 'debug'
+elif profile == 1:
+  buildDir = 'profile'
+else:
+  buildDir = 'generic'
+
+buildEnv.VariantDir(buildDir, 'src', duplicate=0)
+
+sources = Glob(buildDir + '/*.cpp') + Glob(buildDir + '/py-bindings/*.cpp')
+results = dict()
 
 apnslib = buildEnv.SharedLibrary(target='_apnsmod', source=sources)
 results['apnslib'] = apnslib

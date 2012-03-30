@@ -116,24 +116,17 @@ zobrist_hasher::hash_t zobrist_hasher::update(hash_t old_hash, Iter steps_begin,
   return hash;
 }
 
+namespace detail {
 
-/**
- * A transposition table serves as a cache for already explored positions -- vertices of the search tree. Vertices are indexed
- * by their hash values as given by the supplied Hasher algorithm.
- *
- * If the user code attempts store a vertex with a hash that's already in use, the new vertex will only replace the old one
- * if the old one has been in the table for too long. How long is too long is specified by the \c keep_time parameter. Time is
- * measured in iterations of the main algorithm loop. The timer is updated by calling the #tick function at the start of each
- * iteration.
- *
- * The table allocates its memory in 1MB-sized pages in order to avoid huge allocation at the start of the algorithm.
- *
- * \tparam Hasher Hashing algorithm that is used to make the keys.
- */
-class transposition_table : boost::noncopyable {
+//! Storage of records that can be accessed by their Hash value. Collisions are ignored on query. If a collision occurs
+//! on insertion, and the old entry was not recently accessed, it is replaced; otherwise, the new value is not stored.
+template <typename Entry, typename Hash>
+class table : boost::noncopyable {
 public:
   //! Type of values stored in the table.
-  typedef std::pair<vertex::number_t, vertex::number_t> entry_t;
+  typedef Entry entry_t;
+  typedef Hash  hash_t;
+  static std::size_t const SIZE_OF_ELEMENT;  //!< Size, in bytes, of one element of the table.
   
 private:
   typedef unsigned iteration_t;
@@ -149,34 +142,68 @@ private:
   };
 
 public:
-  typedef zobrist_hasher::hash_t hash_t;
-  static std::size_t const SIZE_OF_ELEMENT;  //!< Size, in bytes, of one element of the table.
-
   /**
    * Create a transposition table.
    * \param table_size Capacity, in number of elements, of this table.
    * \param keep_time How long should a record be kept before it can be replaced by another one?
    */
-  transposition_table(std::size_t table_size, std::size_t keep_time);
+  table(std::size_t table_size, std::size_t keep_time)
+    : table_size(table_size)
+    , keep_time(keep_time)
+    , pages((table_size / PAGE_RECORDS) + (table_size % PAGE_RECORDS != 0 ? 1 : 0))  // pages := ceil(table_size / PAGE_RECORDS)
+    , dir(new page_ptr[pages])
+    , now(1)
+    , allocated_pages(0)
+    , elements(0)
+    , hits(0)
+    , misses(0)
+  {
+    assert(sizeof(page) <= PAGE_SIZE);
+    assert(pages * PAGE_RECORDS >= table_size);
+  }
 
   /**
    * Insert an element to the table.
    * \param hash Key of the element.
    * \param vertex Value of the element.
    */
-  void insert(hash_t hash, entry_t entry);
+  void insert(hash_t hash, entry_t entry) {
+    record& r = find_record(hash);
+    if (r.last_accessed == NEVER || now - r.last_accessed > keep_time) {
+      if (r.last_accessed == NEVER)
+        ++elements;
+      r.entry = entry;
+      r.last_accessed = now;
+    }
+  }
 
   /**
    * Try to retreive an element from the table.
    * \param hash The key.
    * \returns Either the found element or an empty pointer if the element wasn't found.
    */
-  boost::optional<entry_t> query(hash_t hash);
+  boost::optional<entry_t> query(hash_t hash) {
+    record& r = find_record(hash);
+    if (r.last_accessed != NEVER) {
+      r.last_accessed = now;
+      ++hits;
+
+      return r.entry;
+    } else {
+      ++misses;
+      return boost::none;
+    }
+  }
 
   //! Update the internal iteration-count timer. Call this each iteration of the search algorithm.
-  void tick();
+  void tick() {
+    ++now;
+  }
 
-  std::size_t get_memory_usage() const;                       //!< Get the amount of memory, in bytes, of this table.
+  std::size_t get_memory_usage() const {                      //!< Get the amount of memory, in bytes, of this table.
+    return allocated_pages * PAGE_SIZE + pages * sizeof(page_ptr);
+  }
+
   std::size_t get_table_size() const  { return table_size; }  //!< Get the maximal number of elements storeable in this table.
   std::size_t get_elements() const    { return elements; }    //!< Get the number of elements currently stored in the table.
   std::size_t get_hits() const        { return hits; }        //!< Get the number of successful retreivals from the table.
@@ -190,24 +217,132 @@ private:
   typedef boost::scoped_ptr<page> page_ptr;         //!< Pointer to page.
   typedef boost::scoped_array<page_ptr> directory;  //!< Directory of pages.
 
-  std::size_t page_number(std::size_t index) const;  //!< Given an index of an element, get the index into the directory.
-  std::size_t page_offset(std::size_t index) const;  //!< Given an index of an element, get the index into the page.
+  std::size_t page_number(std::size_t index) const {  //!< Given an index of an element, get the index into the directory.
+    return index / PAGE_RECORDS;
+  }
+  std::size_t page_offset(std::size_t index) const {  //!< Given an index of an element, get the index into the page.
+    return index % PAGE_RECORDS;
+  }
+  
+  //! Get the record for given hash.
+  record& find_record(hash_t hash) {
+    page_ptr& pg = dir[page_number(hash % table_size)];
+
+    if (pg == 0) {
+      pg.reset(new page);
+      ++allocated_pages;
+    }
+
+    return (*pg)[page_offset(hash % table_size)];
+  }
 
   std::size_t const table_size;    //!< How many elements are there in one page?
   std::size_t const keep_time;     //!< How long to keep an element before it can be replaced?
   std::size_t const pages;         //!< How many pages are there?
 
-  directory table;                 //!< The table itself.
+  directory dir;                   //!< The table itself.
   iteration_t now;                 //!< Current "time" measured in iterations of the search algorithm.
 
   std::size_t allocated_pages;     //!< Number of pages allocated.
   std::size_t elements;            //!< Number of elements stored.
   std::size_t hits;                //!< Number of successful retreivals from the table.
   std::size_t misses;              //!< Number of unsuccessful retreival attempts.
-
-  //! Get the record for given hash.
-  record& find_record(hash_t hash);
 };
+
+template <typename Entry, typename Hash>
+std::size_t const table<Entry, Hash>::SIZE_OF_ELEMENT = sizeof(record);
+
+} // namespace detail
+
+/**
+ * A transposition table serves as a cache for already explored positions -- vertices of the search tree. Vertices are indexed
+ * by their hash values as given by the supplied Hasher algorithm.
+ *
+ * If the user code attempts store a vertex with a hash that's already in use, the new vertex will only replace the old one
+ * if the old one has been in the table for too long. How long is too long is specified by the \c keep_time parameter. Time is
+ * measured in iterations of the main algorithm loop. The timer is updated by calling the #tick function at the start of each
+ * iteration.
+ *
+ * The table allocates its memory in 1MB-sized pages in order to avoid huge allocation at the start of the algorithm.
+ */
+typedef detail::table<std::pair<vertex::number_t, vertex::number_t>, zobrist_hasher::hash_t> transposition_table;
+
+//! A history table stores the proof- and disproof-numbers of each prooved/disprooved vertex. To address the GHI problem,
+//! this table also stores the history of each vertex and compares that on query. This table is indexed by the XOR'ed values
+//! of hashes of each record in the history of the vertex.
+struct history_table {
+  struct history_record {
+    board           position;
+    piece::color_t  on_move;
+
+    history_record() { }
+    history_record(board const& p, piece::color_t o) :
+      position(p),
+      on_move(o)
+    { }
+  };
+
+  typedef std::pair<vertex::number_t, vertex::number_t> entry_t;
+  typedef std::vector<history_record> history_t;
+  typedef zobrist_hasher::hash_t      hash_t;
+
+private:
+  struct stored_entry {
+    history_t   history;
+    entry_t     values;
+
+    stored_entry() { }
+
+    stored_entry(history_t const& h, entry_t v) :
+      history(h),
+      values(v)
+    { }
+  };
+
+public:
+  static std::size_t const SIZE_OF_ELEMENT;
+
+  history_table(std::size_t table_size, std::size_t keep_time) :
+    table(table_size, keep_time),
+    hits(0),
+    misses(0)
+  { }
+
+  void insert(hash_t hash, history_t const& history, entry_t entry) {
+    table.insert(hash, stored_entry(history, entry));
+  }
+
+  boost::optional<entry_t> query(hash_t hash, history_t const& history) {
+    boost::optional<stored_entry> e = table.query(hash);
+    if (e && e->history.size() == history.size() && std::equal(history.begin(), history.end(), e->history.begin())) {
+      ++hits;
+      return e->values;
+    } else {
+      ++misses;
+      return boost::none;
+    }
+  }
+
+  void tick()                           { table.tick(); }
+  std::size_t get_memory_usage() const  { return table.get_memory_usage(); }
+  std::size_t get_table_size() const    { return table.get_table_size(); }
+  std::size_t get_elements() const      { return table.get_elements(); }
+  std::size_t get_hits() const          { return hits; }
+  std::size_t get_misses() const        { return misses; }
+
+private:
+  detail::table<stored_entry, zobrist_hasher::hash_t> table;
+  std::size_t hits;
+  std::size_t misses;
+};
+
+inline bool operator == (history_table::history_record const& lhs, history_table::history_record const& rhs) {
+  return lhs.position == rhs.position && lhs.on_move == rhs.on_move;
+}
+
+inline bool operator != (history_table::history_record const& lhs, history_table::history_record const& rhs) {
+  return !operator == (lhs, rhs);
+}
 
 } // namespace apns
 

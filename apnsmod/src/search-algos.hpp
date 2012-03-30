@@ -31,29 +31,31 @@ boost::optional<piece::color_t> winner(board const& board, piece::color_t player
 //! Compare children of a vertex according to the apropriate number.
 struct vertex_comparator {
   explicit vertex_comparator(vertex const& parent) :
-    number(parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number)
+    number(parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number),
+    parent_type(parent.type)
   { }
 
   bool operator () (vertex const& lhs, vertex const& rhs) {
-    return lhs.*number < rhs.*number;
+    return lhs.*number < rhs.*number || (lhs.*number == rhs.*number && lhs.type == parent_type && rhs.type != parent_type);
   }
 
 private:
-  vertex::number_t vertex::* number;
+  vertex::number_t vertex::*  number;
+  vertex::e_type              parent_type;
 };
 
 //! Compare pointers to children of a vertex according to the apropriate number.
 struct vertex_ptr_comparator {
   explicit vertex_ptr_comparator(vertex const* parent) :
-    number(parent->type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number)
-    { }
+    comp(*parent)
+  { }
 
   bool operator () (vertex const* lhs, vertex const* rhs) {
-    return lhs->*number < rhs->*number;
+    return comp(*lhs, *rhs);
   }
 
 private:
-  vertex::number_t vertex::* number;
+  vertex_comparator comp;
 };
 
 //! Return the best successor of a vertex. Can be used as a traversal policy.
@@ -92,13 +94,7 @@ private:
 
 //! Container for the history of a path. That is, all board states at the point of the beginnings of each player's turn.
 struct history_stack {
-  struct record {
-    apns::board       position;
-    piece::color_t    player;
-
-    record(apns::board const& b, piece::color_t p) : position(b), player(p) { }
-  };
-
+  typedef history_table::history_record record;
   typedef std::vector<record> records_cont;
 
   explicit history_stack(piece::color_t attacker);
@@ -109,9 +105,9 @@ struct history_stack {
   void pop(vertex const& vertex);
 
 private:
-  records_cont    current_records;
-  vertex::e_type  last_visited_type;
-  piece::color_t  attacker;
+  records_cont            current_records;
+  vertex::e_type          last_visited_type;
+  piece::color_t          attacker;
 };
 
 //! History of hashes met during a traversal.
@@ -150,114 +146,6 @@ private:
   hashes_cont           stack;
   zobrist_hasher const* hasher;
   std::stack<last>      last_visited;
-};
-
-//! A meta visitor that keeps track of the current board state and runs another visitor on both the given vertex and the
-//! computed board.
-template <typename SubVisitor = null_board_visitor>
-struct board_visitor {
-  explicit board_visitor(apns::board const& initial_board, SubVisitor sub_visitor = SubVisitor()) :
-    boards(initial_board),
-    sub_visitor(sub_visitor)
-  { }
-
-  apns::board const& get_board() const {
-    return boards.top();
-  }
-
-  board_stack& get_board_stack() {
-    return boards;
-  }
-
-  void operator () (vertex& v) {
-    if (v.step)
-      boards.push(*v.step);
-    boost::unwrap_ref(sub_visitor)(v, boards.top());
-  }
-  
-private:
-  board_stack boards;
-  SubVisitor  sub_visitor;
-};
-
-//! Helper to make a board_visitor.
-template <typename SubVisitor>
-board_visitor<SubVisitor> make_board_visitor(apns::board const& initial_board, SubVisitor sub_visitor) {
-  return board_visitor<SubVisitor>(initial_board, sub_visitor);
-}
-
-inline board_visitor<null_board_visitor> make_board_visitor(apns::board const& initial_board) {
-  return board_visitor<null_board_visitor>(initial_board);
-}
-
-//! A visitor that allows composition of board_visitor sub-visitors. This is analogous to composite_visitor, except
-//! it also passes the computed board to the sub-visitors.
-template <typename First, typename Second>
-struct board_composite_visitor {
-  First   first;
-  Second  second;
-
-  explicit board_composite_visitor(First f = First(), Second s = Second()) :
-    first(f),
-    second(s)
-  { }
-
-  void operator () (vertex& v, board& b) {
-    boost::unwrap_ref(first)(v, b);
-    boost::unwrap_ref(second)(v, b);
-  }
-};
-
-//! Visitor that keeps track of a game history. History is a sequence of pairs (board, player) -- each pair corresponds to a
-//! game state at the beginning of a player's turn. This is a visitor for the board_visitor meta-visitor.
-struct history_visitor {
-  explicit history_visitor(piece::color_t attacker) : h(attacker) { }
-
-  history_stack::records_cont const& get_history() {
-    return h.records();
-  }
-
-  history_stack& get_history_stack() {
-    return h;
-  }
-
-  void operator () (vertex const& v, board const& board) {
-    h.push(v, board);
-  }
-
-private:
-  history_stack h;
-};
-
-//! Visitor that keeps track of the hash of the board. This visitor keeps the complete history of hashes encountered during the
-//! descent.
-struct hash_visitor {
-  //! Construct the visitor.
-  //! \param hasher Hasher used for the algorithm.
-  //! \param initial_hash Hash value of the initial board.
-  //! \param attacker Attacker's colour.
-  hash_visitor(zobrist_hasher const& hasher, zobrist_hasher::hash_t initial_hash, piece::color_t attacker) :
-    stack_(hasher, initial_hash, attacker)
-  { }
-
-  hashes_stack::hashes_cont const& hashes() const { return stack_.hashes(); }
-  hashes_stack& stack()                           { return stack_; }
-  void operator () (vertex const& v)              { stack_.push(v); }
-
-private:
-  hashes_stack stack_;
-};
-
-//! Visitor that keeps track of the visited vertices.
-struct path_visitor {
-  typedef std::vector<vertex*> path_cont;
-
-  //! Vertices on the path root -> leaf, in the order they were encountered.
-  path_cont path;
-
-  void operator () (vertex& v) {
-    path.push_back(&v);
-  }
 };
 
 //! Killer steps database.
@@ -345,15 +233,15 @@ namespace detail {
   //! \param leaf_hash Hash value of leaf_state
   //! \param history Game history gathered during the descend to the leaf.
   void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, transposition_table* trans_tbl,
-              hashes_stack& hashes, history_stack::records_cont const& history);
+              hashes_stack& hashes, history_stack const& history);
 
   //! Cut non-proving (-disproving) children of a vertex.
   std::size_t cut(vertex& parent);
 
   //! Process a newly vertex in the tree.
   void process_new(vertex& child, vertex const& parent, piece::color_t atatcker, step const& step, 
-                   vertex::e_type type, transposition_table* trans_tbl, hashes_stack& hashes, board_stack& state,
-                   history_stack::records_cont const& history);
+                   vertex::e_type type, transposition_table* trans_tbl,
+                   hashes_stack& hashes, board_stack& state, history_stack const& history);
 
   //! Simulate a subtree, if possible.
   //!
@@ -386,7 +274,7 @@ public:
   transposition_table const* get_trans_tbl() const {
     return trans_tbl.get(); 
   }
-
+  
   //! Change the number of killers stored for each ply.
   void set_killer_count(std::size_t new_killer_count) {
     killers.resize_plys(new_killer_count);
@@ -399,22 +287,22 @@ public:
 
   //! Set upper GC treshold. If the tree size exceeds this value, GC will be run.
   void set_gc_high(std::size_t new_max) {
-    static_cast<Algo*>(this)->do_set_gc_high(new_max);
+    gc_high = new_max;
   }
 
   //! Get upper GC treshold.
   std::size_t get_gc_high() const {
-    return static_cast<Algo const*>(this)->do_get_gc_high();
+    return gc_high;
   }
 
   //! Set lower GC treshold. GC will stop collecting once the tree size falls below this value.
   void set_gc_low(std::size_t new_min) {
-    static_cast<Algo*>(this)->do_set_gc_low(new_min);
+    gc_low = new_min;
   }
 
   //! Get lower GC treshold.
   std::size_t get_gc_low() const {
-    return static_cast<Algo const*>(this)->do_get_gc_low();
+    return gc_low;
   }
 
   //! Get the total number of vertices currently held by this algorithm.
@@ -438,24 +326,23 @@ public:
     }
   }
 
-  void        do_set_gc_high(std::size_t) { }
-  std::size_t do_get_gc_high() const { return 0; }
-  void        do_set_gc_low(std::size_t) { }
-  std::size_t do_get_gc_low() const  { return 0; }
-
 protected:
   boost::shared_ptr<apns::game>  game;
-  boost::scoped_ptr<transposition_table> trans_tbl;
+  boost::scoped_ptr<transposition_table>  trans_tbl;
   zobrist_hasher              hasher;         //!< Hasher to be used during the algorithm.
   zobrist_hasher::hash_t      initial_hash;   //!< Hash corresponding to initial_state.
   killer_db                   killers;
   std::size_t                 position_count;
+  std::size_t                 gc_high;
+  std::size_t                 gc_low;
 
   search_algo(boost::shared_ptr<apns::game> const& game, std::size_t position_count = 1) :
     game(game),
     initial_hash(hasher.generate_initial(game->initial_state, game->attacker)),
     killers(2),
-    position_count(position_count)
+    position_count(position_count),
+    gc_high(0),
+    gc_low(0)
   { }
 
   template <typename PathIter>
@@ -477,11 +364,16 @@ protected:
 
       update_numbers(std::reverse_iterator<PathIter>(path_end), std::reverse_iterator<PathIter>(path_begin),
                      hashes_stack.hashes().rbegin());
+
+      leaf = *(path_end - 1);
+      if ((leaf->type == vertex::type_or && leaf->proof_number == 0)
+          || (leaf->type == vertex::type_and && leaf->disproof_number == 0))
+        killers.add(leaf_ply, leaf->type, *leaf->step);
     }
   }
 
-  void expand(vertex::children_iterator leaf, board_stack& state, hashes_stack& hashes, history_stack const& history) {
-    apns::detail::expand(leaf, state, game->attacker, trans_tbl.get(), hashes, history.records());
+  void expand(vertex::children_iterator leaf, board_stack& state, hashes_stack& hashes, history_stack& history) {
+    apns::detail::expand(leaf, state, game->attacker, trans_tbl.get(), hashes, history);
   }
 
   template <typename HashesRevIter, typename PathRevIter>
@@ -499,6 +391,7 @@ protected:
 
       if (current + 1 != path_end) {
         vertex& parent = **(current + 1);
+
         if ((parent.type == vertex::type_or && v.proof_number == 0)
             || (parent.type == vertex::type_and && v.disproof_number == 0))
           killers.add(ply, parent.type, *v.step);
@@ -513,6 +406,107 @@ protected:
       --ply;
     }
   }
+
+  void garbage_collect() {
+    if (gc_high > 0 && position_count > gc_high) {
+      // Traverse along the best path cutting children in worst-first manner. Note that gc_traversal never traverses the best
+      // vertex itself, so we won't cut the best path.
+      
+      vertex* current = &game->root;
+      while (position_count > gc_low && current != 0) {
+        traverse_postorder(*current, gc_traversal(), cutter(position_count), gc_stop(position_count, gc_low));
+
+        if (current->children_count() > 0)
+          current = &*current->children_begin();
+        else
+          current = 0;
+      }
+    }
+  }
+
+private:
+  //! Traversal policy that backtracks the tree in a post-order, worst-first manner and leaves out the best N children of each
+  //! subtree. It never traverses the root vertex.
+  struct gc_traversal {
+    static std::size_t const LEAVE_OUT = 2; //!< How many best vertices are to be left out in each ply.
+
+    typedef std::stack<std::pair<apns::vertex::reverse_children_iterator, apns::vertex::reverse_children_iterator> > stack_t;
+
+  public:
+    vertex::children_iterator operator () (apns::vertex& v) {
+      using namespace apns;
+
+      if (stack.empty())
+        return inc(recurse(v));
+
+      if (stack.top().first != stack.top().second)
+        return inc(recurse(*stack.top().first));
+      else {
+        while (!stack.empty() && stack.top().first == stack.top().second)
+          stack.pop();
+
+        if (!stack.empty())
+          return forward_from_backward(stack.top().first++);
+        else
+          return vertex::children_iterator();
+      }
+    }
+
+  private:
+    stack_t stack;
+
+    //! Convert a reverse iterator to a forward one pointing to the same position.
+    vertex::children_iterator forward_from_backward(vertex::reverse_children_iterator i) {
+      return i.base() - 1;
+    }
+
+    //! If an iterator is given, increment it and return the original. If boost::none is given, return a singular iterator.
+    vertex::children_iterator inc(boost::optional<vertex::reverse_children_iterator&> v) {
+      if (v)
+        return forward_from_backward((*v)++);
+      else
+        return vertex::children_iterator();
+    }
+
+  //! Recurse to subtree.
+  boost::optional<vertex::reverse_children_iterator&> recurse(vertex& from) {
+    using namespace apns;
+
+    vertex* current = &from;
+    while (current->children_count() > LEAVE_OUT) {
+      stack.push(std::make_pair(current->children_rbegin(), current->children_rend() - LEAVE_OUT));
+      current = &*current->children_rbegin();
+    }
+
+    if (!stack.empty())
+      return stack.top().first;
+    else
+      return boost::none;
+  }
+};
+  //! Visitor that cuts children of the visited vertex and decreases the position count.
+  struct cutter {
+    std::size_t* count;  //!< Pointer to the total position count in the tree.
+
+    explicit cutter(std::size_t& count) : count(&count) { }
+    void operator () (vertex& v) { *count -= detail::cut(v); }
+  };
+
+  //! Traversal stop policy that stops the algorithm when the position count drops below the given level.
+  struct gc_stop {
+    gc_stop(std::size_t& count, std::size_t low) :
+      count(&count),
+      low(low)
+    { }
+
+    bool operator () (vertex&) {
+      return *count <= low;
+    }
+
+  private:
+    std::size_t* count;
+    std::size_t  low;
+  };
 };
 
 //! The basic variant of the Proof-Number Search algorithm.
@@ -537,9 +531,7 @@ struct depth_first_pns : public search_algo<depth_first_pns> {
     limits(1, limits_t(vertex::infty, vertex::infty)),
     history(game->attacker),
     hashes(hasher, initial_hash, game->attacker),
-    boards(game->initial_state),
-    gc_high(0),
-    gc_low(0)
+    boards(game->initial_state)
   { }
 
   void do_iterate();
@@ -577,11 +569,8 @@ private:
   history_stack   history;
   hashes_stack    hashes;
   board_stack     boards;
-  std::size_t     gc_high;
-  std::size_t     gc_low;
 
   limits_t make_limits(vertex& v, vertex& parent, boost::optional<vertex&> second_best, limits_t parent_limits);
-  void garbage_collect();
 };
 
 } // namespace apns
