@@ -206,6 +206,7 @@ class MainWindowController(object):
         self._controller.resetGame()
         self._resultsCtrl.updateTree(self._controller)
         self._mainWindowDsply.disableStats()
+        gc.collect()
 
     elif command == MainWindow.Command.savePosition:
       filename = tkFileDialog.asksaveasfilename()
@@ -654,9 +655,9 @@ class DialogWindow(object):
 
     self._parent = parent
 
-    self._window = Tkinter.Toplevel(parent)
-    self._window.transient(parent)
+    self._window = Tkinter.Toplevel(parent, takefocus=True)
     self._window.title(title)
+    self._window.transient(self._parent)
     self._window.resizable(0, 0)
 
     if deleteAction is None:
@@ -686,8 +687,9 @@ class DialogWindow(object):
     otherwise it returns immediately.
     '''
 
-    self._window.focus_set()
+    self._window.update_idletasks()
     self._window.grab_set()
+    self._window.focus_set()
     if wait:
       self._window.wait_window(self._window)
 
@@ -783,6 +785,7 @@ class SaveProgressController(object):
     canceller = Canceller(controller, dialog)
     controller.saveGameCallbacks.add(canceller.callback)
     dialog.addObserver(canceller)
+    dlg.run()
 
     try:
       controller.saveGame(filename)
@@ -802,6 +805,7 @@ class LoadProgressController(object):
     canceller = Canceller(controller, dlg)
     controller.loadGameCallbacks.add(canceller.callback)
     dlg.addObserver(canceller)
+    dlg.run()
 
     try:
       controller.loadGame(filename)

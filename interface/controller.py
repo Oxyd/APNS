@@ -3,6 +3,7 @@
 import apnsmod
 import time
 import re
+import gc
 
 class _Callbacks(object):
   def __init__(self):
@@ -229,6 +230,7 @@ class Controller(object):
       attacker = self._game.attacker
       self.dropGame()
       self.newGame(initialPos, attacker)
+      del initialPos, attacker  # Drop the references to the *old* game.
 
   def dropGame(self):
     '''Drop the current game and its associated search.'''
