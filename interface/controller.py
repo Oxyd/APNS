@@ -267,9 +267,13 @@ class Controller(object):
     self._lastPosCount = self._posCount
     self._lastPosPerSec = 0
 
-    while not self._search.finished and not self._limitsExceeded() and not self._cancel:
-      self._search.run(burst)
-      self._updateProgress()
+    try:
+      while not self._search.finished and not self._limitsExceeded() and not self._cancel:
+        self._search.run(burst)
+        self._updateProgress()
+    except MemoryError:
+      self.dropGame()
+      raise
 
     self._posCount = self._search.positionCount
     self.stats = self._makeStats()

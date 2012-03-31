@@ -92,14 +92,14 @@ void vertex::swap(vertex& other) {
 std::size_t vertex::allocator::alloc = 0;
 
 vertex* vertex::allocator::allocate(std::size_t n) {
-  vertex* storage = static_cast<vertex*>(::operator new[] (n * sizeof(vertex)));
+  vertex* storage = static_cast<vertex*>(static_cast<void*>(new char [n * sizeof(vertex)]));
   alloc += n * sizeof(vertex);
   return storage;
 }
 
 void vertex::allocator::deallocate(vertex* memory, std::size_t n) throw () {
   alloc -= n * sizeof(vertex);
-  ::operator delete[] (memory);
+  delete [] static_cast<char*>(static_cast<void*>(memory));
 }
 
 void vertex::storage_wrapper::reset(element_type* new_ptr, std::size_t new_size) throw () {

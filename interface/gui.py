@@ -184,16 +184,22 @@ class MainWindowController(object):
         pars.gcLow = newPrefs.gcLow if newPrefs.gcCheck else 0
 
         #self._search.useTransTbl(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
-        dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
-        searchProgressCtrl = SearchProgressController(dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit,
-                                                      runSearchCtrl.memLimit)
-        self._runStats = searchProgressCtrl.run(self._controller)
+        try:
+          dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
+          searchProgressCtrl = SearchProgressController(dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit,
+                                                        runSearchCtrl.memLimit)
+          self._runStats = searchProgressCtrl.run(self._controller)
+          self._mainWindowDsply.enableStats()
+
+        except MemoryError:
+          tkMessageBox.showerror('Out of memory', 'This program ran out of memory while trying to expand the tree.\n'
+                                                  +'The partial tree has been discarded.')
+          self._mainWindowDsply.disableSearch()
+          self._mainWindowDsply.disableStats()
+
         self._resultsCtrl.updateTree(self._controller)
-
         gc.collect()
-
         self._mainWindowDsply.window.focus_set()
-        self._mainWindowDsply.enableStats()
 
     elif command == MainWindow.Command.resetSearch:
       if tkMessageBox.askyesno('Reset', 'Discard whole search?'):
@@ -1455,10 +1461,11 @@ class SearchProgressController(object):
     self._searchProgressDlg.addObserver(updater)
 
     controller.searchProgressCallbacks.add(updater.updateDlg)
-    controller.runSearch(MS_BURST_TIME)
-    controller.searchProgressCallbacks.remove(updater.updateDlg)
-
-    self._searchProgressDlg.close()
+    try:
+      controller.runSearch(MS_BURST_TIME)
+    finally:
+      controller.searchProgressCallbacks.remove(updater.updateDlg)
+      self._searchProgressDlg.close()
 
 
 class SearchStatsController(object):

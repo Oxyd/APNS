@@ -3,8 +3,6 @@
 
 '''cmdline.py -- the command line interface for the program.'''
 
-from interface.search import makeSearch
-from interface.fileio import loadBoard, loadSearch, saveSearch
 from interface.controller import Controller, SearchParameters
 import apnsmod
 import argparse
@@ -31,9 +29,12 @@ def strFromMem(mem):
   Convert an integer m representing an amount of memory to a string representing the amount with units attached.
   '''
 
-  if mem < KB:      return '%.2f B' % mem
-  elif mem < MB:    return '%.2f kB' % (mem / KB)
-  else:             return '%.2f MB' % (mem / MB)
+  if mem < KB:
+    return '{0}'.format(mem)
+  elif mem < MB:
+    return '{0:.2f} kB'.format(mem / float(1024))
+  else:
+    return '{0:.2f} MB'.format(mem / float(1024 * 1024))
 
 
 def strFromNum(num):
@@ -166,9 +167,6 @@ def main():
       show('Cancelled')
       raise SystemExit(0)
 
-  transTblElements = args.transTblSize * MB / apnsmod.TranspositionTable.sizeOfElement
-  #search.useTranspositionTable(transTblElements, args.transTblKeepTime)
-
   def printProgress(ctrl, progress):
     show('Still working:')
     show('  -- {0} seconds elapsed'.format(int(progress.timeElapsed)))
@@ -176,7 +174,7 @@ def main():
       show('  -- {0} seconds left'.format(int(progress.timeLeft)))
     show('  -- Root vertex PN: {0}'.format(strFromNum(progress.rootPN)))
     show('  -- Root vertex DN: {0}'.format(strFromNum(progress.rootDN)))
-    #show('  -- {0} Search memory used'.format(strFromMem(memoryUsedTotal())))
+    show('  -- {0} Search memory used'.format(strFromMem(progress.memUsed)))
     show('  -- {0} unique positions total'.format(progress.positionCount))
     show('  -- {0} new positions per second'.format(int(progress.positionsPerSecond)))
 
@@ -189,7 +187,11 @@ def main():
   controller.searchProgressCallbacks.add(printProgress)
   show('Starting search. Pres Control-C to stop the search at any time.')
 
-  controller.runSearch(burst=1000)
+  try:
+    controller.runSearch(burst=1000)
+  except MemoryError:
+    print >> sys.stderr, 'Error: The program ran out of memory while trying to expand the tree.'
+    raise SystemExit(1)
 
   if not args.quiet:
     print 'Search finished:',

@@ -61,11 +61,12 @@ for name, target in subTargets.items():
 ver = popen('git describe').read().rstrip()
 distribName = 'apns-windows-{0}bit-{2}{1}.zip'.format(bits, '-debug' if debug else '', ver)
 distr = Zip(distribName,
-  [ 'apnsmod/',
+  [ Glob('apnsmod/*.py'),
+    Glob('apnsmod/*.pyd'),
     'batch.py',
     'gui.pyw',
-    'interface/',
-    'doc/doc.pdf',
+    Glob('interface/*.py'),
+    'interface/arimaa-graphics',
     'example-positions/' ])
 
 Alias('distrib', distr)
