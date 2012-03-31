@@ -920,7 +920,7 @@ class RunSearchDialog(Observable):
     memLimitUnits = ttk.Label(limitsFrame, text='MB')
 
     algoParamsFrame = ttk.Labelframe(self._dialog.content, text='Algorithm parameters:', padding=5)
-    killersLabel = ttk.Label(algoParamsFrame, text='Killers for each ply: ')
+    killersLabel = ttk.Label(algoParamsFrame, text='Killers for each level: ')
 
     sizeLabel = ttk.Label(algoParamsFrame, text='Transposition table size: ')
     sizeUnits = ttk.Label(algoParamsFrame, text='MB')
@@ -1072,7 +1072,7 @@ class RunSearchDialog(Observable):
     self._memorySpinVar.set(int(value))
 
   def setKillers(self, value):
-    '''Set the killer count for each ply.'''
+    '''Set the killer count for each level.'''
 
     self._killersSpinVar.set(int(value))
 

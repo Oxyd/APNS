@@ -71,7 +71,7 @@ def main():
                       help='How long should elements be kept in the transposition table before they can be replaced with newer'
                       'entries')
   parser.add_argument('-l', '--killer-count', type=int, default=2, metavar='number of killers', dest='killerCount',
-                      help='How many killers should be kept for each ply')
+                      help='How many killers should be kept for each level')
   parser.add_argument('-G', '--gc-high', type=int, default=0, metavar='GC high', dest='gcHigh',
                       help='Each time the number of vertices exceeds this threshold, GC will be run. Value of 0 disables GC.')
   parser.add_argument('-g', '--gc-low', type=int, default=0, metavar='GC low', dest='gcLow',
