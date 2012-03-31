@@ -174,7 +174,7 @@ public:
   void add(std::size_t ply, vertex::e_type type, step const& step);
 
   //! Is the given step a killer for the given ply?
-  bool is_killer(std::size_t ply, vertex::e_type type, step const& step);
+  bool is_killer(std::size_t ply, vertex::e_type type, step const& step) const;
 
   ply_iterator ply_begin(std::size_t ply, vertex::e_type type) const {
     if (ply < get_plys(type).size()) 
@@ -233,7 +233,7 @@ namespace detail {
   //! \param leaf_hash Hash value of leaf_state
   //! \param history Game history gathered during the descend to the leaf.
   void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, transposition_table* trans_tbl,
-              hashes_stack& hashes, history_stack const& history);
+              std::size_t ply, killer_db const& killers, hashes_stack& hashes, history_stack const& history);
 
   //! Cut non-proving (-disproving) children of a vertex.
   std::size_t cut(vertex& parent);
@@ -373,7 +373,7 @@ protected:
   }
 
   void expand(vertex::children_iterator leaf, board_stack& state, hashes_stack& hashes, history_stack& history) {
-    apns::detail::expand(leaf, state, game->attacker, trans_tbl.get(), hashes, history);
+    apns::detail::expand(leaf, state, game->attacker, trans_tbl.get(), hashes.hashes().size() - 1, killers, hashes, history);
   }
 
   template <typename HashesRevIter, typename PathRevIter>

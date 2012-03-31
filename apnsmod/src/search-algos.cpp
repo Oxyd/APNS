@@ -9,8 +9,6 @@
 #include <limits>
 #include <vector>
 
-#include <iostream>
-
 namespace {
 
 //! Check whether the game would be lost if the given player made the given step from the given position assuming the passed-in
@@ -203,7 +201,7 @@ void killer_db::add(std::size_t ply, vertex::e_type type, step const& step) {
     p[ply].push_back(step);
 }
 
-bool killer_db::is_killer(std::size_t ply, vertex::e_type type, step const& step) {
+bool killer_db::is_killer(std::size_t ply, vertex::e_type type, step const& step) const {
   for (ply_iterator killer = ply_begin(ply, type); killer != ply_end(ply, type); ++killer)
     if (*killer == step)
       return true;
@@ -259,7 +257,7 @@ void update_numbers(vertex& v) {
 namespace detail {
 
 void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, transposition_table* trans_tbl, 
-            hashes_stack& hashes, history_stack const& history) {
+            std::size_t ply, killer_db const& killers, hashes_stack& hashes, history_stack const& history) {
   assert(leaf->children_count() == 0);  // leaf is a leaf.
   assert(leaf->proof_number != 0 || leaf->disproof_number != 0); // It's not (dis-)proven yet.
 
@@ -281,6 +279,7 @@ void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t a
   // Attach them to the leaf now.
   leaf->reserve(steps.size());
   
+  vertex::children_iterator killers_end = leaf->children_begin();
   for (steps_seq::iterator s = steps.begin(); s != steps.end(); ++s) {
     step const&           step = s->first;
     vertex::e_type const  type = s->second;
@@ -288,6 +287,12 @@ void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t a
 
     process_new(*child, *leaf, attacker, step, type, trans_tbl, hashes, state, history);
     assert(child->step);
+
+    if (killers.is_killer(ply, type, step)) {
+      if (child != killers_end)
+        std::swap(*child, *killers_end);
+      ++killers_end;
+    }
   }
 
   sort_children(*leaf, vertex_comparator(*leaf));
