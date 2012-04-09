@@ -129,16 +129,17 @@ public:
   static std::size_t const SIZE_OF_ELEMENT;  //!< Size, in bytes, of one element of the table.
   
 private:
-  typedef unsigned iteration_t;
-
-  static iteration_t const NEVER = 0;  //! Special value of last_accessed saying that the entry has never been accessed.
-
   //! One record in the table.
   struct record {
     entry_t     entry;
-    iteration_t last_accessed;
+    int         depth;
+    hash_t      hash;
 
-    record() : last_accessed(NEVER) { }
+    record() : depth(-1), hash(0) { }
+
+    bool is_set() {
+      return depth != -1;
+    }
   };
 
 public:
@@ -152,7 +153,6 @@ public:
     , keep_time(keep_time)
     , pages((table_size / PAGE_RECORDS) + (table_size % PAGE_RECORDS != 0 ? 1 : 0))  // pages := ceil(table_size / PAGE_RECORDS)
     , dir(new page_ptr[pages])
-    , now(1)
     , allocated_pages(0)
     , elements(0)
     , hits(0)
@@ -167,13 +167,14 @@ public:
    * \param hash Key of the element.
    * \param vertex Value of the element.
    */
-  void insert(hash_t hash, entry_t entry) {
+  void insert(hash_t hash, int depth, entry_t entry) {
     record& r = find_record(hash);
-    if (r.last_accessed == NEVER || now - r.last_accessed > keep_time) {
-      if (r.last_accessed == NEVER)
+    if (!r.is_set() || r.hash == hash || depth < r.depth) {
+      if (!r.is_set())
         ++elements;
       r.entry = entry;
-      r.last_accessed = now;
+      r.depth = depth;
+      r.hash = hash;
     }
   }
 
@@ -184,20 +185,13 @@ public:
    */
   boost::optional<entry_t> query(hash_t hash) {
     record& r = find_record(hash);
-    if (r.last_accessed != NEVER) {
-      r.last_accessed = now;
+    if (r.is_set() && r.hash == hash) {
       ++hits;
-
       return r.entry;
     } else {
       ++misses;
       return boost::none;
     }
-  }
-
-  //! Update the internal iteration-count timer. Call this each iteration of the search algorithm.
-  void tick() {
-    ++now;
   }
 
   std::size_t get_memory_usage() const {                      //!< Get the amount of memory, in bytes, of this table.
@@ -241,7 +235,6 @@ private:
   std::size_t const pages;         //!< How many pages are there?
 
   directory dir;                   //!< The table itself.
-  iteration_t now;                 //!< Current "time" measured in iterations of the search algorithm.
 
   std::size_t allocated_pages;     //!< Number of pages allocated.
   std::size_t elements;            //!< Number of elements stored.
@@ -308,8 +301,8 @@ public:
     misses(0)
   { }
 
-  void insert(hash_t hash, history_t const& history, entry_t entry) {
-    table.insert(hash, stored_entry(history, entry));
+  void insert(hash_t hash, int depth, history_t const& history, entry_t entry) {
+    table.insert(hash, depth, stored_entry(history, entry));
   }
 
   boost::optional<entry_t> query(hash_t hash, history_t const& history) {
@@ -323,7 +316,6 @@ public:
     }
   }
 
-  void tick()                           { table.tick(); }
   std::size_t get_memory_usage() const  { return table.get_memory_usage(); }
   std::size_t get_table_size() const    { return table.get_table_size(); }
   std::size_t get_elements() const      { return table.get_elements(); }

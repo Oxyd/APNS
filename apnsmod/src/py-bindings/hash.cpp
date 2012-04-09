@@ -40,9 +40,6 @@ void export_hash() {
     .def("query", &apns::transposition_table::query,
         "t.query(Hash) -> (Vertex.Number, Vertex.Number)\n\n"
         "Find a vertex in the table by the key. Return None if the vertex doesn't exist in the table")
-    .def("tick", &apns::transposition_table::tick,
-        "t.tick() -> None\n\n"
-        "Update the internal tick count.")
 
     .add_property("memoryUsage",
         &apns::transposition_table::get_memory_usage,
@@ -71,10 +68,6 @@ void export_hash() {
       .def("query", &apns::history_table::query,
           "t.query(Hash, History) -> (Vertex.Number, Vertex.Number)\n\n"
           "Find a vertex in the table by the key. Return None if the vertex doesn't exist in the table")
-      .def("tick", &apns::history_table::tick,
-          "t.tick() -> None\n\n"
-          "Update the internal tick count.")
-
       .add_property("memoryUsage",
           &apns::history_table::get_memory_usage,
           "Return the number of bytes used by the transposition table")

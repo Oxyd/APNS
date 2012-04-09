@@ -40,8 +40,8 @@ apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(board const&
   hash_t hash = 0;
 
   for (board::pieces_iterator p = board.pieces_begin(); p != board.pieces_end(); ++p) {
-    position const& position = p->first;
-    piece const& piece = p->second;
+    position position = p->first;
+    piece piece = p->second;
 
     hash ^= codes[index_from_type(piece.get_type())]
                  [index_from_color(piece.get_color())]

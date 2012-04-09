@@ -7,7 +7,7 @@ def config(conf, bits, debug, profile):
       'compile-flags': [
         '-Wall',
         '-Wextra',
-        '-ansi',
+        '-std=c++03',
         '-pedantic',
         '-O3' if not debug else '',
         '-ggdb' if debug or profile else '',

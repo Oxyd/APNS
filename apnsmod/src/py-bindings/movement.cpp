@@ -18,7 +18,71 @@ struct step_holder_converter {
   }
 };
 
+//! Wrapper to turn the steps_iterator into a Python iterator.
+struct steps_iterator {
+  explicit steps_iterator(apns::steps_iter const& iter) :
+    steps_iter(iter)
+  { }
+
+  steps_iterator(apns::position what, apns::board const& position) :
+    steps_iter(what, position)
+  { }
+
+  steps_iterator iter() const { return *this; }
+  boost::python::object next() {
+    using namespace boost::python;
+
+    if (steps_iter != apns::steps_end())
+      return object(*steps_iter++);
+    else {
+      PyErr_SetNone(PyExc_StopIteration);
+      throw_error_already_set();
+      return object();
+    }
+  }
+
+private:
+  apns::steps_iter steps_iter;
+};
+
+//! Create a StepsIterator.
+steps_iterator steps(apns::position piece, apns::board const& board) {
+  return steps_iterator(apns::steps_iter(piece, board));
 }
+
+//! Wrapper to turn the all_steps_iterator into a Python iterator.
+struct all_steps_iterator {
+  explicit all_steps_iterator(apns::all_steps_iter const& iter) :
+    all_steps_iter(iter)
+  { }
+
+  all_steps_iterator(apns::board const& position, apns::piece::color_t player) :
+    all_steps_iter(position, player)
+  { }
+
+  all_steps_iterator iter() const { return *this; }
+  boost::python::object next() {
+    using namespace boost::python;
+
+    if (all_steps_iter != apns::all_steps_end())
+      return object(*all_steps_iter++);
+    else {
+      PyErr_SetNone(PyExc_StopIteration);
+      throw_error_already_set();
+      return object();
+    }
+  }
+
+private:
+  apns::all_steps_iter all_steps_iter;
+};
+
+//! Create an AllStepsIterator.
+all_steps_iterator all_steps(apns::board const& position, apns::piece::color_t player) {
+  return all_steps_iterator(apns::all_steps_iter(position, player));
+}
+
+} // anonymous namespacek
 
 /**
  * \brief Export types and functions declared in movement.hpp.
@@ -93,16 +157,45 @@ void export_movement() {
 
     .def("toString", &apns::step::to_string,
         "Get the string representation of this step")
+    
+    .add_property("stepsUsed", &apns::step::steps_used,
+                  "How many steps this steps counts as? Ordinary steps count as one, pushes and pulls as two. Captures are "
+                  "not counted.")
+
+    .def("__str__", &apns::step::to_string)
+    .def("__repr__", &apns::step::to_string)
     ;
 
   def("apply", &apns::apply,
       "apply(Step, Board) -> None\n\n"
       "Apply given step to given board.");
 
+  def("unapply", &apns::unapply,
+      "unapply(Step, Board) -> None\n\n"
+      "Undo the application of the step on the board");
+
   def("opponentColor", &apns::opponent_color,
       "opponentColor(Color) -> Color\n\n"
       "Given a player's color, return the opponent's color.");
 
   to_python_converter<boost::optional<apns::step>, optional_to_T<apns::step> >();
+
+  class_<steps_iterator>("StepsIterator", init<apns::position, apns::board const&>())
+    .def("__iter__", &steps_iterator::iter)
+    .def("next", &steps_iterator::next)
+    ;
+
+  def("steps", &steps,
+      "steps(Position, Board) -> [Step]\n\n"
+      "Create an iterator object that goes through all possible steps for given piece on given board.");
+
+  class_<all_steps_iterator>("AllStepsIterator", init<apns::board const&, apns::piece::color_t>())
+    .def("__iter__", &all_steps_iterator::iter)
+    .def("next", &all_steps_iterator::next)
+    ;
+
+  def("allSteps", &all_steps,
+      "allSteps(Board, Color) -> [Step]\n\n"
+      "Create an iterator object that goes through all possible steps for a given player from a given position");
 }
 

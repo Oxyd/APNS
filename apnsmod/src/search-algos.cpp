@@ -9,6 +9,8 @@
 #include <limits>
 #include <vector>
 
+#include <iostream>
+
 namespace {
 
 //! Check whether the game would be lost if the given player made the given step from the given position assuming the passed-in
@@ -67,8 +69,8 @@ boost::optional<piece::color_t> winner(board const& board, piece::color_t player
   bool opponent_has_rabbits = false;
 
   for (board::pieces_iterator pos_piece = board.pieces_begin(); pos_piece != board.pieces_end(); ++pos_piece) {
-    position const& position = pos_piece->first;
-    piece const& piece = pos_piece->second;
+    position position = pos_piece->first;
+    piece piece = pos_piece->second;
 
     if (piece.get_type() == piece::rabbit) {
       if (piece.get_color() == player) {

@@ -320,8 +320,6 @@ public:
 
   void iterate() {
     if (!finished()) {
-      if (trans_tbl)
-        trans_tbl->tick();
       static_cast<Algo*>(this)->do_iterate();
     }
   }
@@ -387,7 +385,7 @@ protected:
       apns::update_numbers(v);
 
       if (trans_tbl && v.proof_number != 0 && v.disproof_number != 0)
-        trans_tbl->insert(*hashes_begin, std::make_pair(v.proof_number, v.disproof_number));
+        trans_tbl->insert(*hashes_begin, ply, std::make_pair(v.proof_number, v.disproof_number));
 
       if (current + 1 != path_end) {
         vertex& parent = **(current + 1);

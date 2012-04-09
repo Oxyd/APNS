@@ -106,6 +106,44 @@ TEST(algorithm, update_numbers_test) {
   EXPECT_EQ(2, v.disproof_number);
 }
 
+TEST(winner_test, attacker_goal) {
+  board b;
+  b.put(position(8, 'd'), piece(piece::gold, piece::rabbit));
+  b.put(position(4, 'h'), piece(piece::silver, piece::rabbit));
+
+  boost::optional<piece::color_t> w = winner(b, piece::gold);
+  ASSERT_TRUE(w);
+  EXPECT_EQ(*w, piece::gold);
+}
+
+TEST(winner_test, defender_goal) {
+  board b;
+  b.put(position(4, 'd'), piece(piece::gold, piece::rabbit));
+  b.put(position(1, 'h'), piece(piece::silver, piece::rabbit));
+
+  boost::optional<piece::color_t> w = winner(b, piece::gold);
+  ASSERT_TRUE(w);
+  EXPECT_EQ(*w, piece::silver);
+}
+
+TEST(winner_test, attacker_out_of_rabbits) {
+  board b;
+  b.put(position(4, 'h'), piece(piece::silver, piece::rabbit));
+
+  boost::optional<piece::color_t> w = winner(b, piece::gold);
+  ASSERT_TRUE(w);
+  EXPECT_EQ(*w, piece::silver);
+}
+
+TEST(winner_test, defender_out_of_rabbits) {
+  board b;
+  b.put(position(4, 'h'), piece(piece::gold, piece::rabbit));
+
+  boost::optional<piece::color_t> w = winner(b, piece::gold);
+  ASSERT_TRUE(w);
+  EXPECT_EQ(*w, piece::gold);
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

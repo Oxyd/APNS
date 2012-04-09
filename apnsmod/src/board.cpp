@@ -1,6 +1,7 @@
 #include "board.hpp"
 
 #include <boost/iterator/iterator_facade.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
 
 #include <stdexcept>
@@ -52,13 +53,20 @@ namespace apns {
 
 piece::piece(color_t c, type_t t) : 
   data(letter_from_pair(c, t))
-{ }
+{
+  assert(data == 'e' || data == 'm' || data == 'h' || data == 'd' || data == 'c' || data == 'r' ||
+         data == 'E' || data == 'M' || data == 'H' || data == 'D' || data == 'C' || data == 'R');
+}
 
 piece::color_t piece::get_color() const {
+  assert(data == 'e' || data == 'm' || data == 'h' || data == 'd' || data == 'c' || data == 'r' ||
+         data == 'E' || data == 'M' || data == 'H' || data == 'D' || data == 'C' || data == 'R');
   return data & 0x20 ? piece::silver : piece::gold;
 }
 
 piece::type_t piece::get_type() const {
+  assert(data == 'e' || data == 'm' || data == 'h' || data == 'd' || data == 'c' || data == 'r' ||
+         data == 'E' || data == 'M' || data == 'H' || data == 'D' || data == 'C' || data == 'R');
   return static_cast<piece::type_t>(data | 0x20);
 }
 
