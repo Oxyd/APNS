@@ -53,7 +53,7 @@ public:
    * \param steps_remaining How many steps does the player have remaining?
    * \return The hash value.
    */
-  hash_t generate_initial(board const& board, piece::color_t on_move, unsigned steps_remaining = MAX_STEPS) const;
+  hash_t generate_initial(board const& board, piece::color_t on_move) const;
 
   /**
    * Update the hash value after the situation on board has changed.
@@ -68,7 +68,6 @@ public:
    */
   template <typename Iter>
     hash_t update(hash_t old_hash, Iter steps_begin, Iter steps_end, 
-                  unsigned current_steps_remaining, unsigned next_steps_remaining,
                   piece::color_t current_player, piece::color_t next_player) const;
 
 private:
@@ -78,12 +77,10 @@ private:
 
   codes_cont    codes;
   players_cont  players;
-  steps_cont    steps;
 };
 
 template <typename Iter>
 zobrist_hasher::hash_t zobrist_hasher::update(hash_t old_hash, Iter steps_begin, Iter steps_end, 
-                                              unsigned current_steps_remaining, unsigned next_steps_remaining,
                                               piece::color_t current_player, piece::color_t next_player) const {
   hash_t hash = old_hash;
 
@@ -109,9 +106,6 @@ zobrist_hasher::hash_t zobrist_hasher::update(hash_t old_hash, Iter steps_begin,
 
   hash ^= players[current_player];
   hash ^= players[next_player];
-
-  hash ^= steps[current_steps_remaining - 1];
-  hash ^= steps[next_steps_remaining - 1];
 
   return hash;
 }

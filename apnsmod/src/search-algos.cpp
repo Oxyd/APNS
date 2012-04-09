@@ -175,17 +175,14 @@ void hashes_stack::push(vertex const& v) {
     zobrist_hasher::hash_t const  last_hash           = stack.back();
     vertex::e_type const          last_visited_type   = last_visited.top().type;
     piece::color_t const          last_visited_player = last_visited.top().player;
-    unsigned const                last_visited_steps  = last_visited.top().steps_remaining;
 
     piece::color_t const next_player = v.type == last_visited_type ? last_visited_player : opponent_color(last_visited_player);
     zobrist_hasher::hash_t hash = hasher->update(
       last_hash, v.step->step_sequence_begin(), v.step->step_sequence_end(),
-      last_visited_steps,
-      v.steps_remaining,
       last_visited_player, next_player
     );
     stack.push_back(hash);
-    last_visited.push(last(v.type, next_player, v.steps_remaining));
+    last_visited.push(last(v.type, next_player));
   }
 }
 

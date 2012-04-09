@@ -114,12 +114,11 @@ private:
 struct hashes_stack {
   typedef std::vector<zobrist_hasher::hash_t> hashes_cont;
 
-  hashes_stack(zobrist_hasher const& hasher, zobrist_hasher::hash_t initial_hash, piece::color_t attacker,
-               unsigned steps_remaining = MAX_STEPS) :
+  hashes_stack(zobrist_hasher const& hasher, zobrist_hasher::hash_t initial_hash, piece::color_t attacker) :
     stack(1, initial_hash),
     hasher(&hasher)
   { 
-    last_visited.push(last(vertex::type_or, attacker, steps_remaining));
+    last_visited.push(last(vertex::type_or, attacker));
   }
 
   zobrist_hasher::hash_t top() const    { return stack.back(); }
@@ -134,12 +133,10 @@ private:
   struct last {
     vertex::e_type    type;
     piece::color_t    player;
-    unsigned          steps_remaining;
 
-    last(vertex::e_type t, piece::color_t p, unsigned s) :
+    last(vertex::e_type t, piece::color_t p) :
       type(t),
-      player(p),
-      steps_remaining(s)
+      player(p)
     { }
   };
 

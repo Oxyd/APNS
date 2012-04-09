@@ -30,13 +30,9 @@ apns::zobrist_hasher::zobrist_hasher()
 
   for (std::size_t player = 0; player < piece::color_count; ++player)
     players[player] = rand_distrib(prng);
-
-  for (std::size_t s = 0; s < 4; ++s)
-    steps[s] = rand_distrib(prng);
 }
 
-apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(board const& board, piece::color_t on_move, 
-                                                                    unsigned steps_remaining) const {
+apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(board const& board, piece::color_t on_move) const {
   hash_t hash = 0;
 
   for (board::pieces_iterator p = board.pieces_begin(); p != board.pieces_end(); ++p) {
@@ -50,7 +46,6 @@ apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(board const&
   }
 
   hash ^= players[on_move];
-  hash ^= steps[steps_remaining - 1];
 
   return hash;
 }
