@@ -50,5 +50,3 @@ apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(board const&
   return hash;
 }
 
-std::size_t const apns::history_table::SIZE_OF_ELEMENT = apns::detail::table<stored_entry, zobrist_hasher::hash_t>::SIZE_OF_ELEMENT;
-

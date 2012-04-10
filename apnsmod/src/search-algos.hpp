@@ -94,20 +94,26 @@ private:
 
 //! Container for the history of a path. That is, all board states at the point of the beginnings of each player's turn.
 struct history_stack {
-  typedef history_table::history_record record;
+  struct record {
+    zobrist_hasher::hash_t  hash;
+
+    record() { }
+    record(zobrist_hasher::hash_t hash) :
+      hash(hash)
+    { }
+  };
+
   typedef std::vector<record> records_cont;
 
-  explicit history_stack(piece::color_t attacker);
-
+  history_stack();
   records_cont const& records() const { return current_records; }
 
-  void push(vertex const& vertex, board const& state);
+  void push(vertex const& vertex, zobrist_hasher::hash_t hash);
   void pop(vertex const& vertex);
 
 private:
-  records_cont            current_records;
-  vertex::e_type          last_visited_type;
-  piece::color_t          attacker;
+  records_cont                current_records;
+  std::stack<vertex::e_type>  last;
 };
 
 //! History of hashes met during a traversal.
@@ -121,7 +127,8 @@ struct hashes_stack {
     last_visited.push(last(vertex::type_or, attacker));
   }
 
-  zobrist_hasher::hash_t top() const    { return stack.back(); }
+  zobrist_hasher::hash_t top() const          { return stack.back(); }
+  zobrist_hasher::hash_t opponent_top() const { return hasher->opponent_hash(stack.back()); }
 
   //! Get a container of the encountered hashes. The top of the stack is the last element in the container; bottom is the first.
   hashes_cont const&     hashes() const { return stack; }
@@ -247,6 +254,15 @@ namespace detail {
   bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_t attacker, board_stack& boards,
                 hashes_stack& hashes, history_stack& history);
 
+  //! Convert history as defined by the history_stack into history as defined by proof_table.
+#if 0
+  history_t proof_history_from_records(history_stack::records_cont const& records) {
+    history_t history;
+    for (history_stack::records_cont::const_iterator record = records.begin();
+         record != records.end(); ++record) {
+      history[
+#endif
+
 } // namespace apns::detail
 
 //! A CRTP base class for search algorithms.
@@ -262,14 +278,24 @@ public:
   }
 
   //! Make the algorithm use a transposition table.
-  void use_trans_tbl(std::size_t size, std::size_t keep_time) {
-    trans_tbl.reset(new transposition_table(size, keep_time)); 
+  void use_trans_tbl(std::size_t size) {
+    trans_tbl.reset(new transposition_table(size));
   }
 
   //! Get the transposition table, if any, used by this algorithm.
   //! \returns Pointer to the transposition table or null if no table is associated with this algorithm.
   transposition_table const* get_trans_tbl() const {
     return trans_tbl.get(); 
+  }
+
+  //! Make the algorithm use a proof table.
+  void use_proof_tbl(std::size_t size) {
+    proof_tbl.reset(new proof_table(size));
+  }
+
+  //! Get the proof table, if any, used by this algorithm.
+  proof_table const* get_proof_tbl() const {
+    return proof_tbl.get();
   }
   
   //! Change the number of killers stored for each ply.
@@ -324,6 +350,7 @@ public:
 protected:
   boost::shared_ptr<apns::game>  game;
   boost::scoped_ptr<transposition_table>  trans_tbl;
+  boost::scoped_ptr<proof_table>          proof_tbl;
   zobrist_hasher              hasher;         //!< Hasher to be used during the algorithm.
   zobrist_hasher::hash_t      initial_hash;   //!< Hash corresponding to initial_state.
   killer_db                   killers;
@@ -524,7 +551,6 @@ struct depth_first_pns : public search_algo<depth_first_pns> {
     search_algo(game, position_count),
     path(1, &game->root),
     limits(1, limits_t(vertex::infty, vertex::infty)),
-    history(game->attacker),
     hashes(hasher, initial_hash, game->attacker),
     boards(game->initial_state)
   { }

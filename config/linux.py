@@ -17,6 +17,7 @@ def config(conf, bits, debug, profile):
       ],
       'defines': [
         'POSIX',
+        'BOOST_SP_DISABLE_THREADS',
         'NDEBUG' if not debug else '',
         '_GLIBCXX_DEBUG' if debug else '',
         '_GLIBCXX_DEBUG_PEDANTIC' if debug else ''

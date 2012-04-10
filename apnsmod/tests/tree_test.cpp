@@ -58,7 +58,8 @@ struct bfs_traversal {
       vertex::children_iterator n = queue.front();
       queue.pop();
       return n;
-    } else return 0;
+    } else 
+      return current.children_end();
   }
 
 private:
@@ -508,7 +509,7 @@ bool find_two(vertex& v) {
 
 TEST(traverser, stop_condition) {
   boost::shared_ptr<vertex> tree = make_tree();
-  vertex::children_iterator found = traverse(*tree, bfs_traversal(), null_visitor(), &find_two);
+  vertex* found = traverse(*tree, bfs_traversal(), null_visitor(), &find_two);
   EXPECT_EQ(2, found->proof_number);
 }
 

@@ -19,8 +19,7 @@
 #include <boost/scoped_array.hpp>
 #include <boost/utility.hpp>
 #include <boost/optional.hpp>
-
-#include <iostream>
+#include <boost/unordered_map.hpp>
 
 #ifdef BOOST_NO_INT64_T
 // Defined only if the underlying platform doesn't provide 64-bit integer types. This program can't work without
@@ -69,6 +68,13 @@ public:
   template <typename Iter>
     hash_t update(hash_t old_hash, Iter steps_begin, Iter steps_end, 
                   piece::color_t current_player, piece::color_t next_player) const;
+
+  //! Given a hash, return the hash value corresponding to the same board state, but with the opposite player to move.
+  hash_t opponent_hash(hash_t h) const {
+    h ^= players[0];
+    h ^= players[1];
+    return h;
+  }
 
 private:
   typedef boost::multi_array<hash_t, 4>   codes_cont;
@@ -142,9 +148,8 @@ public:
    * \param table_size Capacity, in number of elements, of this table.
    * \param keep_time How long should a record be kept before it can be replaced by another one?
    */
-  table(std::size_t table_size, std::size_t keep_time)
+  table(std::size_t table_size)
     : table_size(table_size)
-    , keep_time(keep_time)
     , pages((table_size / PAGE_RECORDS) + (table_size % PAGE_RECORDS != 0 ? 1 : 0))  // pages := ceil(table_size / PAGE_RECORDS)
     , dir(new page_ptr[pages])
     , allocated_pages(0)
@@ -225,7 +230,6 @@ private:
   }
 
   std::size_t const table_size;    //!< How many elements are there in one page?
-  std::size_t const keep_time;     //!< How long to keep an element before it can be replaced?
   std::size_t const pages;         //!< How many pages are there?
 
   directory dir;                   //!< The table itself.
@@ -254,81 +258,17 @@ std::size_t const table<Entry, Hash>::SIZE_OF_ELEMENT = sizeof(record);
  */
 typedef detail::table<std::pair<vertex::number_t, vertex::number_t>, zobrist_hasher::hash_t> transposition_table;
 
-//! A history table stores the proof- and disproof-numbers of each prooved/disprooved vertex. To address the GHI problem,
-//! this table also stores the history of each vertex and compares that on query. This table is indexed by the XOR'ed values
-//! of hashes of each record in the history of the vertex.
-struct history_table {
-  struct history_record {
-    board           position;
-    piece::color_t  on_move;
+//! History of a path is a collection of the positions that occured at the start of each player's turn.
+typedef boost::unordered_map<zobrist_hasher::hash_t, std::size_t> history_t;
 
-    history_record() { }
-    history_record(board const& p, piece::color_t o) :
-      position(p),
-      on_move(o)
-    { }
-  };
-
-  typedef std::pair<vertex::number_t, vertex::number_t> entry_t;
-  typedef std::vector<history_record> history_t;
-  typedef zobrist_hasher::hash_t      hash_t;
-
-private:
-  struct stored_entry {
-    history_t   history;
-    entry_t     values;
-
-    stored_entry() { }
-
-    stored_entry(history_t const& h, entry_t v) :
-      history(h),
-      values(v)
-    { }
-  };
-
-public:
-  static std::size_t const SIZE_OF_ELEMENT;
-
-  history_table(std::size_t table_size, std::size_t keep_time) :
-    table(table_size, keep_time),
-    hits(0),
-    misses(0)
-  { }
-
-  void insert(hash_t hash, int depth, history_t const& history, entry_t entry) {
-    table.insert(hash, depth, stored_entry(history, entry));
-  }
-
-  boost::optional<entry_t> query(hash_t hash, history_t const& history) {
-    boost::optional<stored_entry> e = table.query(hash);
-    if (e && e->history.size() == history.size() && std::equal(history.begin(), history.end(), e->history.begin())) {
-      ++hits;
-      return e->values;
-    } else {
-      ++misses;
-      return boost::none;
-    }
-  }
-
-  std::size_t get_memory_usage() const  { return table.get_memory_usage(); }
-  std::size_t get_table_size() const    { return table.get_table_size(); }
-  std::size_t get_elements() const      { return table.get_elements(); }
-  std::size_t get_hits() const          { return hits; }
-  std::size_t get_misses() const        { return misses; }
-
-private:
-  detail::table<stored_entry, zobrist_hasher::hash_t> table;
-  std::size_t hits;
-  std::size_t misses;
+//! An entry in the proof table.
+struct proof_entry_t {
+  vertex::number_t  proof_number;
+  vertex::number_t  disproof_number;
+  history_t         history;
 };
 
-inline bool operator == (history_table::history_record const& lhs, history_table::history_record const& rhs) {
-  return lhs.position == rhs.position && lhs.on_move == rhs.on_move;
-}
-
-inline bool operator != (history_table::history_record const& lhs, history_table::history_record const& rhs) {
-  return !operator == (lhs, rhs);
-}
+typedef detail::table<proof_entry_t, zobrist_hasher::hash_t> proof_table;
 
 } // namespace apns
 
