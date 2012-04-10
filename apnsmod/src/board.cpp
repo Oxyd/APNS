@@ -1,17 +1,13 @@
 #include "board.hpp"
 
-#include <boost/iterator/iterator_facade.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
 
 #include <stdexcept>
 #include <cassert>
 #include <utility>
-#include <iterator>
 #include <cctype>
 #include <sstream>
-
-#include <iostream>
 
 namespace {
 

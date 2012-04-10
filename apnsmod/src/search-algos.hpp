@@ -11,7 +11,6 @@
 #include <boost/timer.hpp>
 #include <boost/ref.hpp>
 #include <boost/circular_buffer.hpp>
-#include <boost/bind.hpp>
 
 #include <vector>
 #include <stack>

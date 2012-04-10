@@ -7,13 +7,9 @@
 
 #include <boost/optional.hpp>
 #include <boost/utility.hpp>
-#include <boost/scoped_array.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
 #include <boost/cstdint.hpp>
-#include <boost/type_traits.hpp>
 #include <boost/ref.hpp>
-#include <boost/pool/pool_alloc.hpp>
 
 #include <cstddef>
 #include <cassert>

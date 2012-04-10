@@ -1,17 +1,8 @@
 #include "movement.hpp"
 #include "board.hpp"
 
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/iterator/filter_iterator.hpp>
-#include <boost/iterator/transform_iterator.hpp>
-
 #include <boost/bind.hpp>
-#include <boost/lambda/lambda.hpp>
-#include <boost/lambda/bind.hpp>
-#include <boost/function.hpp>
-#include <boost/utility.hpp>
 
-#include <functional>
 #include <sstream>
 #include <stdexcept>
 #include <cctype>

@@ -3,9 +3,6 @@
 
 #include <boost/utility.hpp>
 #include <boost/timer.hpp>
-#include <boost/shared_ptr.hpp>
-
-#include <memory>
 
 void export_util();
 

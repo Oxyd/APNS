@@ -9,12 +9,10 @@
 
 #include "board.hpp"
 #include "tree.hpp"
-#include "movement.hpp"
 
 #include <boost/array.hpp>
 #include <boost/multi_array.hpp>
 #include <boost/cstdint.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/scoped_array.hpp>
 #include <boost/utility.hpp>

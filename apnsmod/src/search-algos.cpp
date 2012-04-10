@@ -6,10 +6,7 @@
 #include <boost/integer.hpp>
 
 #include <cassert>
-#include <limits>
 #include <vector>
-
-#include <iostream>
 
 namespace {
 

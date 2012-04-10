@@ -9,16 +9,13 @@
 
 #include <boost/optional.hpp>
 #include <boost/array.hpp>
-#include <boost/function.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/iterator/filter_iterator.hpp>
-#include <boost/iterator/transform_iterator.hpp>
+#include <boost/iterator/iterator_adaptor.hpp>
 
-#include <map>
-#include <list>
 #include <string>
 #include <ostream>
 #include <algorithm>
+#include <algorithm>
+#include <cstddef>
 
 namespace apns {
 
