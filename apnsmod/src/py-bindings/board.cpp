@@ -143,6 +143,9 @@ void export_board() {
         "Make a copy of this Board")
 
     .add_property("pieces", range(&apns::board::pieces_begin, &apns::board::pieces_end))
+
+    .def(self == self)
+    .def(self != self)
     ;
 
   def("empty", &apns::empty,

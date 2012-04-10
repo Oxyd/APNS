@@ -9,31 +9,34 @@
 #include <limits>
 #include <vector>
 
+#include <iostream>
+
 namespace {
 
 //! Check whether the game would be lost if the given player made the given step from the given position assuming the passed-in
 //! game history.
-bool repetition(apns::board const& board, apns::piece::color_t player, apns::history_stack::records_cont const& history) {
+bool repetition(apns::zobrist_hasher::hash_t hash, apns::history_stack::records_cont const& history) {
   using namespace apns;
 
-  bool lose = false;
-
   if (!history.empty()) {
-    if (history.back().on_move == player && history.back().position == board)
-      lose = true;  // Lead doesn't move to a net change in overall position.
+    if (history.back().hash == hash)
+      return true;  // Move doesn't lead to a net change in overall position.
     else {
       // Check for third-time repetitions.
       unsigned count = 0;
-      for (history_stack::records_cont::const_iterator h = history.begin(); h != history.end(); ++h)
-        if (h->on_move == player && h->position == board)
+      for (history_stack::records_cont::const_iterator h = history.begin(); h != history.end(); ++h) {
+        if (h->hash == hash) {
           ++count;
 
-      if (count >= 3)
-        lose = true;
+          if (count == 3) {
+            return true;
+          }
+        }
+      }
     }
   }
 
-  return lose;
+  return false;
 }
 
 } // anonymous namespace
@@ -67,8 +70,8 @@ boost::optional<piece::color_t> winner(board const& board, piece::color_t player
   bool opponent_has_rabbits = false;
 
   for (board::pieces_iterator pos_piece = board.pieces_begin(); pos_piece != board.pieces_end(); ++pos_piece) {
-    position const& position = pos_piece->first;
-    piece const& piece = pos_piece->second;
+    position position = pos_piece->first;
+    piece piece = pos_piece->second;
 
     if (piece.get_type() == piece::rabbit) {
       if (piece.get_color() == player) {
@@ -149,23 +152,29 @@ std::pair<vertex::children_iterator, vertex::children_iterator> two_best_success
   return std::make_pair(min_vertex, second_min_vertex);
 }
 
-history_stack::history_stack(piece::color_t attacker) :
-  last_visited_type(vertex::type_and),  // Root's type is always OR, so this will force push() below to add the root to history.
-  attacker(attacker)
-{ }
+history_stack::history_stack() {
+  last.push(vertex::type_and);  // Root's type is always OR, so this will force push() below to add the root to history.
+}
 
-void history_stack::push(vertex const& v, board const& board) {
-  if (v.type != last_visited_type)
-    current_records.push_back(record(board, v.type == vertex::type_or ? attacker : opponent_color(attacker)));
+void history_stack::push(vertex const& v, zobrist_hasher::hash_t hash) {
+  if (v.type != last.top()) {
+    current_records.push_back(record(hash));
+  }
 
-  last_visited_type = v.type;
+  last.push(v.type);
 }
 
 void history_stack::pop(vertex const& v) {
-  if (v.type != last_visited_type)
-    current_records.pop_back();
+  last.pop();
 
-  last_visited_type = v.type;
+  if (!last.empty()) {
+    if (v.type != last.top()) {
+      current_records.pop_back();
+    }
+  } else {
+    assert(current_records.empty());
+    last.push(vertex::type_and);
+  }
 }
 
 void hashes_stack::push(vertex const& v) {
@@ -173,17 +182,14 @@ void hashes_stack::push(vertex const& v) {
     zobrist_hasher::hash_t const  last_hash           = stack.back();
     vertex::e_type const          last_visited_type   = last_visited.top().type;
     piece::color_t const          last_visited_player = last_visited.top().player;
-    unsigned const                last_visited_steps  = last_visited.top().steps_remaining;
 
     piece::color_t const next_player = v.type == last_visited_type ? last_visited_player : opponent_color(last_visited_player);
     zobrist_hasher::hash_t hash = hasher->update(
       last_hash, v.step->step_sequence_begin(), v.step->step_sequence_end(),
-      last_visited_steps,
-      v.steps_remaining,
       last_visited_player, next_player
     );
     stack.push_back(hash);
-    last_visited.push(last(v.type, next_player, v.steps_remaining));
+    last_visited.push(last(v.type, next_player));
   }
 }
 
@@ -371,11 +377,8 @@ void process_new(vertex& child, vertex const& parent, piece::color_t attacker, s
   state.push(step);
   
   boost::optional<piece::color_t> winner;
-  //if (child.type != parent.type)  // Only check for win if this is the start of a move.
-  winner = apns::winner(state.top(), player);
-
-  if (winner && child.type != parent.type && *winner != player)
-    winner = boost::none;  // Since the current player continues with their turn, they haven't lost yet.
+  if (child.type != parent.type)  // Only check for win if this is the start of a move.
+    winner = apns::winner(state.top(), player);
 
   if (winner) {
     if (*winner == attacker) {
@@ -387,13 +390,17 @@ void process_new(vertex& child, vertex const& parent, piece::color_t attacker, s
     }
   } else {
     // Check for repetitions.
-    if (type == parent.type || !repetition(state.top(), player, history.records())) {
+    hashes.push(child);
+
+    if (type == parent.type || !repetition(hashes.opponent_top(), history.records())) {
       child.proof_number    = 1;
       child.disproof_number = 1;
     } else {
       child.proof_number    = player == attacker ? vertex::infty : 0;
       child.disproof_number = player == attacker ? 0 : vertex::infty;
     }
+
+    hashes.pop();
   }
 
   state.pop(step);
@@ -428,7 +435,7 @@ bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_
       else if (parent.type == child->type) {
         boards.push(*killer);
         hashes.push(*child);
-        history.push(*child, boards.top());
+        history.push(*child, hashes.top());
 
         bool const success = simulate(*child, killers, ply + 1, attacker, boards, hashes, history);
 
@@ -455,7 +462,7 @@ void proof_number_search::do_iterate() {
   assert(!game->root.step);
 
   board_stack     boards(game->initial_state);
-  history_stack   history(game->attacker);
+  history_stack   history;
   hashes_stack    hashes(hasher, initial_hash, game->attacker);
 
   typedef std::vector<vertex*> path_cont;
@@ -468,7 +475,7 @@ void proof_number_search::do_iterate() {
     if (current->step)
       boards.push(*current->step);
     hashes.push(*current);
-    history.push(*current, boards.top());
+    history.push(*current, hashes.top());
 
     vertex::children_iterator next = best_successor(*current);
     if (next != current->children_end())
@@ -537,7 +544,7 @@ void depth_first_pns::do_iterate() {
     if (path.back()->step)
       boards.push(*path.back()->step);
     hashes.push(*path.back());
-    history.push(*path.back(), boards.top());
+    history.push(*path.back(), hashes.top());
   }
 
   garbage_collect();

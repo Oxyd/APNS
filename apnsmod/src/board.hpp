@@ -13,7 +13,6 @@
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
-#include <boost/python.hpp>
 
 #include <map>
 #include <list>
@@ -63,7 +62,10 @@ struct piece {
 
 private:
   friend piece piece_from_letter_unsafe(char);
-  explicit piece(char letter) : data(letter) { }
+  explicit piece(char letter) : data(letter) {
+    assert(data == 'e' || data == 'm' || data == 'h' || data == 'd' || data == 'c' || data == 'r' ||
+           data == 'E' || data == 'M' || data == 'H' || data == 'D' || data == 'C' || data == 'R');
+  }
   char data;
 };
 

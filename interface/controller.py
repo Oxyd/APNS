@@ -258,7 +258,7 @@ class Controller(object):
 
     if self.searchParameters.transTblSize > 0 and (
         self._search.transpositionTable is None or self._search.transpositionTable.size != self.searchParameters.transTblSize):
-      self._search.useTransTbl(numElementsFromMbSize(self.searchParameters.transTblSize, apnsmod.TranspositionTable), 16)
+      self._search.useTransTbl(numElementsFromMbSize(self.searchParameters.transTblSize, apnsmod.TranspositionTable))
 
     self._search.killerCount = self.searchParameters.killersCount
     self._search.gcHigh = self.searchParameters.gcHigh
