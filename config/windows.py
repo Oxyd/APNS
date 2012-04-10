@@ -33,6 +33,7 @@ def config(conf, bits, debug, profile):
         'NOMINMAX',                 # MSVS defines min and max names as macros otherwise. Evil, sad, but true.                                                                                                       
         '_SCL_SECURE_NO_WARNINGS',  # Reduce the number of warnings from the standard library implementation.                                                                                                        
         'BOOST_PYTHON_STATIC_LIB',  # I want to link against Boost.Python statically on Windows.                                                                                                                     
+        'BOOST_SP_DISABLE_THREADS',
         '_MBCS',
         'NDEBUG' if not debug else '',
 
