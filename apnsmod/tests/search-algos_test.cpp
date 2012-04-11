@@ -176,31 +176,29 @@ TEST(history_stack_test, push_pop_test) {
   fourth.type = vertex::type_and;
   fourth.step = step::validate_ordinary_step(b, elementary_step::displacement(position(7, 'h'), south));
 
-  history_stack h(piece::gold);
+  history_stack h;
 
   unapply(*third.step, b);
   unapply(*second.step, b);
   unapply(*first.step, b);
 
-  h.push(first, b, first_hash);
+  h.push(first, first_hash);
   ASSERT_EQ(1, h.records().size());
-  EXPECT_EQ(b, h.records().back().position);
   EXPECT_EQ(first_hash, h.records().back().hash);
 
   apply(*first.step, b);
 
-  h.push(second, b, 0);
+  h.push(second, 0);
   EXPECT_EQ(1, h.records().size());
 
   apply(*second.step, b);
-  h.push(third, b, second_hash);
+  h.push(third, second_hash);
 
   EXPECT_EQ(2, h.records().size());
-  EXPECT_EQ(b, h.records().back().position);
   EXPECT_EQ(second_hash, h.records().back().hash);
 
   apply(*third.step, b);
-  h.push(fourth, b, 0);
+  h.push(fourth, 0);
 
   EXPECT_EQ(2, h.records().size());
 

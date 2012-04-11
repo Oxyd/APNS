@@ -33,11 +33,18 @@ void export_algo(char const* name, char const* description) {
          "algo.run(msHowLong) -> None\n\nRun the algorithm for msHowLong milliseconds. If msHowLong is 0, the algorithm will run"
          "until it finishes.")
     .def("useTransTbl", &Algo::use_trans_tbl,
-         "algo.useTransTbl(size, keepTime) -> None\n\nMake this algorithm use a transposition table of given size and keep time.")
+         "algo.useTransTbl(size) -> None\n\n"
+         "Make this algorithm use a transposition table of given size.")
+    .def("useProofTbl", &Algo::use_proof_tbl,
+         "algo.useProofTbl(size) -> None\n\n"
+         "Make this algorithm use a proof table of given size.")
     
     .add_property("transpositionTable", 
                   make_function(&Algo::get_trans_tbl, return_internal_reference<>()),
                   "The TranspositionTable instance associated with this algorithm or None.")
+    .add_property("proofTable",
+                  make_function(&Algo::get_proof_tbl, return_internal_reference<>()),
+                  "The ProofTable instance associated with this algorithm or None.")
     .add_property("positionCount",
                   &Algo::get_position_count,
                   "Total number of vertices currently held by this algorithm")

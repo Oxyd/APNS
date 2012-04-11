@@ -235,7 +235,8 @@ namespace detail {
   //! \param hasher The hasher instance used for this tree.
   //! \param leaf_hash Hash value of leaf_state
   //! \param history Game history gathered during the descend to the leaf.
-  void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, transposition_table* trans_tbl,
+  void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, 
+              transposition_table* trans_tbl, proof_table* proof_tbl, 
               std::size_t ply, killer_db const& killers, hashes_stack& hashes, history_stack const& history);
 
   //! Cut non-proving (-disproving) children of a vertex.
@@ -243,7 +244,7 @@ namespace detail {
 
   //! Process a newly vertex in the tree.
   void process_new(vertex& child, vertex const& parent, piece::color_t atatcker, step const& step, 
-                   vertex::e_type type, transposition_table* trans_tbl,
+                   vertex::e_type type, transposition_table* trans_tbl, proof_table* proof_tbl,
                    hashes_stack& hashes, board_stack& state, history_stack const& history);
 
   //! Simulate a subtree, if possible.
@@ -254,13 +255,15 @@ namespace detail {
                 hashes_stack& hashes, history_stack& history);
 
   //! Convert history as defined by the history_stack into history as defined by proof_table.
-#if 0
-  history_t proof_history_from_records(history_stack::records_cont const& records) {
+  inline history_t proof_history_from_records(history_stack::records_cont const& records) {
     history_t history;
     for (history_stack::records_cont::const_iterator record = records.begin();
          record != records.end(); ++record) {
-      history[
-#endif
+      history.push_back(record->hash);
+    }
+
+    return history;
+  }
 
 } // namespace apns::detail
 
@@ -384,7 +387,7 @@ protected:
       }
 
       update_numbers(std::reverse_iterator<PathIter>(path_end), std::reverse_iterator<PathIter>(path_begin),
-                     hashes_stack.hashes().rbegin());
+                     hashes_stack.hashes().rbegin(), history);
 
       leaf = *(path_end - 1);
       if ((leaf->type == vertex::type_or && leaf->proof_number == 0)
@@ -394,11 +397,12 @@ protected:
   }
 
   void expand(vertex::children_iterator leaf, board_stack& state, hashes_stack& hashes, history_stack& history) {
-    apns::detail::expand(leaf, state, game->attacker, trans_tbl.get(), hashes.hashes().size() - 1, killers, hashes, history);
+    apns::detail::expand(leaf, state, game->attacker, trans_tbl.get(), proof_tbl.get(), hashes.hashes().size() - 1, 
+                         killers, hashes, history);
   }
 
   template <typename HashesRevIter, typename PathRevIter>
-  void update_numbers(PathRevIter path_begin, PathRevIter path_end, HashesRevIter hashes_begin) {
+  void update_numbers(PathRevIter path_begin, PathRevIter path_end, HashesRevIter hashes_begin, history_stack history) {
     std::size_t ply = std::distance(path_begin, path_end) - 1;
     PathRevIter prev = path_end;
     PathRevIter current = path_begin;
@@ -409,6 +413,14 @@ protected:
 
       if (trans_tbl && v.proof_number != 0 && v.disproof_number != 0)
         trans_tbl->insert(*hashes_begin, ply, std::make_pair(v.proof_number, v.disproof_number));
+
+      else if (proof_tbl && (v.proof_number == 0 || v.disproof_number == 0)) {
+        proof_tbl->insert(
+          *hashes_begin, ply,
+          proof_entry_t(v.proof_number, v.disproof_number,
+                        detail::proof_history_from_records(history.records()))
+        );
+      }
 
       if (current + 1 != path_end) {
         vertex& parent = **(current + 1);
@@ -421,6 +433,7 @@ protected:
       if (prev != path_end)
         *prev = resort_children(**current, *prev, vertex_comparator(**current));
 
+      history.pop(**current);
       prev = current;
       ++current;
       ++hashes_begin;

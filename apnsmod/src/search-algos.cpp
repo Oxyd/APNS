@@ -259,7 +259,8 @@ void update_numbers(vertex& v) {
 
 namespace detail {
 
-void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, transposition_table* trans_tbl, 
+void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, 
+            transposition_table* trans_tbl, proof_table* proof_tbl, 
             std::size_t ply, killer_db const& killers, hashes_stack& hashes, history_stack const& history) {
   assert(leaf->children_count() == 0);  // leaf is a leaf.
   assert(leaf->proof_number != 0 || leaf->disproof_number != 0); // It's not (dis-)proven yet.
@@ -284,11 +285,11 @@ void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t a
   
   vertex::children_iterator killers_end = leaf->children_begin();
   for (steps_seq::iterator s = steps.begin(); s != steps.end(); ++s) {
-    step const&           step = s->first;
+    step                  step = s->first;
     vertex::e_type const  type = s->second;
     vertex::children_iterator child = leaf->add_child();
 
-    process_new(*child, *leaf, attacker, step, type, trans_tbl, hashes, state, history);
+    process_new(*child, *leaf, attacker, step, type, trans_tbl, proof_tbl, hashes, state, history);
     assert(child->step);
 
     if (killers.is_killer(ply, type, step)) {
@@ -340,66 +341,102 @@ std::size_t cut(vertex& parent) {
 }
 
 void process_new(vertex& child, vertex const& parent, piece::color_t attacker, step const& step, 
-                 vertex::e_type type, transposition_table* trans_tbl, hashes_stack& hashes, board_stack& state,
-                 history_stack const& history) {
+                 vertex::e_type type, transposition_table* trans_tbl, proof_table* proof_tbl, 
+                 hashes_stack& hashes, board_stack& state, history_stack const& history) {
   piece::color_t const player = parent.type == vertex::type_or ? attacker : opponent_color(attacker);
 
   child.step = step;
   child.type = type;
+  child.proof_number = 0;
+  child.disproof_number = 0;
 
   if (type == parent.type)
     child.steps_remaining = parent.steps_remaining - static_cast<signed>(step.steps_used());
   else
     child.steps_remaining = MAX_STEPS;
 
-  if (trans_tbl) {
-    hashes.push(child);
-    boost::optional<transposition_table::entry_t> values = trans_tbl->query(hashes.top());
-    hashes.pop();
+  state.push(step);
+  hashes.push(child);
+
+  if (proof_tbl) {
+    boost::optional<proof_table::entry_t> values = proof_tbl->query(hashes.top());
 
     if (values) {
-      vertex::number_t pn = values->first;
-      vertex::number_t dn = values->second;
+      // Check whether the histories are compatible.
+      boost::unordered_map<zobrist_hasher::hash_t, std::size_t> repetitions;
+
+      bool repetition = false;
+
+      for (history_t::const_iterator h = values->history.begin(); h != values->history.end(); ++h)
+        ++repetitions[*h];
+
+      for (history_stack::records_cont::const_iterator h = history.records().begin();
+           h != history.records().end() && !repetition; ++h) {
+        if (++repetitions[h->hash] >= 3) {
+          // This would possibly (but not surely) use a third-time repetition somewhere along the path.
+          repetition = true;
+        }
+      }
+
+      if (!repetition) {
+        vertex::number_t const pn = values->proof_number;
+        vertex::number_t const dn = values->disproof_number;
+        assert(pn == 0 || dn == 0);
+
+        child.proof_number = pn;
+        child.disproof_number = dn;
+      }
+      else {
+        proof_tbl->reject();
+      }
+    }
+  }
+
+  if (trans_tbl && child.proof_number == 0 && child.disproof_number == 0) {
+    // If values weren't found in the proof table.
+    
+    boost::optional<transposition_table::entry_t> values = trans_tbl->query(hashes.top());
+
+    if (values) {
+      vertex::number_t const pn = values->first;
+      vertex::number_t const dn = values->second;
       assert(pn != 0 && dn != 0);
 
       child.proof_number = pn;
       child.disproof_number = dn;
-
-      return;
     }
   }
 
-  // If values were not found in the transposition table.
+  if (child.proof_number == 0 && child.disproof_number == 0) {
+    // If values were not found in any table.
+    
+    boost::optional<piece::color_t> winner;
+    if (child.type != parent.type)  // Only check for win if this is the start of a move.
+      winner = apns::winner(state.top(), player);
 
-  state.push(step);
-  
-  boost::optional<piece::color_t> winner;
-  if (child.type != parent.type)  // Only check for win if this is the start of a move.
-    winner = apns::winner(state.top(), player);
-
-  if (winner) {
-    if (*winner == attacker) {
-      child.proof_number     = 0;
-      child.disproof_number  = vertex::infty;
+    if (winner) {
+      if (*winner == attacker) {
+        child.proof_number     = 0;
+        child.disproof_number  = vertex::infty;
+      } else {
+        child.proof_number     = vertex::infty;
+        child.disproof_number  = 0;
+      }
     } else {
-      child.proof_number     = vertex::infty;
-      child.disproof_number  = 0;
-    }
-  } else {
-    // Check for repetitions.
-    hashes.push(child);
+      // Check for repetitions.
+      if (type == parent.type || !repetition(hashes.opponent_top(), history.records())) {
+        child.proof_number    = 1;
+        child.disproof_number = 1;
+      } else {
+        child.proof_number    = player == attacker ? vertex::infty : 0;
+        child.disproof_number = player == attacker ? 0 : vertex::infty;
+      }
 
-    if (type == parent.type || !repetition(hashes.opponent_top(), history.records())) {
-      child.proof_number    = 1;
-      child.disproof_number = 1;
-    } else {
-      child.proof_number    = player == attacker ? vertex::infty : 0;
-      child.disproof_number = player == attacker ? 0 : vertex::infty;
     }
 
-    hashes.pop();
   }
 
+  hashes.pop();
   state.pop(step);
 }
 
@@ -421,7 +458,7 @@ bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_
         continue;
 
       vertex::children_iterator child = parent.add_child();
-      process_new(*child, parent, attacker, *killer, type, 0, hashes, boards, history);
+      process_new(*child, parent, attacker, *killer, type, 0, 0, hashes, boards, history);
 
       if ((parent.type == vertex::type_or && child->proof_number == 0)
           || (parent.type == vertex::type_and && child->disproof_number == 0)) {

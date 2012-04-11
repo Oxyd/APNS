@@ -4,9 +4,9 @@
                     #memoryUsedTotal, TranspositionTable, saveGame, loadGame
 import apnsmod
 from interface.observable import Observable
-from interface.controller import Controller, SearchProgress, SearchParameters, loadBoard, saveBoard
+from interface.controller import Controller, SearchParameters, loadBoard, saveBoard
 
-import time, gc, os, sys, itertools
+import time, gc, sys, itertools
 
 try:
   import Tkinter
@@ -179,6 +179,7 @@ class MainWindowController(object):
         pars.positionLimit = newPrefs.positionLimit if newPrefs.positionLimitCheck else None
         pars.memoryLimit = newPrefs.memLimit if newPrefs.memLimitCheck else None
         pars.transTblSize = newPrefs.transTblSize
+        pars.proofTblSize = newPrefs.proofTblSize
         pars.killersCount = newPrefs.killersCount
         pars.gcHigh = newPrefs.gcHigh if newPrefs.gcCheck else 0
         pars.gcLow = newPrefs.gcLow if newPrefs.gcCheck else 0
@@ -220,7 +221,7 @@ class MainWindowController(object):
         gc.collect()
 
         dlg = SaveLoadProgressDialog(self._mainWindowDsply.window, 'Loading search tree', 'Loading the search tree.\nThis might take a while')
-        ctrl = LoadProgressController(self._controller, dlg, str(filename))
+        LoadProgressController(self._controller, dlg, str(filename))
         self._resultsCtrl.updateTree(self._controller)
 
         if self._controller.gameLoaded:
@@ -291,7 +292,7 @@ class ResultsDisplay(Observable):
     self._content.columnconfigure(0, weight=1)
 
 
-  def addNode(self, parent, name, type, pn, dn, best=False, principal=False):
+  def addNode(self, parent, name, type_, pn, dn, best=False, principal=False):
     '''Add a node to the tree. Return a handle of the node, which can later be used to remove the node, or attach a child
     to it.
 
@@ -308,7 +309,7 @@ class ResultsDisplay(Observable):
     else:
       mark = ''
 
-    handle = self._tree.insert(parent, 'end', text=name, values=(mark, type, pn, dn))
+    handle = self._tree.insert(parent, 'end', text=name, values=(mark, type_, pn, dn))
     return handle
 
 
@@ -318,7 +319,7 @@ class ResultsDisplay(Observable):
     self._tree.delete(handle)
 
 
-  def updateNode(self, handle, type, pn, dn, best=False, principal=False):
+  def updateNode(self, handle, type_, pn, dn, best=False, principal=False):
     '''Change the PN and DN values of a node.'''
 
     if principal:
@@ -328,7 +329,7 @@ class ResultsDisplay(Observable):
     else:
       mark = ''
 
-    self._tree.item(handle, values=(mark, type, pn, dn))
+    self._tree.item(handle, values=(mark, type_, pn, dn))
 
 
   def selectNode(self, handle):
@@ -628,7 +629,7 @@ class ResultsController(object):
   def _nodeType(self, node):
     '''Return the string representation of a node's type. It's either 'AND' or 'OR'.'''
 
-    if node.type_ == Vertex.Type.and_:
+    if node.type_ == apnsmod.Vertex.Type.and_:
       return 'AND'
     else:
       return 'OR'
@@ -785,7 +786,7 @@ class SaveProgressController(object):
     canceller = Canceller(controller, dialog)
     controller.saveGameCallbacks.add(canceller.callback)
     dialog.addObserver(canceller)
-    dlg.run()
+    dialog.run()
 
     try:
       controller.saveGame(filename)
@@ -837,6 +838,8 @@ class RunSearchDialog(Observable):
                            lambda self, val: self.enableMemLimit(val))
   transTblSize = property(lambda self: self._memorySpinVar.get(),
                           lambda self, val: self.setTransTblSize(val))
+  proofTblSize = property(lambda self: self._proofSpinVar.get(),
+                          lambda self, val: self.setProofTblSize(val))
   killersCount = property(lambda self: self._killersSpinVar.get(),
                           lambda self, val: self.setKillers(val))
   gcCheck = property(lambda self: self._gcCheckVar.get() == '1',
@@ -925,12 +928,18 @@ class RunSearchDialog(Observable):
     sizeLabel = ttk.Label(algoParamsFrame, text='Transposition table size: ')
     sizeUnits = ttk.Label(algoParamsFrame, text='MB')
 
+    proofLabel = ttk.Label(algoParamsFrame, text='Proof table size: ')
+    proofUnits = ttk.Label(algoParamsFrame, text='MB')
+
     self._killersSpinVar = Tkinter.StringVar(value='0')
     self._memorySpinVar = Tkinter.StringVar(value='0')
+    self._proofSpinVar = Tkinter.StringVar(value='0')
 
-    self._killersSpin = Tkinter.Spinbox(algoParamsFrame, from_=1, to=50, textvariable=self._killersSpinVar)
-    self._memorySpin = Tkinter.Spinbox(algoParamsFrame, from_=1, to=99999999,
+    self._killersSpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=50, textvariable=self._killersSpinVar)
+    self._memorySpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=99999999,
                                        textvariable=self._memorySpinVar)
+    self._proofSpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=99999999,
+                                      textvariable=self._proofSpinVar)
 
     runBtn = ttk.Button(self._dialog.buttonBox, text='Run', command=self._execute)
     cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel', command=self._dialog.close)
@@ -961,6 +970,10 @@ class RunSearchDialog(Observable):
     sizeLabel.grid(row=1, column=0, sticky='W')
     self._memorySpin.grid(row=1, column=1, sticky='WE', padx=5)
     sizeUnits.grid(row=1, column=2)
+
+    proofLabel.grid(row=2, column=0, sticky='W')
+    self._proofSpin.grid(row=2, column=1, sticky='WE', padx=5)
+    proofUnits.grid(row=2, column=2)
 
     algoParamsFrame.columnconfigure(1, weight=1)
     algoParamsFrame.grid(row=3, column=0, sticky='EW', pady=(5, 0))
@@ -1071,6 +1084,13 @@ class RunSearchDialog(Observable):
 
     self._memorySpinVar.set(int(value))
 
+
+  def setProofTblSize(self, value):
+    '''Set the proof table size spinbox to the given value.'''
+
+    self._proofSpinVar.set(int(value))
+
+
   def setKillers(self, value):
     '''Set the killer count for each level.'''
 
@@ -1092,6 +1112,7 @@ class RunSearchController(object):
   posLimit = property(lambda self: self._posLimit)
   memLimit = property(lambda self: self._memLimit)
   transTblSize = property(lambda self: self._transTblSize)
+  proofTblSize = property(lambda self: self._proofTblSize)
   killersCount = property(lambda self: self._killersCount)
   showTimeLeft = property(lambda self: self._showTimeLeft)
   gcHigh = property(lambda self: self._gcHigh)
@@ -1126,6 +1147,7 @@ class RunSearchController(object):
     self._runSearchDlg.memLimit = get('memLimit', 1500)
     self._runSearchDlg.memLimitCheck = get('memLimitCheck', not is64Bit)
     self._runSearchDlg.transTblSize = get('transTblSize', 32)
+    self._runSearchDlg.proofTblSize = get('proofTblSize', 32)
     self._runSearchDlg.killersCount = get('killersCount', 2)
 
     self._doRun = False
@@ -1177,6 +1199,7 @@ class RunSearchController(object):
 
         self._algo = self._runSearchDlg.algo
         self._transTblSize = (int(self._runSearchDlg.transTblSize) * MB) / apnsmod.TranspositionTable.sizeOfElement
+        self._proofTblSize = (int(self._runSearchDlg.proofTblSize) * MB) / apnsmod.ProofTable.sizeOfElement
         self._timeLimit = sTimeLimit
         self._posLimit = posLimit
         self._memLimit = memLimit
@@ -1196,6 +1219,7 @@ class RunSearchController(object):
         last.memLimit = int(self._runSearchDlg.memLimit)
         last.memLimitCheck = bool(self._runSearchDlg.memLimitCheck)
         last.transTblSize = int(self._runSearchDlg.transTblSize)
+        last.proofTblSize = int(self._runSearchDlg.proofTblSize)
         last.killersCount = int(self._runSearchDlg.killersCount)
         last.gcCheck = bool(self._runSearchDlg.gcCheck)
         last.gcHigh = int(self._runSearchDlg.gcHigh)
@@ -1238,6 +1262,7 @@ class RunSearchController(object):
             and checkVar(dlg.positionLimitCheck, dlg.positionLimit, 'Position limit')
             and checkVar(dlg.memLimitCheck, dlg.memLimit, 'Memory limit')
             and checkVar(True, dlg.transTblSize, 'Size of transposition table')
+            and checkVar(True, dlg.proofTblSize, 'Size of proof table')
             and checkVar(True, dlg.killersCount, 'Killers count')
             and checkVar(dlg.gcCheck, dlg.gcHigh, 'GC high threshold')
             and checkVar(dlg.gcCheck, dlg.gcLow, 'GC low threshold'))
@@ -1271,6 +1296,9 @@ class SearchProgressDialog(Observable):
     transTblSizeLbl = ttk.Label(stats, text='Transposition table size:')
     transTblHitsLbl = ttk.Label(stats, text='Transposition table hits:')
     transTblMissesLbl = ttk.Label(stats, text='Transposition table misses:')
+    proofTblSizeLbl = ttk.Label(stats, text='Proof table size:')
+    proofTblHitsLbl = ttk.Label(stats, text='Proof table hits:')
+    proofTblMissesLbl = ttk.Label(stats, text='Proof table misses:')
     posCountLbl = ttk.Label(stats, text='Unique positions total:')
     posPerSecLbl = ttk.Label(stats, text='New positions per second:')
 
@@ -1278,6 +1306,9 @@ class SearchProgressDialog(Observable):
     self._transTblSize = ttk.Label(stats)
     self._transTblHits = ttk.Label(stats)
     self._transTblMisses = ttk.Label(stats)
+    self._proofTblSize = ttk.Label(stats)
+    self._proofTblHits = ttk.Label(stats)
+    self._proofTblMisses = ttk.Label(stats)
     self._posCount = ttk.Label(stats)
     self._posPerSec = ttk.Label(stats)
 
@@ -1321,15 +1352,21 @@ class SearchProgressDialog(Observable):
     transTblSizeLbl.grid(row=1, column=0, sticky='E')
     transTblHitsLbl.grid(row=2, column=0, sticky='E')
     transTblMissesLbl.grid(row=3, column=0, sticky='E')
-    posCountLbl.grid(row=4, column=0, sticky='E')
-    posPerSecLbl.grid(row=5, column=0, sticky='E')
+    proofTblSizeLbl.grid(row=4, column=0, sticky='E')
+    proofTblHitsLbl.grid(row=5, column=0, sticky='E')
+    proofTblMissesLbl.grid(row=6, column=0, sticky='E')
+    posCountLbl.grid(row=7, column=0, sticky='E')
+    posPerSecLbl.grid(row=8, column=0, sticky='E')
 
     self._memoryAlloc.grid(row=0, column=1, sticky='W', padx=(5, 0))
     self._transTblSize.grid(row=1, column=1, sticky='W', padx=(5, 0))
     self._transTblHits.grid(row=2, column=1, sticky='W', padx=(5, 0))
     self._transTblMisses.grid(row=3, column=1, sticky='W', padx=(5, 0))
-    self._posCount.grid(row=4, column=1, sticky='W', padx=(5, 0))
-    self._posPerSec.grid(row=5, column=1, sticky='W', padx=(5, 0))
+    self._proofTblSize.grid(row=4, column=1, sticky='W', padx=(5, 0))
+    self._proofTblHits.grid(row=5, column=1, sticky='W', padx=(5, 0))
+    self._proofTblMisses.grid(row=6, column=1, sticky='W', padx=(5, 0))
+    self._posCount.grid(row=7, column=1, sticky='W', padx=(5, 0))
+    self._posPerSec.grid(row=8, column=1, sticky='W', padx=(5, 0))
 
     stats.columnconfigure(1, weight=1)
 
@@ -1338,6 +1375,7 @@ class SearchProgressDialog(Observable):
 
     self.showMemoryAllocated('0 B')
     self.showTransTblStats(0, 0, 0)
+    self.showProofTblStats(0, 0, 0)
     self.showPosCount(0, 0)
 
     self._dialog.window.bind('<Escape>', lambda e: self._cancel())
@@ -1385,6 +1423,14 @@ class SearchProgressDialog(Observable):
     self._transTblSize['text'] = '%s' % memUsed
     self._transTblHits['text'] = '%s' % hits
     self._transTblMisses['text'] = '%s' % misses
+
+
+  def showProofTblStats(self, memUsed, hits, misses):
+    '''Show statistics about the proof table.'''
+
+    self._proofTblSize['text'] = '%s' % memUsed
+    self._proofTblHits['text'] = '%s' % hits
+    self._proofTblMisses['text'] = '%s' % misses
 
 
   def showPosCount(self, posCount, posPerSec):
@@ -1457,6 +1503,12 @@ class SearchProgressController(object):
         else:
           dlg.showTransTblStats(memUsed='0 B', hits='0', misses='0')
 
+        if progress.proofTblSize is not None:
+          ptSize = '{0:.2f} MB'.format(progress.proofTblSize / float(1024 * 1024))
+          dlg.showProofTblStats(memUsed=ptSize, hits=progress.proofTblHits, misses=progress.proofTblMisses)
+        else:
+          dlg.showProofTblStats(memUsed='0 B', hits='0', misses='0')
+
         dlg.showPosCount(posCount=progress.positionCount, posPerSec=progress.positionsPerSecond)
         dlg.showRootPnDn(progress.rootPN, progress.rootDN)
         dlg.updateGui()
@@ -1481,8 +1533,18 @@ class SearchStatsController(object):
     searchProgressDlg.showMemoryAllocated('{0:.2f} MB'.format(s.memUsed / float(1024 * 1024)))
     searchProgressDlg.showPosCount(posCount=s.positionCount, posPerSec=s.positionsPerSecond)
     searchProgressDlg.showRootPnDn(s.rootPN, s.rootDN)
-    ttSize = '{0:.2f} MB'.format(s.transTblSize / float(1024 * 1024))
-    searchProgressDlg.showTransTblStats(ttSize, hits=s.transTblHits, misses=s.transTblMisses)
+
+    if s.transTblSize is not None:
+      ttSize = '{0:.2f} MB'.format(s.transTblSize / float(1024 * 1024))
+      searchProgressDlg.showTransTblStats(ttSize, hits=s.transTblHits, misses=s.transTblMisses)
+    else:
+      searchProgressDlg.showTransTblStats('0 B', '0', '0')
+
+    if s.proofTblSize is not None:
+      ptSize = '{0:.2f} MB'.format(s.proofTblSize / float(1024 * 1024))
+      searchProgressDlg.showProofTblStats(ptSize, hits=s.proofTblHits, misses=s.proofTblMisses)
+    else:
+      searchProgressDlg.showProofTblStats('0 B', '0', '0')
 
     searchProgressDlg.addObserver(self)
     searchProgressDlg.run()
@@ -1722,21 +1784,21 @@ class ImageManager(object):
 
       self._pieceImages = dict()
       for color in _COLORS:
-        for type in _TYPES:
-          img = PhotoImage(file=self._imageName(color, type))
-          self._pieceImages[(color, type)] = img
+        for type_ in _TYPES:
+          img = PhotoImage(file=self._imageName(color, type_))
+          self._pieceImages[(color, type_)] = img
 
     except Tkinter.TclError, e:
       tkMessageBox.showerror('Error', 'Failed to load graphics.\n%s' % e)
       raise SystemExit(1)
 
 
-  def _imageName(self, color, type):
+  def _imageName(self, color, type_):
     '''Get the filename of the image of the piece with given color and type.'''
 
     colorName = { apnsmod.Piece.Color.gold: 'Gold', apnsmod.Piece.Color.silver: 'Silver' }[color]
     typeName = { apnsmod.Piece.Type.elephant: 'Elephant', apnsmod.Piece.Type.camel: 'Camel', apnsmod.Piece.Type.horse: 'Horse',
-                 apnsmod.Piece.Type.dog: 'Dog', apnsmod.Piece.Type.cat: 'Cat', apnsmod.Piece.Type.rabbit: 'Rabbit' }[type]
+                 apnsmod.Piece.Type.dog: 'Dog', apnsmod.Piece.Type.cat: 'Cat', apnsmod.Piece.Type.rabbit: 'Rabbit' }[type_]
     return 'interface/arimaa-graphics/' + colorName + typeName + '.gif'
 
 
@@ -1761,15 +1823,15 @@ class PieceChooser(Observable):
     for column in xrange(0, len(_COLORS)):
       for row in xrange(0, len(_TYPES)):
         color = _COLORS[column]
-        type = _TYPES[row]
+        type_ = _TYPES[row]
 
-        b = ttk.Label(self._frame, image=imageManager.pieceImages[color, type])
+        b = ttk.Label(self._frame, image=imageManager.pieceImages[color, type_])
         b.color = color
-        b.type = type
+        b.type = type_
         b.bind('<1>', self._pieceClicked)
 
         b.grid(row=row, column=column)
-        self._pieces[color, type] = b
+        self._pieces[color, type_] = b
 
         if PieceChooser._NORMAL_COLOR is None:
           PieceChooser._NORMAL_COLOR = b['background']
@@ -1785,19 +1847,19 @@ class PieceChooser(Observable):
   def _pieceClicked(self, event):
     widget = event.widget
     color = widget.color
-    type = widget.type
+    type_ = widget.type
 
-    self.notifyObservers(color=color, type=type)
+    self.notifyObservers(color=color, type=type_)
 
 
-  def select(self, color, type):
+  def select(self, color, type_):
     '''Hilight the piece of the given color and type in the selection.'''
-    self._pieces[color, type]['background'] = PieceChooser._HILIGHT_COLOR
+    self._pieces[color, type_]['background'] = PieceChooser._HILIGHT_COLOR
 
 
-  def unselect(self, color, type):
+  def unselect(self, color, type_):
     '''De-hilight the piece of the given color and type.'''
-    self._pieces[color, type]['background'] = PieceChooser._NORMAL_COLOR
+    self._pieces[color, type_]['background'] = PieceChooser._NORMAL_COLOR
 
 
 class BoardDisplay(Observable):
@@ -1832,14 +1894,14 @@ class BoardDisplay(Observable):
     self._canvas.delete(selection)
 
 
-  def putPiece(self, row, column, color, type):
+  def putPiece(self, row, column, color, type_):
     '''Put the specified piece on the given row and column. Return a handle to the piece. The returned handle
     must then be passed to removePiece. It is of an unspecified type. This function doesn't check if the target
     position is empty or not.
     '''
 
     x, y = self._rowColumnToXY(row, column)
-    img = self._imageManager.pieceImages[color, type]
+    img = self._imageManager.pieceImages[color, type_]
 
     return self._canvas.create_image(x, y, image=img, anchor='nw')
 
@@ -1916,8 +1978,8 @@ class BoardController(object):
     if self._enabled:
       if source == self._piecesDisplay:
         color = kwargs['color']
-        type = kwargs['type']
-        self._updatePieceSelection(color, type)
+        type_ = kwargs['type']
+        self._updatePieceSelection(color, type_)
 
       elif source == self._boardDisplay:
         row = kwargs['row']
@@ -1974,18 +2036,18 @@ class BoardController(object):
         self._displayPiece(position, piece)
 
 
-  def _updatePieceSelection(self, color, type):
+  def _updatePieceSelection(self, color, type_):
     '''Update selection on the PieceChooser.'''
 
-    if self._selectedPiece is not None and self._selectedPiece == (color, type):
+    if self._selectedPiece is not None and self._selectedPiece == (color, type_):
       self._removePieceSelection()
 
     else:
       self._removePieceSelection()
       self._removeBoardSelection()
 
-      self._piecesDisplay.select(color, type)
-      self._selectedPiece = (color, type)
+      self._piecesDisplay.select(color, type_)
+      self._selectedPiece = (color, type_)
 
 
   def _updateBoardSelection(self, row, column):
@@ -2000,10 +2062,10 @@ class BoardController(object):
 
     if self._selectedPiece is not None:
       r, c = self._boardCoordsFromDisplay(row, column)
-      color, type = self._selectedPiece
+      color, type_ = self._selectedPiece
 
       if empty(Position(r, c), self._board):
-        self._board.put(Position(r, c), Piece(color, type))
+        self._board.put(Position(r, c), Piece(color, type_))
         self._updateBoard(Position(r, c))
         self._removePieceSelection()
 

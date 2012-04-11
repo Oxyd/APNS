@@ -165,13 +165,15 @@ public:
    * \param vertex Value of the element.
    */
   void insert(hash_t hash, int depth, entry_t entry) {
-    record& r = find_record(hash);
-    if (!r.is_set() || r.hash == hash || depth < r.depth) {
-      if (!r.is_set())
+    record* r = find_record(hash, true);
+    assert(r);
+
+    if (!r->is_set() || r->hash == hash || depth < r->depth) {
+      if (!r->is_set())
         ++elements;
-      r.entry = entry;
-      r.depth = depth;
-      r.hash = hash;
+      r->entry = entry;
+      r->depth = depth;
+      r->hash = hash;
     }
   }
 
@@ -181,14 +183,23 @@ public:
    * \returns Either the found element or an empty pointer if the element wasn't found.
    */
   boost::optional<entry_t> query(hash_t hash) {
-    record& r = find_record(hash);
-    if (r.is_set() && r.hash == hash) {
+    record* r = find_record(hash, false);
+    if (r && r->is_set() && r->hash == hash) {
       ++hits;
-      return r.entry;
+      return r->entry;
     } else {
       ++misses;
       return boost::none;
     }
+  }
+
+  //! Inform the table that the client code rejected the last successful query and that is should thus be counted as a miss
+  //! rather than a hit.
+  void reject() {
+    assert(hits > 0);
+
+    --hits;
+    ++misses;
   }
 
   std::size_t get_memory_usage() const {                      //!< Get the amount of memory, in bytes, of this table.
@@ -216,15 +227,18 @@ private:
   }
   
   //! Get the record for given hash.
-  record& find_record(hash_t hash) {
+  record* find_record(hash_t hash, bool allocate) {
     page_ptr& pg = dir[page_number(hash % table_size)];
 
-    if (pg == 0) {
+    if (pg == 0 && allocate) {
       pg.reset(new page);
       ++allocated_pages;
     }
 
-    return (*pg)[page_offset(hash % table_size)];
+    if (pg != 0)
+      return &((*pg)[page_offset(hash % table_size)]);
+    else
+      return 0;
   }
 
   std::size_t const table_size;    //!< How many elements are there in one page?
@@ -257,13 +271,19 @@ std::size_t const table<Entry, Hash>::SIZE_OF_ELEMENT = sizeof(record);
 typedef detail::table<std::pair<vertex::number_t, vertex::number_t>, zobrist_hasher::hash_t> transposition_table;
 
 //! History of a path is a collection of the positions that occured at the start of each player's turn.
-typedef boost::unordered_map<zobrist_hasher::hash_t, std::size_t> history_t;
+//typedef boost::unordered_map<zobrist_hasher::hash_t, std::size_t> history_t;
+typedef std::vector<zobrist_hasher::hash_t> history_t;
 
 //! An entry in the proof table.
 struct proof_entry_t {
   vertex::number_t  proof_number;
   vertex::number_t  disproof_number;
   history_t         history;
+
+  proof_entry_t() : proof_number(0), disproof_number(0) { }
+  proof_entry_t(vertex::number_t pn, vertex::number_t dn, history_t const& h) :
+    proof_number(pn), disproof_number(dn), history(h)
+  { }
 };
 
 typedef detail::table<proof_entry_t, zobrist_hasher::hash_t> proof_table;

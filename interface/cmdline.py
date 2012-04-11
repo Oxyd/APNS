@@ -67,9 +67,8 @@ def main():
   parser.add_argument('-r', '--trans-tbl-size', type=int, default=32, metavar='trans tbl size', dest='transTblSize',
                       help='Size of the transposition table to use, in megabytes. If set to 0, don\'t use transposition table'
                       'at all')
-  parser.add_argument('-k', '--trans-tbl-keep-time', type=int, default=16, metavar='trans tbl keep time', dest='transTblKeepTime',
-                      help='How long should elements be kept in the transposition table before they can be replaced with newer'
-                      'entries')
+  parser.add_argument('-o', '--proof-tbl-size', type=int, default=32, metavar='proof tbl size', dest='proofTblSize',
+                      help='Size of the proof table to use, in megabytes. If set to 0, don\'t use proof table')
   parser.add_argument('-l', '--killer-count', type=int, default=2, metavar='number of killers', dest='killerCount',
                       help='How many killers should be kept for each level')
   parser.add_argument('-G', '--gc-high', type=int, default=0, metavar='GC high', dest='gcHigh',
@@ -99,7 +98,7 @@ def main():
       raise SystemExit(1)
 
   checkNum(args.transTblSize, 'Size of transposition table')
-  checkNum(args.transTblKeepTime, 'Transposition table keep time')
+  checkNum(args.proofTblSize, 'Size of proof table')
   checkNum(args.killerCount, 'Number of killers')
   checkNum(args.gcHigh, 'GC high threshold')
   checkNum(args.gcLow, 'GC low threshold')
@@ -113,7 +112,7 @@ def main():
   params.positionLimit = args.posLimit
   params.memoryLimit = args.memLimit
   params.transTblSize = args.transTblSize
-  params.transTblKeepTime = args.transTblKeepTime
+  params.proofTblSize = args.proofTblSize
   params.killersCount = args.killerCount
   params.gcHigh = args.gcHigh
   params.gcLow = args.gcLow
@@ -183,6 +182,12 @@ def main():
       show('    -- Size: {0:.2f} MB'.format(float(progress.transTblSize) / MB))
       show('    -- Hits: {0}'.format(progress.transTblHits))
       show('    -- Misses: {0}'.format(progress.transTblMisses))
+
+    if progress.proofTblSize:
+      show('  -- Proof table:')
+      show('    -- Site: {0:.2f} MB'.format(float(progress.proofTblSize) / MB))
+      show('    -- Hits: {0}'.format(progress.proofTblHits))
+      show('    -- Misses: {0}'.format(progress.proofTblMisses))
 
   controller.searchProgressCallbacks.add(printProgress)
   show('Starting search. Pres Control-C to stop the search at any time.')

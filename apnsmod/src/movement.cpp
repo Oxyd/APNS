@@ -98,13 +98,13 @@ bool would_be_capture(apns::position pos, apns::piece what, apns::position from,
   using namespace apns;
   if (!empty(pos, board)
       && trap(pos)) {
-    piece const& target = *board.get(pos);
+    piece const target = *board.get(pos);
 
     for (neighbourhood_iter neighbour = neighbourhood_begin(pos); neighbour != neighbourhood_end(); ++neighbour) {
-      if (*neighbour != from
-          && *neighbour != where
-          && !empty(*neighbour, board)
-          && board.get(*neighbour)->get_color() == target.get_color()) {
+      if (*neighbour != from &&
+          *neighbour != where &&
+          !empty(*neighbour, board) &&
+          board.get(*neighbour)->get_color() == target.get_color()) {
         return false;
       } else if (*neighbour == where
           && target.get_color() == what.get_color()) {
@@ -124,7 +124,7 @@ typedef std::vector<apns::elementary_step> elementary_steps_cont;
  * Check for captures and insert them into a sequence of elementary steps.
  *
  * Assuming that the piece #what has moved from position #from to position #destination, this function calculates
- * all captures that have resulted from this move and inserts them into #sequence.
+ * all captures that would have resulted from this move and inserts them into #sequence.
  *
  * \param what What piece has moved.
  * \param from From where it has moved.
@@ -133,7 +133,7 @@ typedef std::vector<apns::elementary_step> elementary_steps_cont;
  * \param sequence All detected captures will be inserted here.
  */
 void check_for_captures(apns::piece what, apns::position from, apns::position destination,
-    apns::board const& board, elementary_steps_cont& sequence) {
+                        apns::board const& board, elementary_steps_cont& sequence) {
   using namespace apns;
   if (would_be_capture(what, from, destination, board)) {
     elementary_step capture = elementary_step::capture(destination);
@@ -288,15 +288,15 @@ bool operator != (elementary_step const& lhs, elementary_step const& rhs) {
 }
 
 step_holder step::validate_ordinary_step(board const& board, elementary_step step) {
-  position const& from    = step.get_from();
-  direction const& where  = step.get_where();
+  position const from    = step.get_from();
+  direction const where  = step.get_where();
 
   if (adjacent_valid(from, where)
       && !empty(from, board)
       && !frozen(from, board)
       && empty(make_adjacent(from, where), board)) {
-    position const destination = make_adjacent(from, where);
-    piece const& what = *board.get(from);  // Guaranteed to be non-empty by the if above.
+    position const destination  = make_adjacent(from, where);
+    piece const what            = *board.get(from);  // Guaranteed to be non-empty by the if above.
 
     if (what.get_type() == piece::rabbit
         && ((what.get_color() == piece::gold && where == south)
@@ -450,7 +450,7 @@ std::size_t step::steps_used() const {
 
 step step::make_push_pull(board const& board, elementary_step first_step, elementary_step second_step) {
   elementary_step_seq sequence;
-  piece const& first_piece = *board.get(first_step.get_from());  // Assumed to be non-empty.
+  piece const first_piece = *board.get(first_step.get_from());  // Assumed to be non-empty.
   first_step.set_what(first_piece);
   sequence.insert(sequence.begin(), first_step);
 
@@ -458,7 +458,7 @@ step step::make_push_pull(board const& board, elementary_step first_step, elemen
 
   check_for_captures(first_piece, first_step.get_from(), first_destination, board, sequence);
 
-  piece const& second_piece = *board.get(second_step.get_from());  // Assumed to be non-empty.
+  piece const second_piece = *board.get(second_step.get_from());  // Assumed to be non-empty.
   second_step.set_what(second_piece);
   sequence.insert(sequence.end(), second_step);
 
@@ -501,7 +501,7 @@ void apply(step const& step, board& board) {
       es != step.step_sequence_end(); ++es) {
     boost::optional<piece> maybe_what = board.get(es->get_from());
     if (maybe_what) {
-      piece const& what = *maybe_what;
+      piece const what = *maybe_what;
 
       board.remove(es->get_from());
 
@@ -527,7 +527,7 @@ void unapply(step const& step, board& board) {
       boost::optional<piece> maybe_what = board.get(destination);
 
       if (maybe_what) {
-        piece const& what = *maybe_what;
+        piece const what = *maybe_what;
         board.remove(destination);
         board.put(original_position, what);
       } else {
@@ -535,7 +535,7 @@ void unapply(step const& step, board& board) {
       }
     } else {
       assert(es->get_what());
-      piece const& what = *es->get_what();
+      piece const what = *es->get_what();
       board.put(original_position, what);
     }
   }

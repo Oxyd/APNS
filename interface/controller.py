@@ -3,7 +3,7 @@
 import apnsmod
 import time
 import re
-import gc
+import sys
 
 class _Callbacks(object):
   def __init__(self):
@@ -141,7 +141,7 @@ class SearchParameters:
     self.positionLimit      = None
     self.memoryLimit        = None
     self.transTblSize       = None
-    self.transTblKeepTime   = None
+    self.proofTblSize       = None
     self.killersCount       = 2
     self.gcHigh             = 5000000
     self.gcLow              = 3000000
@@ -159,6 +159,9 @@ class SearchProgress:
     self.transTblSize = None
     self.transTblHits = None
     self.transTblMisses = None
+    self.proofTblSize = None
+    self.proofTblHits = None
+    self.proofTblMisses = None
 
 MB = 1024 * 1024
 
@@ -260,6 +263,10 @@ class Controller(object):
         self._search.transpositionTable is None or self._search.transpositionTable.size != self.searchParameters.transTblSize):
       self._search.useTransTbl(numElementsFromMbSize(self.searchParameters.transTblSize, apnsmod.TranspositionTable))
 
+    if self.searchParameters.proofTblSize > 0 and (
+        self._search.proofTable is None or self._searchProofTable.size != self.searchParameters.proofTblSize):
+      self._search.useProofTbl(numElementsFromMbSize(self.searchParameters.proofTblSize, apnsmod.ProofTable))
+
     self._search.killerCount = self.searchParameters.killersCount
     self._search.gcHigh = self.searchParameters.gcHigh
     self._search.gcLow  = self.searchParameters.gcLow
@@ -322,6 +329,12 @@ class Controller(object):
       progress.transTblSize = tt.memoryUsage
       progress.transTblHits = tt.hits
       progress.transTblMisses = tt.misses
+
+    pt = self._search.proofTable
+    if pt:
+      progress.proofTblSize = pt.memoryUsage
+      progress.proofTblHits = pt.hits
+      progress.proofTblMisses = pt.misses
 
     return progress
 

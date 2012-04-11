@@ -309,6 +309,19 @@ TEST(movement, sacrifice_test) {
   EXPECT_EQ(piece::elephant, e2.get_what()->get_type());
 }
 
+TEST(movement, simple_move_loss_test) {
+  board b;
+  b.put(position(3, 'b'), piece(piece::gold, piece::elephant));
+  b.put(position(3, 'c'), piece(piece::gold, piece::horse));
+  b.put(position(2, 'c'), piece(piece::silver, piece::cat));
+
+  step_holder s = step::validate_ordinary_step(b, elementary_step::displacement(position(3, 'b'), north));
+
+  ASSERT_TRUE(s);
+  EXPECT_TRUE(s->capture());
+  EXPECT_EQ("Eb3n Hc3x", s->to_string());
+}
+
 class move_generation : public testing::Test {
 protected:
   void SetUp() {
