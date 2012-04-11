@@ -20,11 +20,11 @@ void vertex_set_step(apns::vertex& vertex, boost::python::object step) {
 //! Wrapper around Traversal Policy to make it more Python-friendly.
 struct py_traversal_policy : apns::virtual_traversal_policy::base {
   explicit py_traversal_policy(boost::python::object policy) : policy(policy) { }
-  virtual apns::vertex::children_iterator next(apns::vertex& v) {
+  virtual apns::vertex* next(apns::vertex& v) {
     using namespace boost::python;
 
     object n = policy(boost::ref(v));
-    return extract<apns::vertex::children_iterator>(n);
+    return extract<apns::vertex*>(n);
   }
 
 private:
@@ -61,10 +61,10 @@ private:
 };
 
 //! Wrapper around traverse to make it more Python-friendly.
-apns::vertex::children_iterator py_traverse(apns::vertex& v,
-                                            boost::python::object traversal_policy, 
-                                            boost::python::object visitor,
-                                            boost::python::object stop_condition) {
+apns::vertex* py_traverse(apns::vertex& v,
+                          boost::python::object traversal_policy,
+                          boost::python::object visitor,
+                          boost::python::object stop_condition) {
   return apns::traverse(
     v,
     apns::virtual_traversal_policy(boost::make_shared<py_traversal_policy>(py_traversal_policy(traversal_policy))),
@@ -73,20 +73,27 @@ apns::vertex::children_iterator py_traverse(apns::vertex& v,
   );
 }
 
-apns::vertex::children_iterator py_traverse(apns::vertex& v,
-                                            boost::python::object traversal_policy,
-                                            boost::python::object visitor) {
+apns::vertex* py_traverse(apns::vertex& v,
+                          boost::python::object traversal_policy,
+                          boost::python::object visitor) {
   return py_traverse(v, traversal_policy, visitor, boost::python::object());
 }
 
-apns::vertex::children_iterator py_traverse(apns::vertex& v,
-                                            boost::python::object traversal_policy) {
+apns::vertex* py_traverse(apns::vertex& v, boost::python::object traversal_policy) {
   using namespace boost::python;
   return py_traverse(v, traversal_policy, object(), object());
 }
 
 std::ptrdiff_t vertex_hash(apns::vertex& v) {
   return reinterpret_cast<std::ptrdiff_t>(&v);
+}
+
+apns::vertex* vertex_add_child(apns::vertex& parent) {
+  return &*parent.add_child();
+}
+
+void vertex_remove_child(apns::vertex& parent, apns::vertex* child) {
+  parent.remove_child(parent.iter_from_ptr(child));
 }
 
 apns::vertex* game_get_root(apns::game& g) {
@@ -121,10 +128,10 @@ void export_tree() {
           static_cast<apns::vertex::children_iterator (apns::vertex::*)()>(&apns::vertex::children_end)))
       .add_property("childrenCount", &apns::vertex::children_count)
       
-      .def("addChild", &apns::vertex::add_child,
+      .def("addChild", &vertex_add_child,
            return_internal_reference<>(),
            "v.addChild() -> Vertex\n\nAdd a child to this vertex. Returns a reference to the new child")
-      .def("removeChild", &apns::vertex::remove_child,
+      .def("removeChild", &vertex_remove_child,
            "v.removeChild(Vertex) -> None\n\nRemove a child of this vertex")
       .def("resize", &apns::vertex::resize,
            "v.resize(n) -> None\n\nResize this vertex to have exactly n children. If that means to shrink this vertex, the "
@@ -177,9 +184,9 @@ void export_tree() {
     pair_to_tuple<boost::shared_ptr<apns::game>, std::size_t> 
   >();
 
-  apns::vertex::children_iterator (*py_traverse1)(apns::vertex&, object, object, object) = &py_traverse;
-  apns::vertex::children_iterator (*py_traverse2)(apns::vertex&, object, object) = &py_traverse;
-  apns::vertex::children_iterator (*py_traverse3)(apns::vertex&, object) = &py_traverse;
+  apns::vertex* (*py_traverse1)(apns::vertex&, object, object, object) = &py_traverse;
+  apns::vertex* (*py_traverse2)(apns::vertex&, object, object) = &py_traverse;
+  apns::vertex* (*py_traverse3)(apns::vertex&, object) = &py_traverse;
   def("traverse", py_traverse1,
       return_internal_reference<1>(),
       "traverse(Vertex, traversalPolicy, visitor, stopCondition) -> Vertex\n\n"

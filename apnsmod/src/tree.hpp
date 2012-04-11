@@ -10,6 +10,9 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/ref.hpp>
+#include <boost/iterator/iterator_adaptor.hpp>
+#include <boost/iterator/reverse_iterator.hpp>
+#include <boost/type_traits.hpp>
 
 #include <cstddef>
 #include <cassert>
@@ -30,15 +33,37 @@ namespace apns {
 //! \note Operations such as add_child, remove_child, reserve, resize and pack may and will invalidate all iterators, pointers
 //! and references to any children of this vertex.
 class vertex {
+  template <typename HeldValue>
+  class children_iterator_base : public boost::iterator_adaptor<
+    children_iterator_base<HeldValue>,
+    HeldValue*,
+    boost::use_default,
+    boost::bidirectional_traversal_tag
+  > {
+    struct enabler { };
+
+  public:
+    children_iterator_base() { }
+    explicit children_iterator_base(HeldValue* ptr) : children_iterator_base::iterator_adaptor_(ptr) { }
+
+    template <typename OtherValue>
+      children_iterator_base(
+        children_iterator_base<OtherValue> const& other,
+        typename boost::enable_if<boost::is_convertible<OtherValue*, HeldValue*>, enabler>::type = enabler()
+      ) : children_iterator_base::iterator_adaptor_(other.base()) { }
+
+    template <typename T>
+    T& operator ->* (T HeldValue::* mptr) { return this->base()->*mptr; }
+  };
+
 public:
   typedef boost::uint32_t number_t;  //!< Type of the proof and disproof numbers.
-
-  typedef vertex*                               children_iterator;
-  typedef vertex const*                         const_children_iterator;
-
-  typedef std::reverse_iterator<vertex*>        reverse_children_iterator;
-  typedef std::reverse_iterator<vertex const*>  const_reverse_children_iterator;
   
+  typedef children_iterator_base<vertex>                    children_iterator;
+  typedef children_iterator_base<vertex const>              const_children_iterator;
+  typedef boost::reverse_iterator<children_iterator>        reverse_children_iterator;
+  typedef boost::reverse_iterator<const_children_iterator>  const_reverse_children_iterator;
+
   static number_t const max_num;  //!< Maximum value of a proof- or disproof number.
   static number_t const infty;    //!< Infinity value used in the algorithm.
   
@@ -64,10 +89,21 @@ public:
   //! Remove child specified by an iterator into this vertex. May invalidate all existing iterators to children of this vertex.
   void remove_child(children_iterator child);
   
-  children_iterator       children_begin()          { return reinterpret_cast<vertex*>(storage.get()); }
-  children_iterator       children_end()            { return children_begin() + size; }
-  const_children_iterator children_begin() const    { return reinterpret_cast<vertex const*>(storage.get()); }
-  const_children_iterator children_end() const      { return children_begin() + size; }
+  children_iterator children_begin() {
+    return children_iterator(reinterpret_cast<vertex*>(storage.get()));
+  }
+
+  children_iterator children_end() {
+    return children_iterator(reinterpret_cast<vertex*>(storage.get() + size));
+  }
+
+  const_children_iterator children_begin() const {
+    return const_children_iterator(reinterpret_cast<vertex const*>(storage.get()));
+  }
+
+  const_children_iterator children_end() const {
+    return const_children_iterator(reinterpret_cast<vertex const*>(storage.get() + size));
+  }
 
   reverse_children_iterator children_rbegin() {
     return reverse_children_iterator(children_end());
@@ -85,7 +121,13 @@ public:
     return const_reverse_children_iterator(children_begin());
   }
 
-  std::size_t             children_count() const    { return children_end() - children_begin(); }
+  std::size_t children_count() const { return size; }
+
+  //! Construct an iterator to a child from a pointer to a child of this vertex. The behaviour is undefined if child does not
+  //! point to a child of this vertex.
+  children_iterator iter_from_ptr(vertex* child) {
+    return children_iterator(child);
+  }
 
   //! Make this vertex allocate enough memory to hold new_size children, but don't really create the children yet. This may
   //! invalidate all existing iterators to children of this vertex.
@@ -313,66 +355,64 @@ typedef vertex* (*fun_tp)(vertex&);
 //! Generic tree traverser. This traverser doesn't have to visit every node in the tree; instead, the path it will take is
 //! dictated by the specified TraversalPolicy.
 //!
-//! \tparam TraversalPolicy Specifies how the tree will be traversed.
+//! \tparam TraversalPolicy Specifies how the tree will be traversed. It is a functor taking a vertex& and returning a pointer
+//!   to the desired successor, or null if the traversal is to be stopped.
 //! \tparam Visitor Will be called on each node that is traversed.
 //! \tparam StopCondition Will be called on each node that is traversed (after Visitor) and if it returns true, the traversal
 //! will be stopped and the last visited vertex returned.
 template <typename TraversalPolicy, typename Visitor, typename StopCondition>
-vertex::children_iterator traverse(vertex& root, TraversalPolicy traversal_policy,
-                                   Visitor visitor, StopCondition stop_condition) {
-  // This internally assumes that vertex::children_iterator is vertex*. If that changes, this function will have to be
-  // rewritten.
+vertex* traverse(vertex& root, TraversalPolicy traversal_policy, Visitor visitor, StopCondition stop_condition) {
   vertex* previous = 0;
   vertex* current = &root;
 
-  while (current && (!previous || current != previous->children_end())) {
+  while (current) {
     boost::unwrap_ref(visitor)(*current);
     if (boost::unwrap_ref(stop_condition)(*current))
       return current;
 
     previous = current;
-    current = boost::unwrap_ref(traversal_policy)(*current);
+    current = &*boost::unwrap_ref(traversal_policy)(*current);
   }
 
   return previous;
 }
 
 template <typename TraversalPolicy, typename Visitor>
-vertex::children_iterator traverse(vertex& root, TraversalPolicy traversal_policy, Visitor visitor) {
+vertex* traverse(vertex& root, TraversalPolicy traversal_policy, Visitor visitor) {
   return traverse(root, traversal_policy, visitor, null_stop_condition());
 }
 
 template <typename TraversalPolicy>
-vertex::children_iterator traverse(vertex& root, TraversalPolicy traversal_policy) {
+vertex* traverse(vertex& root, TraversalPolicy traversal_policy) {
   return traverse(root, traversal_policy, null_visitor(), null_stop_condition());
 }
 
 //! Generic tree traverser like traverse, except that this one applies TraversalPolicy first and Visitor and StopCondition after
 //! that. Useful for post-order traversals.
 template <typename TraversalPolicy, typename Visitor, typename StopCondition>
-vertex::children_iterator traverse_postorder(vertex& root, TraversalPolicy traversal_policy,
-                                             Visitor visitor, StopCondition stop_condition) {
-  vertex::children_iterator previous = &root;
-  vertex::children_iterator current = boost::unwrap_ref(traversal_policy)(root);
-  while (current && current != previous->children_end()) {
+vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy, Visitor visitor, StopCondition stop_condition) {
+  vertex* previous = &root;
+  vertex* current = &*boost::unwrap_ref(traversal_policy)(root);
+
+  while (current) {
     boost::unwrap_ref(visitor)(*current);
     if (boost::unwrap_ref(stop_condition)(*current))
       return current;
 
     previous = current;
-    current = boost::unwrap_ref(traversal_policy)(*current);
+    current = &*boost::unwrap_ref(traversal_policy)(*current);
   }
 
   return previous;
 }
 
 template <typename TraversalPolicy, typename Visitor>
-vertex::children_iterator traverse_postorder(vertex& root, TraversalPolicy traversal_policy, Visitor visitor) {
+vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy, Visitor visitor) {
   return traverse_postorder(root, traversal_policy, visitor, null_stop_condition());
 }
 
 template <typename TraversalPolicy>
-vertex::children_iterator traverse_postorder(vertex& root, TraversalPolicy traversal_policy) {
+vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy) {
   return traverse_postorder(root, traversal_policy, null_visitor(), null_stop_condition());
 }
 
@@ -381,11 +421,11 @@ class backtrack {
   typedef std::stack<std::pair<vertex::children_iterator, vertex::children_iterator> > stack_t;
 
 public:
-  vertex::children_iterator operator () (vertex& current) {
+  vertex* operator () (vertex& current) {
     if (current.children_count() > 0) {
       // This vertex has any children? Good, go to the first one. Also push this level onto the stack.
       stack.push(std::make_pair(current.children_begin(), current.children_end()));
-      return current.children_begin();
+      return &*current.children_begin();
 
     } else while (!stack.empty()) {
         // A leaf? Okay, does it have an unvisited sibling?
@@ -394,13 +434,13 @@ public:
 
         ++cur;
         if (cur != end)
-          return cur;   // It does, visit that.
+          return &*cur;   // It does, visit that.
         else
           stack.pop();  // Nope, try one level above.
       }
 
     // No dice either way? Looks like we're done.
-    return vertex::children_iterator();
+    return 0;
   }
 
 private:
@@ -412,11 +452,17 @@ class postorder {
   typedef std::stack<std::pair<apns::vertex::children_iterator, apns::vertex::children_iterator> > stack_t;
 
 public:
-  vertex::children_iterator operator () (apns::vertex& v) {
+  vertex* operator () (apns::vertex& v) {
     using namespace apns;
 
-    if (stack.empty())
-      return inc(recurse(&v));
+    if (stack.empty()) {
+      if (v.children_count() > 0) {
+        stack.push(std::make_pair(v.children_begin(), v.children_end()));
+        return inc(recurse(stack.top().first));
+      } else {
+        return 0;
+      }
+    }
 
     if (stack.top().first != stack.top().second)
       return inc(recurse(stack.top().first));
@@ -425,24 +471,24 @@ public:
         stack.pop();
 
       if (!stack.empty())
-        return stack.top().first++;
+        return inc(stack.top().first);
       else
-        return vertex::children_iterator();
+        return 0;
     }
   }
 
 private:
   stack_t stack;
 
-  //! If an iterator is given, increments it and returns the original. If boost::none is given, returns a singular iterator.
-  vertex::children_iterator inc(boost::optional<vertex::children_iterator&> i) {
+  //! If an iterator is given, increments it and returns pointer to the originally pointed-to vertex. Otherwise, it returns 0.
+  vertex* inc(boost::optional<vertex::children_iterator&> i) {
     if (i)
-      return (*i)++;
+      return &*((*i)++);
     else
-      return vertex::children_iterator();
+      return 0;
   }
 
-  boost::optional<vertex::children_iterator&> recurse(apns::vertex::children_iterator from) {
+  boost::optional<vertex::children_iterator&> recurse(vertex::children_iterator from) {
     using namespace apns;
 
     vertex::children_iterator current = from;
@@ -474,7 +520,7 @@ struct virtual_traversal_policy {
   //! Virtual traversal policy interface.
   struct base {
     virtual ~base() { }
-    virtual vertex::children_iterator next(vertex&) = 0;
+    virtual vertex* next(vertex&) = 0;
   };
 
   boost::shared_ptr<base> policy;  //!< Concrete traversal policy.
@@ -483,7 +529,7 @@ struct virtual_traversal_policy {
     policy(policy)
   { }
 
-  vertex::children_iterator operator () (vertex& current) {
+  vertex* operator () (vertex& current) {
     assert(policy);
     return policy->next(current);
   }

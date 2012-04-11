@@ -4,6 +4,7 @@
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/utility.hpp>
 
 #include <algorithm>
 #include <limits>
@@ -13,6 +14,8 @@
 #include <iostream>
 #include <stack>
 #include <utility>
+
+#include <iostream>
 
 namespace apns {
 
@@ -37,14 +40,15 @@ vertex::~vertex() {
 
 vertex::children_iterator vertex::add_child() {
   resize(size + 1);
-  return children_end() - 1;
+  return boost::prior(children_end());
 }
 
 void vertex::remove_child(children_iterator child) {
   vertex& to_remove = *child;
-  children_iterator next_child = child + 1;
+  children_iterator next_child = child;
+  ++next_child;
 
-  while (next_child < children_end()) 
+  while (next_child != children_end())
     *child++ = *next_child++;
 
   *child = to_remove;
@@ -162,7 +166,7 @@ void vertex::realloc(std::size_t new_alloc) {
 }
 
 vertex& vertex::get(std::size_t index) {
-  return *(children_begin() + index);
+  return *((&*children_begin()) + index);
 }
 
 void vertex::destroy() {

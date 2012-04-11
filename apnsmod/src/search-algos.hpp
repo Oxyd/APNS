@@ -58,10 +58,10 @@ private:
 };
 
 //! Return the best successor of a vertex. Can be used as a traversal policy.
-vertex::children_iterator best_successor(vertex& parent);
+vertex* best_successor(vertex& parent);
 
 //! Return the best successor of a vertex and, if any, the second-best successor.
-std::pair<vertex::children_iterator, vertex::children_iterator> two_best_successors(vertex& parent);
+std::pair<vertex*, vertex*> two_best_successors(vertex& parent);
 
 //! A no-op visitor for board_visitor.
 struct null_board_visitor {
@@ -235,7 +235,7 @@ namespace detail {
   //! \param hasher The hasher instance used for this tree.
   //! \param leaf_hash Hash value of leaf_state
   //! \param history Game history gathered during the descend to the leaf.
-  void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, 
+  void expand(vertex& leaf, board_stack& state, piece::color_t attacker,
               transposition_table* trans_tbl, proof_table* proof_tbl, 
               std::size_t ply, killer_db const& killers, hashes_stack& hashes, history_stack const& history);
 
@@ -374,7 +374,7 @@ protected:
                     board_stack& board_stack, hashes_stack& hashes_stack, history_stack& history) {
     if (path_begin != path_end) {
       std::size_t const leaf_ply = std::distance(path_begin, path_end) - 1;
-      vertex::children_iterator leaf = *(path_end - 1);
+      vertex* leaf = *(path_end - 1);
 
       if (detail::simulate(*leaf, killers, leaf_ply, game->attacker, proof_tbl.get(), board_stack, hashes_stack, history)) {
         vertex_counter counter;
@@ -382,7 +382,7 @@ protected:
         position_count += counter.count - 1;  // *leaf itself should not be added as it's already in position_count.
       } 
       else {
-        expand(leaf, board_stack, hashes_stack, history);
+        expand(*leaf, board_stack, hashes_stack, history);
         position_count += leaf->children_count();
       }
 
@@ -396,7 +396,7 @@ protected:
     }
   }
 
-  void expand(vertex::children_iterator leaf, board_stack& state, hashes_stack& hashes, history_stack& history) {
+  void expand(vertex& leaf, board_stack& state, hashes_stack& hashes, history_stack& history) {
     apns::detail::expand(leaf, state, game->attacker, trans_tbl.get(), proof_tbl.get(), hashes.hashes().size() - 1, 
                          killers, hashes, history);
   }
@@ -431,7 +431,7 @@ protected:
       }
 
       if (prev != path_end)
-        *prev = resort_children(**current, *prev, vertex_comparator(**current));
+        *prev = &*resort_children(**current, (**current).iter_from_ptr(*prev), vertex_comparator(**current));
 
       history.pop(**current);
       prev = current;
@@ -467,7 +467,7 @@ private:
     typedef std::stack<std::pair<apns::vertex::reverse_children_iterator, apns::vertex::reverse_children_iterator> > stack_t;
 
   public:
-    vertex::children_iterator operator () (apns::vertex& v) {
+    vertex* operator () (apns::vertex& v) {
       using namespace apns;
 
       if (stack.empty())
@@ -480,26 +480,21 @@ private:
           stack.pop();
 
         if (!stack.empty())
-          return forward_from_backward(stack.top().first++);
+          return &*(stack.top().first++);
         else
-          return vertex::children_iterator();
+          return 0;
       }
     }
 
   private:
     stack_t stack;
 
-    //! Convert a reverse iterator to a forward one pointing to the same position.
-    vertex::children_iterator forward_from_backward(vertex::reverse_children_iterator i) {
-      return i.base() - 1;
-    }
-
     //! If an iterator is given, increment it and return the original. If boost::none is given, return a singular iterator.
-    vertex::children_iterator inc(boost::optional<vertex::reverse_children_iterator&> v) {
+    vertex* inc(boost::optional<vertex::reverse_children_iterator&> v) {
       if (v)
-        return forward_from_backward((*v)++);
+        return &*((*v)++);
       else
-        return vertex::children_iterator();
+        return 0;
     }
 
   //! Recurse to subtree.
@@ -508,7 +503,9 @@ private:
 
     vertex* current = &from;
     while (current->children_count() > LEAVE_OUT) {
-      stack.push(std::make_pair(current->children_rbegin(), current->children_rend() - LEAVE_OUT));
+      vertex::reverse_children_iterator end = current->children_rend();
+      std::advance(end, -LEAVE_OUT);
+      stack.push(std::make_pair(current->children_rbegin(), end));
       current = &*current->children_rbegin();
     }
 

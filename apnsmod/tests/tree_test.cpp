@@ -485,7 +485,8 @@ TEST(general, resort_test_down_eq_range) {
   v.add_child()->proof_number = 4;
   v.add_child()->proof_number = 2;
   
-  resort_children(v, v.children_end() - 1, boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
+  resort_children(v, boost::prior(v.children_end()),
+                  boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
   expect_sorted(v);
 
   v.resize(0);
@@ -499,7 +500,8 @@ TEST(general, resort_test_down_eq_range) {
   v.add_child()->proof_number = 1;
   v.add_child()->proof_number = 0;
   
-  resort_children(v, v.children_end() - 1, boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
+  resort_children(v, boost::prior(v.children_end()),
+                  boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
   expect_sorted(v);
 }
 

@@ -103,50 +103,17 @@ boost::optional<piece::color_t> winner(board const& board, piece::color_t player
 }
 
 
-vertex::children_iterator best_successor(vertex& parent) {
-  return parent.children_begin();
-
-  vertex::number_t vertex::*  number      = parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
-  vertex::number_t            min_value   = vertex::max_num;
-  vertex::children_iterator   min_vertex  = parent.children_end();
-
-  for (vertex::children_iterator child = parent.children_begin(); child != parent.children_end(); ++child)
-    if (child->*number < min_value) {
-      min_value = child->*number;
-      min_vertex = child;
-    }
-
-  return min_vertex;
+vertex* best_successor(vertex& parent) {
+  return &*parent.children_begin();
 }
 
-std::pair<vertex::children_iterator, vertex::children_iterator> two_best_successors(vertex& parent) {
-  if (parent.children_count() >= 1)
-    return std::make_pair(parent.children_begin(), boost::next(parent.children_begin()));
+std::pair<vertex*, vertex*> two_best_successors(vertex& parent) {
+  if (parent.children_count() >= 2)
+    return std::make_pair(&*parent.children_begin(), &*boost::next(parent.children_begin()));
+  else if (parent.children_count() == 1)
+    return std::make_pair(&*parent.children_begin(), static_cast<vertex*>(0));
   else
-    return std::make_pair(parent.children_end(), parent.children_end());
-
-  vertex::number_t vertex::*  number            = parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number;
-  vertex::number_t            min_value         = vertex::max_num;
-  vertex::number_t            second_min_value  = vertex::max_num;
-  vertex::children_iterator   min_vertex        = parent.children_end();
-  vertex::children_iterator   second_min_vertex = parent.children_end();
-
-  for (vertex::children_iterator child = parent.children_begin(); child != parent.children_end(); ++child) {
-    if (child->*number < min_value) {
-      if (min_value < second_min_value) {
-        second_min_vertex = min_vertex;
-        second_min_value = min_value;
-      }
-
-      min_value = child->*number;
-      min_vertex = child;
-    } else if (child->*number < second_min_value) {
-      second_min_value = child->*number;
-      second_min_vertex = child;
-    }
-  }
-
-  return std::make_pair(min_vertex, second_min_vertex);
+    return std::make_pair(static_cast<vertex*>(0), static_cast<vertex*>(0));
 }
 
 history_stack::history_stack() {
@@ -259,14 +226,14 @@ void update_numbers(vertex& v) {
 
 namespace detail {
 
-void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t attacker, 
+void expand(vertex& leaf, board_stack& state, piece::color_t attacker,
             transposition_table* trans_tbl, proof_table* proof_tbl, 
             std::size_t ply, killer_db const& killers, hashes_stack& hashes, history_stack const& history) {
-  assert(leaf->children_count() == 0);  // leaf is a leaf.
-  assert(leaf->proof_number != 0 || leaf->disproof_number != 0); // It's not (dis-)proven yet.
+  assert(leaf.children_count() == 0);  // leaf is a leaf.
+  assert(leaf.proof_number != 0 || leaf.disproof_number != 0); // It's not (dis-)proven yet.
 
   // Who plays in this leaf?
-  piece::color_t const player = leaf->type == vertex::type_or ? attacker : opponent_color(attacker);
+  piece::color_t const player = leaf.type == vertex::type_or ? attacker : opponent_color(attacker);
 
   // Make a list of all possible steps.
   typedef std::vector<std::pair<step, vertex::e_type> > steps_seq;
@@ -274,22 +241,22 @@ void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t a
   steps.erase(steps.begin(), steps.end());
 
   for (all_steps_iter new_step = all_steps_begin(state.top(), player); new_step != all_steps_end(); ++new_step)
-    if (leaf->steps_remaining - static_cast<signed>(new_step->steps_used()) >= 0) {
-      steps.push_back(std::make_pair(*new_step, opposite_type(leaf->type)));
-      if (leaf->steps_remaining - static_cast<signed>(new_step->steps_used()) >= 1)
-        steps.push_back(std::make_pair(*new_step, leaf->type));
+    if (leaf.steps_remaining - static_cast<signed>(new_step->steps_used()) >= 0) {
+      steps.push_back(std::make_pair(*new_step, opposite_type(leaf.type)));
+      if (leaf.steps_remaining - static_cast<signed>(new_step->steps_used()) >= 1)
+        steps.push_back(std::make_pair(*new_step, leaf.type));
     }
 
   // Attach them to the leaf now.
-  leaf->reserve(steps.size());
+  leaf.reserve(steps.size());
   
-  vertex::children_iterator killers_end = leaf->children_begin();
+  vertex::children_iterator killers_end = leaf.children_begin();
   for (steps_seq::iterator s = steps.begin(); s != steps.end(); ++s) {
     step                  step = s->first;
     vertex::e_type const  type = s->second;
-    vertex::children_iterator child = leaf->add_child();
+    vertex::children_iterator child = leaf.add_child();
 
-    process_new(*child, *leaf, attacker, step, type, trans_tbl, proof_tbl, hashes, state, history);
+    process_new(*child, leaf, attacker, step, type, trans_tbl, proof_tbl, hashes, state, history);
     assert(child->step);
 
     if (killers.is_killer(ply, type, step)) {
@@ -299,7 +266,7 @@ void expand(vertex::children_iterator leaf, board_stack& state, piece::color_t a
     }
   }
 
-  sort_children(*leaf, vertex_comparator(*leaf));
+  sort_children(leaf, vertex_comparator(leaf));
 }
 
 //! Cut non-(dis-)proof children of this vertex.
@@ -481,6 +448,7 @@ bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_
 
         if (success) {
           update_numbers(parent);
+          assert(parent.proof_number == 0 || parent.disproof_number == 0);
           return true;
         }
       }
@@ -514,11 +482,7 @@ void proof_number_search::do_iterate() {
     hashes.push(*current);
     history.push(*current, hashes.top());
 
-    vertex::children_iterator next = best_successor(*current);
-    if (next != current->children_end())
-      current = &*next;
-    else
-      current = 0;
+    current = best_successor(*current);
   } while (current);
 
   assert(path.size() == hashes.hashes().size());
@@ -563,7 +527,7 @@ void depth_first_pns::do_iterate() {
 
   // And go back down.
   while (!path.empty() && path.back()->children_count() > 0) {
-    std::pair<vertex::children_iterator, vertex::children_iterator> best_two = two_best_successors(*path.back());
+    std::pair<vertex*, vertex*> best_two = two_best_successors(*path.back());
     assert(best_two.first->proof_number > 0 && best_two.first->disproof_number > 0);
 
     limits_t new_limits = make_limits(
