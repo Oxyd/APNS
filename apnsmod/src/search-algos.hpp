@@ -251,8 +251,8 @@ namespace detail {
   //!
   //! \returns True if simulation has been successful, and parent has been proved (parent will have children attached, then).
   //! false otherwise.
-  bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_t attacker, board_stack& boards,
-                hashes_stack& hashes, history_stack& history);
+  bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_t attacker,
+                proof_table* proof_tbl, board_stack& boards, hashes_stack& hashes, history_stack& history);
 
   //! Convert history as defined by the history_stack into history as defined by proof_table.
   inline history_t proof_history_from_records(history_stack::records_cont const& records) {
@@ -376,7 +376,7 @@ protected:
       std::size_t const leaf_ply = std::distance(path_begin, path_end) - 1;
       vertex::children_iterator leaf = *(path_end - 1);
 
-      if (detail::simulate(*leaf, killers, leaf_ply, game->attacker, board_stack, hashes_stack, history)) {
+      if (detail::simulate(*leaf, killers, leaf_ply, game->attacker, proof_tbl.get(), board_stack, hashes_stack, history)) {
         vertex_counter counter;
         traverse(*leaf, backtrack(), boost::ref(counter));
         position_count += counter.count - 1;  // *leaf itself should not be added as it's already in position_count.

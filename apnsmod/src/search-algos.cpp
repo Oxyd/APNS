@@ -440,13 +440,15 @@ void process_new(vertex& child, vertex const& parent, piece::color_t attacker, s
   state.pop(step);
 }
 
-bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_t attacker, board_stack& boards,
-              hashes_stack& hashes, history_stack& history) {
+bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_t attacker,
+              proof_table* proof_tbl, board_stack& boards, hashes_stack& hashes, history_stack& history) {
   assert(parent.children_count() == 0);
 
   piece::color_t const player = parent.type == vertex::type_or ? attacker : opponent_color(attacker);
 
-  for (killer_db::ply_iterator killer = killers.ply_begin(ply + 1, parent.type); killer != killers.ply_end(ply + 1, parent.type); ++killer)
+  for (killer_db::ply_iterator killer = killers.ply_begin(ply + 1, parent.type);
+      killer != killers.ply_end(ply + 1, parent.type);
+      ++killer) {
     if (killer->revalidate(boards.top(), player)) {
 
       vertex::e_type type;
@@ -458,7 +460,7 @@ bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_
         continue;
 
       vertex::children_iterator child = parent.add_child();
-      process_new(*child, parent, attacker, *killer, type, 0, 0, hashes, boards, history);
+      process_new(*child, parent, attacker, *killer, type, 0, proof_tbl, hashes, boards, history);
 
       if ((parent.type == vertex::type_or && child->proof_number == 0)
           || (parent.type == vertex::type_and && child->disproof_number == 0)) {
@@ -471,7 +473,7 @@ bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_
         hashes.push(*child);
         history.push(*child, hashes.top());
 
-        bool const success = simulate(*child, killers, ply + 1, attacker, boards, hashes, history);
+        bool const success = simulate(*child, killers, ply + 1, attacker, proof_tbl, boards, hashes, history);
 
         history.pop(*child);
         hashes.pop();
@@ -485,6 +487,7 @@ bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_
 
       parent.resize(0);
     }
+  }
 
   return false;
 }
