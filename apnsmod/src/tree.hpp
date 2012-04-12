@@ -32,7 +32,7 @@ namespace apns {
 //!
 //! \note Operations such as add_child, remove_child, reserve, resize and pack may and will invalidate all iterators, pointers
 //! and references to any children of this vertex.
-class vertex {
+class vertex : boost::noncopyable {
   template <typename HeldValue>
   class children_iterator_base : public boost::iterator_adaptor<
     children_iterator_base<HeldValue>,
@@ -43,8 +43,11 @@ class vertex {
     struct enabler { };
 
   public:
-    children_iterator_base() { }
-    explicit children_iterator_base(HeldValue* ptr) : children_iterator_base::iterator_adaptor_(ptr) { }
+    children_iterator_base() : end(true) { }
+    explicit children_iterator_base(HeldValue* ptr, bool end = false) :
+        children_iterator_base::iterator_adaptor_(ptr),
+        end(end)
+    { }
 
     template <typename OtherValue>
       children_iterator_base(
@@ -54,6 +57,31 @@ class vertex {
 
     template <typename T>
     T& operator ->* (T HeldValue::* mptr) { return this->base()->*mptr; }
+
+  private:
+    friend class boost::iterator_core_access;
+
+    bool end;
+
+    void increment() {
+      if (this->base()->next_sibling) {
+        this->base_reference() = this->base()->next_sibling;
+      } else {
+        end = true;
+      }
+    }
+
+    void decrement() {
+      if (!end) {
+        this->base_reference() = this->base()->prev_sibling;
+      } else {
+        end = false;
+      }
+    }
+
+    bool equal(children_iterator_base<HeldValue> const& other) const {
+      return this->base() == other.base() && end == other.end;
+    }
   };
 
 public:
@@ -73,11 +101,11 @@ public:
     type_or     //!< Attacker's turn.
   };
 
-  number_t                  proof_number;
-  number_t                  disproof_number;
-  step_holder               step;
-  int                       steps_remaining;
-  e_type                    type;
+  number_t    proof_number;
+  number_t    disproof_number;
+  step_holder step;
+  int         steps_remaining;
+  e_type      type;
 
   vertex();
   ~vertex();
@@ -90,19 +118,19 @@ public:
   void remove_child(children_iterator child);
   
   children_iterator children_begin() {
-    return children_iterator(reinterpret_cast<vertex*>(storage.get()));
+    return children_iterator(first_child, first_child == 0);
   }
 
   children_iterator children_end() {
-    return children_iterator(reinterpret_cast<vertex*>(storage.get() + size));
+    return children_iterator(last_child, true);
   }
 
   const_children_iterator children_begin() const {
-    return const_children_iterator(reinterpret_cast<vertex const*>(storage.get()));
+    return const_children_iterator(first_child, first_child == 0);
   }
 
   const_children_iterator children_end() const {
-    return const_children_iterator(reinterpret_cast<vertex const*>(storage.get() + size));
+    return const_children_iterator(last_child, true);
   }
 
   reverse_children_iterator children_rbegin() {
@@ -131,7 +159,7 @@ public:
 
   //! Make this vertex allocate enough memory to hold new_size children, but don't really create the children yet. This may
   //! invalidate all existing iterators to children of this vertex.
-  void reserve(std::size_t new_size);
+  void reserve(std::size_t) { }
 
   //! Make this vertex have new_size children. If new_size is more than the current size, new children will be 
   //! default-constructed at the end of the children sequence. If new_size is less than the current size, this is equivalent
@@ -144,79 +172,23 @@ public:
 
   //! Make this vertex use only as much memory as required to hold all its children. This may invalidate all existing iterator
   //! to children of this vertex.
-  void pack();
+  void pack() { }
 
   //! Swap the subtree rooted in this vertex with a subtree rooted in the other vertex.
   void swap(vertex& other);
 
   //! Get the total memory usage by all vertices of any tree.
-  static std::size_t alloc_size() { return allocator::alloc; }
+  static std::size_t alloc_size() { return 0; }
   
 private:
-  //! Memory allocation interface. It is here so that it can be changed easily, but also so that a change of the allocator
-  //! doesn't change the type of vertex as would happen with a template parameter. This is justified by my assumption that only
-  //! one type of vertices (all using the same allocator) will be needed in this program.
-  struct allocator {
-    //! Allocate memory to hold count objects of type vertex.
-    //!
-    //! \returns Pointer to new memory.
-    //! \throws std::bad_alloc
-    static vertex* allocate(std::size_t count);
+  template <typename> friend class children_iterator_base;
 
-    //! Reclaim previously-allocated memory.
-    //!
-    //! \param memory Pointer to previously-allocated memory. May be null.
-    static void deallocate(vertex* memory, std::size_t count) throw ();
+  vertex*     first_child;
+  vertex*     last_child;
+  vertex*     next_sibling;
+  vertex*     prev_sibling;
 
-    static std::size_t alloc;
-  };
-
-  //! A SBRM wrapper for a non-copyable, non-transferrable arrays of vertex. This mimics boost::scoped_array, except it uses
-  //! allocator::deallocate to deallocate the storage, unlikely boost::scoped_array which always uses delete-expression.
-  class storage_wrapper {
-    // Safe bool idiom.
-    typedef void (storage_wrapper::* bool_type)() const;
-    void this_type_does_not_support_comparisons() const { }
-
-  public:
-    typedef vertex element_type;
-
-    storage_wrapper(element_type* ptr = 0, std::size_t size = 0) : storage(ptr), size(size) { }
-    ~storage_wrapper() throw ()                                 { reset(0, 0); }
-
-    void reset(element_type* new_ptr, std::size_t size) throw ();
-
-    element_type& operator [] (std::ptrdiff_t i) const throw () { return *(get() + i); }
-    element_type* get() const throw ()                          { return storage; }
-
-    operator bool_type() const {
-      return storage ? &storage_wrapper::this_type_does_not_support_comparisons : 0;
-    }
-
-    void swap(storage_wrapper& other) throw ();
-
-  private:
-    element_type* storage;
-    std::size_t   size;
-  };
-
-  storage_wrapper storage;
-  std::size_t     size;
-  std::size_t     capacity;
-
-  // These two in fact move rather than copy.
-  vertex(vertex& other);
-  vertex& operator = (vertex& other);
-
-  //! Make the storage large enough to hold exactly new_alloc children. This assumes that size <= new_alloc as it has to copy
-  //! old children into new storage. If new_alloc is 0, doesn't allocate any storage but merely deallocates the previous one.
-  void realloc(std::size_t new_alloc);
-
-  //! Get a child with a given index. Doesn't do any bounds checking.
-  vertex& get(std::size_t index);
-
-  //! Destroy this vertex assuming that its children have been destroyed too (regardless of what capacity and size have to say).
-  void destroy();
+  std::size_t size;
 };
 
 //! Given a vertex type, return its opposite.
@@ -272,7 +244,9 @@ vertex::children_iterator resort_children(vertex& parent, vertex::children_itera
   // So long as the child is greater than its sibling to the right, bubble it right.
   while (boost::next(child) != parent.children_end() && comp(*boost::next(child), *child)) {
     vertex::children_iterator equal_range_end = boost::next(child);
-    while (boost::next(equal_range_end) != parent.children_end() && !comp(*equal_range_end, *boost::next(equal_range_end)))
+    while (equal_range_end != parent.children_end() &&
+           boost::next(equal_range_end) != parent.children_end() &&
+           !comp(*equal_range_end, *boost::next(equal_range_end)))
       ++equal_range_end;
 
     std::swap(*child, *equal_range_end);
@@ -283,7 +257,9 @@ vertex::children_iterator resort_children(vertex& parent, vertex::children_itera
   // anything if the previous loop already re-sorted the children.
   while (child != parent.children_begin() && !comp(*boost::prior(child), *child)) {
     vertex::children_iterator equal_range_begin = boost::prior(child);
-    while (boost::prior(equal_range_begin) != parent.children_begin() && !comp(*boost::prior(equal_range_begin), *equal_range_begin))
+    while (equal_range_begin != parent.children_begin() &&
+           boost::prior(equal_range_begin) != parent.children_begin() &&
+           !comp(*boost::prior(equal_range_begin), *equal_range_begin))
       --equal_range_begin;
 
     std::swap(*child, *boost::prior(child));

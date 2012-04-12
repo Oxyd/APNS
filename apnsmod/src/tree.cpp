@@ -28,151 +28,74 @@ vertex::vertex() :
   steps_remaining(0),
   type(vertex::type_or),
 
-  storage(0),
-  size(0),
-  capacity(0)
+  first_child(0),
+  last_child(0),
+  next_sibling(0),
+  prev_sibling(0),
+  size(0)
 { }
 
 vertex::~vertex() {
-  if (children_count() > 0)
-    traverse_postorder(*this, postorder(), boost::bind(&vertex::destroy, _1));
+  while (children_begin() != children_end())
+    remove_child(children_begin());
 }
 
 vertex::children_iterator vertex::add_child() {
-  resize(size + 1);
-  return boost::prior(children_end());
+  std::auto_ptr<vertex> child(new vertex);
+
+  if (last_child != 0) {
+    last_child->next_sibling = child.get();
+    child->prev_sibling = last_child;
+    last_child = child.release();
+  } else {
+    first_child = last_child = child.release();
+  }
+
+  ++size;
+  return children_iterator(last_child);
 }
 
-void vertex::remove_child(children_iterator child) {
-  vertex& to_remove = *child;
-  children_iterator next_child = child;
-  ++next_child;
+void vertex::remove_child(children_iterator child_iter) {
+  vertex* child = &*child_iter;
+  assert(child);
 
-  while (next_child != children_end())
-    *child++ = *next_child++;
+  if (child->next_sibling) child->next_sibling->prev_sibling = child->prev_sibling;
+  if (child->prev_sibling) child->prev_sibling->next_sibling = child->next_sibling;
 
-  *child = to_remove;
+  assert(child != first_child || !child->prev_sibling);
+  assert(child != last_child || !child->next_sibling);
 
-  resize(size - 1);
-}
+  if (child == first_child) first_child = child->next_sibling;
+  if (child == last_child) last_child = child->prev_sibling;
 
-void vertex::reserve(std::size_t new_size) {
-  if (new_size > capacity)
-    realloc(new_size);
+  assert(first_child || !last_child);
+
+  --size;
+  delete child;
 }
 
 void vertex::resize(std::size_t new_size) {
-  if (capacity < new_size)
-    reserve(new_size);
-
   if (new_size > size)
     for (std::size_t index = size; index < new_size; ++index)
-      new (&get(index)) vertex();
+      add_child();
 
-  else if (new_size < size)
-    for (std::size_t index = new_size; index < size; ++index)
-      get(index).~vertex();
-
-  size = new_size;
-}
-
-void vertex::pack() {
-  if (capacity > size)
-    realloc(size);
+  else if (new_size < size) {
+    std::size_t const difference = size - new_size;
+    for (std::size_t count = 0; count < difference; ++count)
+      remove_child(boost::prior(children_end()));
+  }
 }
 
 void vertex::swap(vertex& other) {
-  storage.swap(other.storage);
+  std::swap(first_child, other.first_child);
+  std::swap(last_child, other.last_child);
   std::swap(size, other.size);
-  std::swap(capacity, other.capacity);
 
   std::swap(proof_number, other.proof_number);
   std::swap(disproof_number, other.disproof_number);
   std::swap(step, other.step);
   std::swap(steps_remaining, other.steps_remaining);
   std::swap(type, other.type);
-}
-
-std::size_t vertex::allocator::alloc = 0;
-
-vertex* vertex::allocator::allocate(std::size_t n) {
-  vertex* storage = static_cast<vertex*>(static_cast<void*>(new char [n * sizeof(vertex)]));
-  alloc += n * sizeof(vertex);
-  return storage;
-}
-
-void vertex::allocator::deallocate(vertex* memory, std::size_t n) throw () {
-  alloc -= n * sizeof(vertex);
-  delete [] static_cast<char*>(static_cast<void*>(memory));
-}
-
-void vertex::storage_wrapper::reset(element_type* new_ptr, std::size_t new_size) throw () {
-  allocator::deallocate(storage, size);
-  storage = new_ptr;
-  size = new_size;
-}
-
-void vertex::storage_wrapper::swap(storage_wrapper& other) throw () {
-  std::swap(storage, other.storage);
-  std::swap(size, other.size);
-}
-
-vertex::vertex(vertex& other) :
-  proof_number(other.proof_number),
-  disproof_number(other.disproof_number),
-  step(other.step),
-  steps_remaining(other.steps_remaining),
-  type(other.type),
-
-  size(0),
-  capacity(0)
-{ 
-  storage.swap(other.storage);
-  std::swap(size, other.size);
-  std::swap(capacity, other.capacity);
-}
-
-vertex& vertex::operator = (vertex& other) {
-  if (this != &other) {
-    proof_number = other.proof_number;
-    disproof_number = other.disproof_number;
-    step = other.step;
-    steps_remaining = other.steps_remaining;
-    type = other.type;
-
-    std::swap(size, other.size);
-    std::swap(capacity, other.capacity);
-    storage.swap(other.storage);
-  }
-
-  return *this;
-}
-
-void vertex::realloc(std::size_t new_alloc) {
-  storage_wrapper new_storage;
-
-  if (new_alloc > 0) {
-    new_storage.reset(allocator::allocate(new_alloc), new_alloc);
-
-    // *Move* children into new storage.
-    for (std::size_t index = 0; index < size; ++index) {
-      new (new_storage.get() + index) vertex(get(index));
-      get(index).~vertex();  // Won't deallocate children as the storage of that child is null already.
-    }
-  }
-
-  storage.swap(new_storage);
-  capacity = new_alloc;
-}
-
-vertex& vertex::get(std::size_t index) {
-  return *((&*children_begin()) + index);
-}
-
-void vertex::destroy() {
-  capacity = size = 0;
-  storage.reset(0, 0);
-  this->~vertex();
 }
 
 namespace {

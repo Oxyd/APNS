@@ -248,13 +248,13 @@ void expand(vertex& leaf, board_stack& state, piece::color_t attacker,
     }
 
   // Attach them to the leaf now.
-  leaf.reserve(steps.size());
+  leaf.resize(steps.size());
   
   vertex::children_iterator killers_end = leaf.children_begin();
-  for (steps_seq::iterator s = steps.begin(); s != steps.end(); ++s) {
+  vertex::children_iterator child = leaf.children_begin();
+  for (steps_seq::iterator s = steps.begin(); s != steps.end(); ++s, ++child) {
     step                  step = s->first;
     vertex::e_type const  type = s->second;
-    vertex::children_iterator child = leaf.add_child();
 
     process_new(*child, leaf, attacker, step, type, trans_tbl, proof_tbl, hashes, state, history);
     assert(child->step);
