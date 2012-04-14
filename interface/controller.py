@@ -243,7 +243,7 @@ class Controller(object):
     self._searchStart = None
     self.stats = None
     self._posCount = None
-
+    
   def runSearch(self, burst=_MS_BURST_TIME):
     '''Run the search until one of the terminating conditions is met.'''
 

@@ -46,7 +46,7 @@ class MainWindow(Observable):
 
     self._window = Tkinter.Tk()
     self._window.title('APNS')
-
+    
     self._imageManager = ImageManager()
 
     self._toolbar = ttk.Frame(self._window, padding=5)

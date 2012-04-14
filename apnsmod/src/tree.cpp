@@ -17,85 +17,65 @@
 
 #include <iostream>
 
+namespace {
+
+//! Get the storage size the container has allocated, in bytes.
+template <typename Container>
+std::size_t bytes(Container const& c) {
+  return c.capacity() * sizeof(typename Container::value_type);
+}
+
+}  // anonymous namespace
+
 namespace apns {
 
 vertex::number_t const vertex::max_num = std::numeric_limits<vertex::number_t>::max();
 vertex::number_t const vertex::infty   = std::numeric_limits<vertex::number_t>::max() - 1;
+std::size_t vertex::alloc = 0;
 
 vertex::vertex() :
   proof_number(0),
   disproof_number(0),
   steps_remaining(0),
-  type(vertex::type_or),
-
-  first_child(0),
-  last_child(0),
-  next_sibling(0),
-  prev_sibling(0),
-  size(0)
-{ }
+  type(vertex::type_or)
+{
+  alloc += sizeof *this;
+}
 
 vertex::~vertex() {
-  while (children_begin() != children_end())
-    remove_child(children_begin());
+  alloc -= bytes(children);
+  alloc -= sizeof *this;
 }
 
 vertex::children_iterator vertex::add_child() {
-  std::auto_ptr<vertex> child(new vertex);
-
-  if (last_child != 0) {
-    last_child->next_sibling = child.get();
-    child->prev_sibling = last_child;
-    last_child = child.release();
-  } else {
-    first_child = last_child = child.release();
-  }
-
-  ++size;
-  return children_iterator(last_child);
+  resize(children.size()  + 1);
+  return boost::prior(children_end());
 }
 
-void vertex::remove_child(children_iterator child_iter) {
-  vertex* child = &*child_iter;
-  assert(child);
+void vertex::remove_child(children_iterator child) {
+  children.erase(child.base());
+}
 
-  if (child->next_sibling) child->next_sibling->prev_sibling = child->prev_sibling;
-  if (child->prev_sibling) child->prev_sibling->next_sibling = child->next_sibling;
-
-  assert(child != first_child || !child->prev_sibling);
-  assert(child != last_child || !child->next_sibling);
-
-  if (child == first_child) first_child = child->next_sibling;
-  if (child == last_child) last_child = child->prev_sibling;
-
-  assert(first_child || !last_child);
-
-  --size;
-  delete child;
+void vertex::reserve(std::size_t new_size) {
+  alloc -= bytes(children);
+  children.reserve(new_size);
+  alloc += bytes(children);
 }
 
 void vertex::resize(std::size_t new_size) {
-  if (new_size > size)
-    for (std::size_t index = size; index < new_size; ++index)
-      add_child();
-
-  else if (new_size < size) {
-    std::size_t const difference = size - new_size;
-    for (std::size_t count = 0; count < difference; ++count)
-      remove_child(boost::prior(children_end()));
-  }
+  alloc -= bytes(children);
+  children.resize(new_size);
+  alloc += bytes(children);
 }
 
-void vertex::swap(vertex& other) {
-  std::swap(first_child, other.first_child);
-  std::swap(last_child, other.last_child);
-  std::swap(size, other.size);
+void vertex::pack() {
+  alloc -= bytes(children);
 
-  std::swap(proof_number, other.proof_number);
-  std::swap(disproof_number, other.disproof_number);
-  std::swap(step, other.step);
-  std::swap(steps_remaining, other.steps_remaining);
-  std::swap(type, other.type);
+  children_container new_children;
+  new_children.transfer(new_children.begin(), children);
+  children.swap(new_children);
+
+  alloc += bytes(children);
 }
 
 namespace {

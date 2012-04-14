@@ -50,16 +50,16 @@ boost::shared_ptr<vertex> make_tree() {
 }
 
 struct bfs_traversal {
-  vertex::children_iterator operator () (vertex& current) {
+  vertex* operator () (vertex& current) {
     for (vertex::children_iterator child = current.children_begin(); child != current.children_end(); ++child)
       queue.push(child);
 
     if (!queue.empty()) {
       vertex::children_iterator n = queue.front();
       queue.pop();
-      return n;
+      return &*n;
     } else 
-      return current.children_end();
+      return 0;
   }
 
 private:
@@ -291,32 +291,53 @@ TEST(traverser, virtual_visitor) {
 }
 
 TEST(general, swap_test) {
-  vertex x;
-  x.proof_number = 1;
-  x.disproof_number = 2;
-  x.steps_remaining = 3;
-  x.step = step::from_string("Dc3n");
+  vertex parent;
 
-  vertex y;
-  y.proof_number = 10;
-  y.disproof_number = 11;
-  y.steps_remaining = 2;
-  y.step = step::from_string("rd2e Ce5w");
+  vertex::children_iterator x = parent.add_child();
+  x->proof_number = 1;
+  x->disproof_number = 2;
+  x->steps_remaining = 3;
+  x->step = step::from_string("Dc3n");
 
-  x.swap(y);
+  vertex::children_iterator y = parent.add_child();
+  y->proof_number = 10;
+  y->disproof_number = 11;
+  y->steps_remaining = 2;
+  y->step = step::from_string("rd2e Ce5w");
 
-  EXPECT_EQ(10, x.proof_number);
-  EXPECT_EQ(11, x.disproof_number);
-  EXPECT_EQ(2, x.steps_remaining);
-  ASSERT_TRUE(x.step);
-  EXPECT_EQ("rd2e Ce5w", x.step->to_string());
+  x = parent.children_begin();
 
+  parent.swap_children(x, y);
 
-  EXPECT_EQ(1, y.proof_number);
-  EXPECT_EQ(2, y.disproof_number);
-  EXPECT_EQ(3, y.steps_remaining);
-  ASSERT_TRUE(y.step);
-  EXPECT_EQ("Dc3n", y.step->to_string());
+  EXPECT_EQ(10, x->proof_number);
+  EXPECT_EQ(11, x->disproof_number);
+  EXPECT_EQ(2, x->steps_remaining);
+  ASSERT_TRUE(x->step);
+  EXPECT_EQ("rd2e Ce5w", x->step->to_string());
+
+  EXPECT_EQ(1, y->proof_number);
+  EXPECT_EQ(2, y->disproof_number);
+  EXPECT_EQ(3, y->steps_remaining);
+  ASSERT_TRUE(y->step);
+  EXPECT_EQ("Dc3n", y->step->to_string());
+}
+
+TEST(general, transfer_test) {
+  vertex root;
+  root.resize(2);
+
+  vertex::children_iterator a = root.children_begin();
+  a->resize(2);
+  a->children_begin()->proof_number = 5;
+
+  vertex::children_iterator b = boost::next(a);
+  b->resize(2);
+
+  transfer_child(*a, a->children_begin(), *b);
+
+  EXPECT_EQ(1, a->children_count());
+  EXPECT_EQ(3, b->children_count());
+  EXPECT_EQ(5, boost::prior(b->children_end())->proof_number);
 }
 
 namespace {

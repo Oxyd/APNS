@@ -104,7 +104,10 @@ boost::optional<piece::color_t> winner(board const& board, piece::color_t player
 
 
 vertex* best_successor(vertex& parent) {
-  return &*parent.children_begin();
+  if (!parent.leaf())
+    return &*parent.children_begin();
+  else
+    return 0;
 }
 
 std::pair<vertex*, vertex*> two_best_successors(vertex& parent) {
@@ -248,20 +251,20 @@ void expand(vertex& leaf, board_stack& state, piece::color_t attacker,
     }
 
   // Attach them to the leaf now.
-  leaf.resize(steps.size());
+  leaf.reserve(steps.size());
   
   vertex::children_iterator killers_end = leaf.children_begin();
-  vertex::children_iterator child = leaf.children_begin();
-  for (steps_seq::iterator s = steps.begin(); s != steps.end(); ++s, ++child) {
+  for (steps_seq::iterator s = steps.begin(); s != steps.end(); ++s) {
     step                  step = s->first;
     vertex::e_type const  type = s->second;
+    vertex::children_iterator child = leaf.add_child();
 
     process_new(*child, leaf, attacker, step, type, trans_tbl, proof_tbl, hashes, state, history);
     assert(child->step);
 
     if (killers.is_killer(ply, type, step)) {
       if (child != killers_end)
-        std::swap(*child, *killers_end);
+        leaf.swap_children(child, killers_end);
       ++killers_end;
     }
   }
@@ -288,7 +291,7 @@ std::size_t cut(vertex& parent) {
         traverse(*child, backtrack(), boost::ref(cut_counter));
 
     if (proof != parent.children_begin())
-      proof->swap(*parent.children_begin());
+      parent.swap_children(proof, parent.children_begin());
 
     parent.resize(1);
     parent.pack();

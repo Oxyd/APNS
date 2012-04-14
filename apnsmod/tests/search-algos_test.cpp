@@ -75,55 +75,6 @@ TEST(traversing, find_best_vertex_test) {
   EXPECT_EQ(vertex::type_and, found->type);
 }
 
-TEST(tree, empty_vertex_test) {
-  vertex v;
-  EXPECT_EQ(0, v.children_count());
-}
-
-TEST(tree, one_child_test) {
-  vertex v;
-  v.add_child()->proof_number = 1;
-
-  EXPECT_EQ(1, v.children_count());
-
-  std::size_t iterations = 0;
-  for (vertex::children_iterator child = v.children_begin(); child != v.children_end(); ++child) {
-    ++iterations;
-    EXPECT_EQ(1, child->proof_number);
-  }
-
-  EXPECT_EQ(1, iterations);
-}
-
-TEST(tree, two_children_test) {
-  vertex v;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 2;
-
-  std::size_t iterations = 0;
-  for (vertex::children_iterator child = v.children_begin(); child != v.children_end(); ++child) {
-    ++iterations;
-    EXPECT_EQ(iterations, child->proof_number);
-  }
-
-  EXPECT_EQ(2, iterations);
-}
-
-TEST(tree, three_children_test) {
-  vertex v;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 2;
-  v.add_child()->proof_number = 3;
-
-  std::size_t iterations = 0;
-  for (vertex::children_iterator child = v.children_begin(); child != v.children_end(); ++child) {
-    ++iterations;
-    EXPECT_EQ(iterations, child->proof_number);
-  }
-
-  EXPECT_EQ(3, iterations);
-}
-
 TEST(algorithm, update_numbers_test) {
   vertex v;
   v.proof_number = 1;
