@@ -535,28 +535,13 @@ void proof_number_search::do_iterate() {
   assert(game_);
   assert(!game_->root.step);
 
-  board_stack     boards(game_->initial_state);
-  history_stack   history;
-  hashes_stack    hashes(hasher_, initial_hash_, game_->attacker);
+  search_stack stack(hasher_, initial_hash_, &game_->root, game_->attacker, game_->initial_state);
 
-  typedef std::vector<vertex*> path_cont;
-  path_cont path;
+  while (!stack.path_top()->leaf()) {
+    stack.push(best_successor(*stack.path_top()));
+  }
 
-  vertex* current = &game_->root;
-
-  do {
-    path.push_back(current);
-    if (current->step)
-      boards.push(*current->step);
-    hashes.push(*current);
-    history.push(*current, hashes.top());
-
-    current = best_successor(*current);
-  } while (current);
-
-  assert(path.size() == hashes.hashes().size());
-
-  process_leaf(path.begin(), path.end(), boards, hashes, history);
+  //process_leaf(path.begin(), path.end(), boards, hashes, history);
 
   garbage_collect();
 }

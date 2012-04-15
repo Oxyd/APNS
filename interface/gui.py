@@ -1139,7 +1139,8 @@ class RunSearchController(object):
     self._runSearchDlg.algo = get('algo', 'pns')
     self._runSearchDlg.gcHigh = get('gcHigh', '5000000')
     self._runSearchDlg.gcLow = get('gcLow', '1000000')
-    self._runSearchDlg.gcCheck = get('gcCheck', True)
+    #self._runSearchDlg.gcCheck = get('gcCheck', True)
+    self._runSearchDlg.gcCheck = False
     self._runSearchDlg.timeLimit = get('timeLimit', 60)
     self._runSearchDlg.timeLimitCheck = get('timeLimitCheck', True)
     self._runSearchDlg.positionLimit = get('positionLimit', 10000000)
@@ -1238,7 +1239,9 @@ class RunSearchController(object):
       self._runSearchDlg.enableMemLimit(self._runSearchDlg.memLimitCheck)
 
     elif command == RunSearchDialog.Command.gcCheck:
-      self._runSearchDlg.enableGC(self._runSearchDlg.gcCheck)
+      #self._runSearchDlg.enableGC(self._runSearchDlg.gcCheck)
+      self._runSearchDlg.gcCheck = False
+      pass
 
 
   def _validateInput(self):

@@ -306,6 +306,10 @@ public:
   history_sequence const& history() const { return history_; }
   board const&            state() const   { return state_; }
 
+  vertex*                 path_top() const    { return path_.back(); }
+  zobrist_hasher::hash_t  hashes_top() const  { return hashes_.back(); }
+  zobrist_hasher::hash_t  history_top() const { return history_.back(); }
+
 private:
   path_sequence         path_;
   hashes_sequence       hashes_;
@@ -380,8 +384,7 @@ public:
   }
 
   //! Set upper GC treshold. If the tree size exceeds this value, GC will be run.
-  void set_gc_high(std::size_t new_max) {
-    gc_high_ = new_max;
+  void set_gc_high(std::size_t) {
   }
 
   //! Get upper GC treshold.
@@ -390,8 +393,7 @@ public:
   }
 
   //! Set lower GC treshold. GC will stop collecting once the tree size falls below this value.
-  void set_gc_low(std::size_t new_min) {
-    gc_low_ = new_min;
+  void set_gc_low(std::size_t) {
   }
 
   //! Get lower GC treshold.
@@ -437,6 +439,10 @@ protected:
     gc_high_(0),
     gc_low_(0)
   { }
+
+  void expand_leaf(search_stack& stack) {
+
+  }
 
   template <typename PathIter>
   void process_leaf(PathIter path_begin, PathIter path_end,
