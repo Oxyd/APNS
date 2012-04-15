@@ -284,10 +284,56 @@ namespace detail {
 
 } // namespace apns::detail
 
-struct search_stack {
-  std::vector<vertex*> path;
-  std::vector<zobrist_hasher::hash_t> hashes;
-  std::vector<zobrist_hasher::hash_t> history;
+//! Manages the various information that are to be kept during descent through the tree.
+class search_stack {
+public:
+  typedef std::vector<vertex*>                path_sequence;
+  typedef std::vector<zobrist_hasher::hash_t> hashes_sequence;
+  typedef std::vector<zobrist_hasher::hash_t> history_sequence;
+
+  //! Create a stack and push the root vertex on it.
+  search_stack(zobrist_hasher const& hasher, zobrist_hasher::hash_t initial_hash,
+               vertex* root, piece::color_t attacker, board const& initial_state);
+
+  void push(vertex* v); //!< Push a successor of the currently-last vertex.
+  void pop();           //!< Pop a vertex. The stack must not be at root before this call.
+
+  //! Is the last vertex the root?
+  bool at_root() const { return path_.size() == 1; }
+
+  path_sequence const&    path() const    { return path_; }
+  hashes_sequence const&  hashes() const  { return hashes_; }
+  history_sequence const& history() const { return history_; }
+  board const&            state() const   { return state_; }
+
+private:
+  path_sequence         path_;
+  hashes_sequence       hashes_;
+  history_sequence      history_;
+  board                 state_;
+  zobrist_hasher const* hasher_;
+  piece::color_t        attacker_;
+};
+
+//! Allows temporary extensions to the search_stack. Whenever you create a checkpoint, you may push further vertices to the
+//! search_stack. When the checkpoint is destroyed, the stack is restored to the original state. Do note that you may *not*
+//! pop any vertices from the stack other than those that were pushed after this checkpoint was created.
+//!
+//! The stack must not be destroyed during the lifetime of the checkpoint.
+struct search_stack_checkpoint {
+  explicit search_stack_checkpoint(search_stack& stack) :
+      stack_(&stack),
+      original_length_(stack.path().size())
+  { }
+
+  ~search_stack_checkpoint() { revert(); }
+
+  //! Explicitely revert the stack to the saved state.
+  void revert();
+
+private:
+  search_stack* stack_;
+  std::size_t   original_length_;
 };
 
 //! A CRTP base class for search algorithms.

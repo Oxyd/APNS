@@ -36,6 +36,10 @@ bool repetition(apns::zobrist_hasher::hash_t hash, apns::history_stack::records_
   return false;
 }
 
+apns::piece::color_t vertex_player(apns::vertex const& v, apns::piece::color_t attacker) {
+  return v.type == apns::vertex::type_or ? attacker : apns::opponent_color(attacker);
+}
+
 } // anonymous namespace
 
 namespace apns {
@@ -464,6 +468,68 @@ bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_
 }
 
 } // namespace apns::detail
+
+search_stack::search_stack(zobrist_hasher const& hasher, zobrist_hasher::hash_t initial_hash,
+                           vertex* root, piece::color_t attacker, board const& initial_state) :
+  path_(1, root),
+  hashes_(1, initial_hash),
+  history_(1, initial_hash),
+  state_(initial_state),
+  hasher_(&hasher),
+  attacker_(attacker)
+{ }
+
+void search_stack::push(vertex* v) {
+  assert(v);
+  assert(!path_.empty());
+  assert(!hashes_.empty());
+  assert(!history_.empty());
+  assert(v->step);
+  assert(hasher_);
+
+  vertex* const                 parent        = path_.back();
+  zobrist_hasher::hash_t const  parent_hash   = hashes_.back();
+  piece::color_t const          parent_player = vertex_player(*parent, attacker_);
+  piece::color_t const          v_player      = vertex_player(*v, attacker_);
+  zobrist_hasher::hash_t const  v_hash        = hasher_->update(
+    parent_hash,
+    v->step->step_sequence_begin(), v->step->step_sequence_end(),
+    parent_player, v_player
+  );
+
+  path_.push_back(v);
+  hashes_.push_back(v_hash);
+  apply(*v->step, state_);
+
+  if (v->type != parent->type)
+    history_.push_back(v_hash);
+}
+
+void search_stack::pop() {
+  assert(!at_root());
+  assert(path_.size() >= 2);
+  assert(hashes_.size() >= 2);
+
+  vertex* const top = path_.back();
+  vertex* const parent = *(path_.end() - 2);
+
+  assert(top->step);
+
+  path_.pop_back();
+  hashes_.pop_back();
+  unapply(*top->step, state_);
+
+  if (top->type != parent->type)
+    history_.pop_back();
+}
+
+void search_stack_checkpoint::revert() {
+  if (stack_->path().size() < original_length_)
+    throw std::logic_error("revert: The watched stack was modified below the checkpoint");
+
+  while (stack_->path().size() > original_length_)
+    stack_->pop();
+}
 
 void proof_number_search::do_iterate() {
   assert(game_);

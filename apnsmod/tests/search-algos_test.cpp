@@ -215,6 +215,125 @@ TEST(history_stack_test, push_pop_test) {
   EXPECT_EQ(0, h.records().size());
 }
 
+TEST(search_stack, push_pop_test) {
+  board b;
+  b.put(position(1, 'a'), piece(piece::gold, piece::dog));
+  b.put(position(8, 'h'), piece(piece::silver, piece::cat));
+
+  zobrist_hasher hasher;
+  zobrist_hasher::hash_t root_hash = hasher.generate_initial(b, piece::gold);
+  vertex root;
+
+  search_stack stack(hasher, root_hash, &root, piece::gold, b);
+
+  EXPECT_TRUE(stack.at_root());
+
+  ASSERT_EQ(1, stack.path().size());
+  ASSERT_EQ(1, stack.hashes().size());
+  ASSERT_EQ(1, stack.history().size());
+
+  EXPECT_EQ(&root, stack.path().back());
+  EXPECT_EQ(root_hash, stack.hashes().back());
+  EXPECT_EQ(root_hash, stack.history().back());
+
+  EXPECT_EQ(b, stack.state());
+
+  root.resize(1);
+  vertex* child = &*root.children_begin();
+  child->step = step::validate_ordinary_step(b, elementary_step::displacement(position(1, 'a'), north));
+  child->type = vertex::type_or;
+
+  stack.push(child);
+
+  EXPECT_EQ(2, stack.path().size());
+  EXPECT_EQ(2, stack.hashes().size());
+  EXPECT_EQ(1, stack.history().size());
+
+  EXPECT_EQ(child, stack.path().back());
+
+  board child_board(b);
+  apply(*child->step, child_board);
+  zobrist_hasher::hash_t child_hash = hasher.generate_initial(child_board, piece::gold);
+
+  EXPECT_FALSE(stack.at_root());
+  EXPECT_EQ(child_hash, stack.hashes().back());
+  EXPECT_EQ(root_hash, stack.history().back());
+  EXPECT_EQ(child_board, stack.state());
+
+  child->resize(1);
+  vertex* second_child = &*child->children_begin();
+  second_child->step = step::validate_ordinary_step(child_board, elementary_step::displacement(position(8, 'h'), south));
+  second_child->type = vertex::type_and;
+
+  board second_child_board(child_board);
+  apply(*second_child->step, second_child_board);
+
+  zobrist_hasher::hash_t second_child_hash = hasher.generate_initial(second_child_board, piece::silver);
+
+  stack.push(second_child);
+
+  EXPECT_EQ(3, stack.path().size());
+  EXPECT_EQ(3, stack.hashes().size());
+  EXPECT_EQ(2, stack.history().size());
+
+  EXPECT_FALSE(stack.at_root());
+  EXPECT_EQ(second_child, stack.path().back());
+  EXPECT_EQ(second_child_hash, stack.hashes().back());
+  EXPECT_EQ(second_child_hash, stack.history().back());
+  EXPECT_EQ(second_child_board, stack.state());
+
+  stack.pop();
+
+  EXPECT_FALSE(stack.at_root());
+  EXPECT_EQ(child_hash, stack.hashes().back());
+  EXPECT_EQ(root_hash, stack.history().back());
+  EXPECT_EQ(child_board, stack.state());
+
+  stack.pop();
+
+  EXPECT_TRUE(stack.at_root());
+  EXPECT_EQ(&root, stack.path().back());
+  EXPECT_EQ(root_hash, stack.hashes().back());
+  EXPECT_EQ(root_hash, stack.history().back());
+}
+
+TEST(search_stack, checkpoint_test) {
+  board b;
+  b.put(position(1, 'a'), piece(piece::gold, piece::dog));
+  b.put(position(8, 'h'), piece(piece::silver, piece::cat));
+
+  zobrist_hasher hasher;
+  zobrist_hasher::hash_t root_hash = hasher.generate_initial(b, piece::gold);
+  vertex root;
+
+  search_stack stack(hasher, root_hash, &root, piece::gold, b);
+
+  root.resize(1);
+  vertex* child = &*root.children_begin();
+
+  child->step = step::validate_ordinary_step(b, elementary_step::displacement(position(1, 'a'), north));
+  child->type = vertex::type_or;
+
+  stack.push(child);
+
+  board child_board(b);
+  apply(*child->step, child_board);
+
+  {
+    search_stack_checkpoint checkpoint(stack);
+    child->resize(1);
+
+    vertex* second_child = &*child->children_begin();
+    second_child->step = step::validate_ordinary_step(child_board, elementary_step::displacement(position(2, 'a'), north));
+    second_child->type = vertex::type_and;
+
+    stack.push(second_child);
+  }
+
+  EXPECT_EQ(2, stack.path().size());
+  EXPECT_EQ(child, stack.path().back());
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
