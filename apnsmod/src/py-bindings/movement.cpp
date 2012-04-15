@@ -108,15 +108,15 @@ void export_movement() {
         "Create an elementary step representing a capture from the given position.")
     .staticmethod("capture")
 
-    .add_property("from", &apns::elementary_step::get_from,
+    .add_property("from", &apns::elementary_step::from,
         "For displacement, this is the initial position of the to-be-moved piece. For capture, this is the position"
         "from which the piece will be captured.")
-    .add_property("where", &apns::elementary_step::get_where,
+    .add_property("where", &apns::elementary_step::where,
         "For displacement, this is where the piece will be moved. For capture, this field has no meaning and contains"
         "an arbitrary value.")
-    .add_property("isCapture", &apns::elementary_step::is_capture,
+    .add_property("isCapture", &apns::elementary_step::capture,
         "If true, this is a capture move. Otherwise, this is a displacement move.")
-    .add_property("what", &apns::elementary_step::get_what,
+    .add_property("what", &apns::elementary_step::what,
         "What piece is being moved/captured? This field may be None.")
     ;
 

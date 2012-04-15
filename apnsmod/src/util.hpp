@@ -69,11 +69,11 @@ private:
   //! Update the user interface. This function will be called each #ms_update_time milliseconds.
   virtual void do_update() = 0;
 
-  unsigned      ms_update_time;
-  bool          stop_requested;
-  unsigned      work_done;
-  unsigned      work_total;
-  boost::timer  update_timer;
+  unsigned      ms_update_time_;
+  bool          stop_requested_;
+  unsigned      work_done_;
+  unsigned      work_total_;
+  boost::timer  update_timer_;
 };
 
 /**

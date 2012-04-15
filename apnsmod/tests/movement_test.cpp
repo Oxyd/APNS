@@ -14,13 +14,13 @@ TEST(elementary_step, elementary_step_test) {
       direction dir = north;
       elementary_step es = elementary_step::displacement(pos, dir);
 
-      EXPECT_TRUE(es.get_from() == pos);
-      EXPECT_EQ(es.get_where(), dir);
-      EXPECT_EQ(es.is_capture(), false);
+      EXPECT_TRUE(es.from() == pos);
+      EXPECT_EQ(es.where(), dir);
+      EXPECT_EQ(es.capture(), false);
 
-      elementary_step capture = elementary_step::capture(pos);
-      EXPECT_TRUE(capture.get_from() == pos);
-      EXPECT_EQ(capture.is_capture(), true);
+      elementary_step capture = elementary_step::make_capture(pos);
+      EXPECT_TRUE(capture.from() == pos);
+      EXPECT_EQ(capture.capture(), true);
     }
   }
 }
@@ -300,13 +300,13 @@ TEST(movement, sacrifice_test) {
   elementary_step const& e1 = el_steps.front();
   elementary_step const& e2 = el_steps.back();
 
-  ASSERT_TRUE(e1.get_what());
-  EXPECT_EQ(piece::gold, e1.get_what()->get_color());
-  EXPECT_EQ(piece::rabbit, e1.get_what()->get_type());
+  ASSERT_TRUE(e1.what());
+  EXPECT_EQ(piece::gold, e1.what()->color());
+  EXPECT_EQ(piece::rabbit, e1.what()->type());
 
-  ASSERT_TRUE(e2.get_what());
-  EXPECT_EQ(piece::gold, e2.get_what()->get_color());
-  EXPECT_EQ(piece::elephant, e2.get_what()->get_type());
+  ASSERT_TRUE(e2.what());
+  EXPECT_EQ(piece::gold, e2.what()->color());
+  EXPECT_EQ(piece::elephant, e2.what()->type());
 }
 
 TEST(movement, simple_move_loss_test) {
@@ -458,8 +458,8 @@ TEST_F(apply_test, ordinary_move) {
   apply(s, b);
   EXPECT_FALSE(b.get(position(1, 'c')));
   ASSERT_TRUE(b.get(position(1, 'd')));
-  EXPECT_EQ(b.get(position(1, 'd'))->get_type(), piece::cat);
-  EXPECT_EQ(b.get(position(1, 'd'))->get_color(), piece::gold);
+  EXPECT_EQ(b.get(position(1, 'd'))->type(), piece::cat);
+  EXPECT_EQ(b.get(position(1, 'd'))->color(), piece::gold);
 
   unapply(s, b);
   EXPECT_TRUE(b == original);
@@ -482,9 +482,9 @@ TEST_F(apply_test, pull) {
   apply(s, b);
   EXPECT_FALSE(b.get(position(6, 'e')));
   ASSERT_TRUE(b.get(position(5, 'e')));
-  EXPECT_EQ(b.get(position(5, 'e'))->get_type(), piece::rabbit);
+  EXPECT_EQ(b.get(position(5, 'e'))->type(), piece::rabbit);
   ASSERT_TRUE(b.get(position(4, 'e')));
-  EXPECT_EQ(b.get(position(4, 'e'))->get_type(), piece::horse);
+  EXPECT_EQ(b.get(position(4, 'e'))->type(), piece::horse);
 
   unapply(s, b);
   EXPECT_TRUE(b == original);
@@ -497,9 +497,9 @@ TEST_F(apply_test, push) {
   apply(s, b);
   EXPECT_FALSE(b.get(position(6, 'g')));
   ASSERT_TRUE(b.get(position(7, 'f')));
-  EXPECT_EQ(b.get(position(7, 'f'))->get_type(), piece::dog);
+  EXPECT_EQ(b.get(position(7, 'f'))->type(), piece::dog);
   ASSERT_TRUE(b.get(position(7, 'g')));
-  EXPECT_EQ(b.get(position(7, 'g'))->get_type(), piece::elephant);
+  EXPECT_EQ(b.get(position(7, 'g'))->type(), piece::elephant);
 
   unapply(s, b);
   EXPECT_TRUE(b == original);
@@ -513,7 +513,7 @@ TEST_F(apply_test, push_capture) {
   EXPECT_FALSE(b.get(position(4, 'g')));
   EXPECT_FALSE(b.get(position(3, 'f')));
   ASSERT_TRUE(b.get(position(3, 'g')));
-  EXPECT_EQ(b.get(position(3, 'g'))->get_type(), piece::horse);
+  EXPECT_EQ(b.get(position(3, 'g'))->type(), piece::horse);
 
   unapply(s, b);
   EXPECT_TRUE(b == original);
@@ -526,7 +526,7 @@ TEST_F(apply_test, pull_capture) {
   apply(s, b);
   EXPECT_FALSE(b.get(position(3, 'c')));
   ASSERT_TRUE(b.get(position(3, 'b')));
-  EXPECT_EQ(b.get(position(3, 'b'))->get_type(), piece::horse);
+  EXPECT_EQ(b.get(position(3, 'b'))->type(), piece::horse);
 
   unapply(s, b);
   EXPECT_TRUE(b == original);

@@ -47,10 +47,10 @@ elementary_step el_step_from_string(std::string::const_iterator begin, std::stri
  * contains some arbitrary, unspecified value.
  */
 struct elementary_step {
-  position get_from() const;
-  direction get_where() const;
-  bool is_capture() const;
-  boost::optional<piece> get_what() const;
+  position from() const;
+  direction where() const;
+  bool capture() const;
+  boost::optional<piece> what() const;
 
   std::string to_string() const;
 
@@ -61,7 +61,7 @@ struct elementary_step {
   //! Construct a displacement-kind elementary step.
   static elementary_step displacement(position from, direction where, boost::optional<piece> what = boost::optional<piece>());
   //! Construct a capture-kind elementary step.
-  static elementary_step capture(position from, boost::optional<piece> what = boost::optional<piece>());
+  static elementary_step make_capture(position from, boost::optional<piece> what = boost::optional<piece>());
 
 private:
   friend elementary_step detail::el_step_from_string(std::string::const_iterator, std::string::const_iterator);
@@ -81,11 +81,11 @@ private:
     assert(*(begin + 1) >= 'a' && *(begin + 1) <= 'h');
     assert(*(begin + 2) >= '1' && *(begin + 2) <= '8');
     assert(*(begin + 3) == 'n' || *(begin + 3) == 'e' || *(begin + 3) == 's' || *(begin + 3) == 'w' || *(begin + 3) == 'x');
-    std::copy(begin, end, representation.begin());
+    std::copy(begin, end, representation_.begin());
   }
 
   //! Four-character representation of the elementary step. This is a string like "Rc7n" or " d3e" if the piece is not known.
-  boost::array<char, 4> representation;
+  boost::array<char, 4> representation_;
 };
 
 bool operator == (elementary_step const& lhs, elementary_step const& rhs);
@@ -155,31 +155,31 @@ public:
     elementary_step const
   > {
     reference dereference() const { 
-      return detail::el_step_from_string(position, position + 4); 
+      return detail::el_step_from_string(position_, position_ + 4); 
     }
 
     void increment() { 
-      position += 4;
-      if (position != end)
-        ++position;
+      position_ += 4;
+      if (position_ != end_)
+        ++position_;
     }
 
     void decrement() { 
-      if (position == end)
-        position -= 4;
+      if (position_ == end_)
+        position_ -= 4;
       else
-        position -= 5;
+        position_ -= 5;
     }
 
-    bool equal(el_steps_iterator const& other) const { return position == other.position; }
+    bool equal(el_steps_iterator const& other) const { return position_ == other.position_; }
 
   private:
     friend class step;
 
-    std::string::const_iterator position;
-    std::string::const_iterator end;
+    std::string::const_iterator position_;
+    std::string::const_iterator end_;
 
-    explicit el_steps_iterator(std::string::const_iterator pos, std::string::const_iterator end) : position(pos), end(end) { }
+    explicit el_steps_iterator(std::string::const_iterator pos, std::string::const_iterator end) : position_(pos), end_(end) { }
   };
 
   typedef boost::reverse_iterator<el_steps_iterator> reverse_el_steps_iterator;
@@ -236,26 +236,26 @@ public:
 
   std::string to_string() const;
 
-  void swap(step& other) { representation.swap(other.representation); }
+  void swap(step& other) { representation_.swap(other.representation_); }
 
 private:
   typedef boost::flyweight<std::string, boost::flyweights::no_locking> representation_t;
 
-  representation_t representation;
+  representation_t representation_;
 
   friend class step_holder;
   // These two are to be used by step_holder.
   step() { }
-  bool is_empty() const { return representation.get().empty(); }
+  bool empty() const { return representation_.get().empty(); }
 
   template <typename Iter>
   step(Iter el_steps_begin, Iter el_steps_end)
-    : representation(detail::string_from_el_steps(el_steps_begin, el_steps_end))
+    : representation_(detail::string_from_el_steps(el_steps_begin, el_steps_end))
   { }
 
   //! Make a push/pull move assuming that the move is valid.
   static step make_push_pull(board const& board,
-      elementary_step first_step, elementary_step second_step);
+                             elementary_step first_step, elementary_step second_step);
 };
 
 bool operator == (step const& lhs, step const& rhs);
@@ -272,40 +272,40 @@ public:
   step_holder() { }
 
   //! Implicit conversion from step, mimicking boost::optional.
-  step_holder(apns::step const& step) : step(step) { }
+  step_holder(apns::step const& step) : step_(step) { }
   
   static step_holder none;
 
   //! Is this holder empty?
-  bool empty() { return step.is_empty(); }
-  bool empty() const { return step.is_empty(); }
+  bool empty() { return step_.empty(); }
+  bool empty() const { return step_.empty(); }
   operator bool_type() { return !empty() ? &step_holder::this_type_does_not_support_comparisons : 0; }
   operator bool_type() const { return !empty() ? &step_holder::this_type_does_not_support_comparisons : 0; }
 
   //! For compatibility with old code, provide an implicit conversion to optional<step>.
   operator boost::optional<apns::step> () const {
-    if (!step.is_empty())
-      return step;
+    if (!step_.empty())
+      return step_;
     else
       return boost::none;
   }
 
-  apns::step& operator * ()               { assert(!empty()); return step; }
-  apns::step const& operator * () const   { assert(!empty()); return step; }
-  apns::step* operator -> ()              { assert(!empty()); return &step; }
-  apns::step const* operator -> () const  { assert(!empty()); return &step; }
+  apns::step& operator * ()               { assert(!empty()); return step_; }
+  apns::step const& operator * () const   { assert(!empty()); return step_; }
+  apns::step* operator -> ()              { assert(!empty()); return &step_; }
+  apns::step const* operator -> () const  { assert(!empty()); return &step_; }
 
   step_holder& operator = (apns::step const& s) {
-    step = s;
+    step_ = s;
     return *this;
   }
 
-  apns::step* get() { if (!empty()) return &step; else return 0; }
+  apns::step* get() { if (!empty()) return &step_; else return 0; }
 
-  void swap(step_holder& other) { step.swap(other.step); }
+  void swap(step_holder& other) { step_.swap(other.step_); }
 
 private:
-  apns::step step;
+  apns::step step_;
 };
 
 inline bool operator == (step_holder const& lhs, step_holder const& rhs) {
@@ -386,11 +386,11 @@ public:
 private:
   friend class boost::iterator_core_access;
 
-  apns::board const* board;
-  position piece_pos;           //!< The specified position of the piece.
-  directions_iter first_dir;    //!< Where to move the piece (possibly pushing something else away).
-  directions_iter second_dir;   //!< Where to push the second piece (if pushing) or which of the neighbours to pull.
-  step_holder result;           //!< Resulting step.
+  apns::board const* board_;
+  position piece_pos_;           //!< The specified position of the piece.
+  directions_iter first_dir_;    //!< Where to move the piece (possibly pushing something else away).
+  directions_iter second_dir_;   //!< Where to push the second piece (if pushing) or which of the neighbours to pull.
+  step_holder result_;           //!< Resulting step.
 
   enum {
     ordinary,  //!< Generating ordinary steps.
@@ -436,10 +436,10 @@ public:
 private:
   friend class boost::iterator_core_access;
 
-  apns::board const*            board;
-  apns::board::pieces_iterator  current_piece;
-  steps_iter                current_step;
-  piece::color_t            player;
+  apns::board const*            board_;
+  apns::board::pieces_iterator  current_piece_;
+  steps_iter                    current_step_;
+  piece::color_t                player_;
 
   void increment();
   reference dereference() const;

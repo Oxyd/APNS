@@ -30,18 +30,18 @@ void export_table(char const* name, char const* description) {
         "Find a vertex in the table by the key. Return None if the vertex doesn't exist in the table")
 
     .add_property("memoryUsage",
-        &Table::get_memory_usage,
+        &Table::memory_usage,
         "Return the number of bytes used by the transposition table")
-    .add_property("size", &apns::transposition_table::get_table_size,
+    .add_property("size", &apns::transposition_table::table_size,
                   "Maximal number of elements storeable in this table.")
     .add_property("elements",
-        &Table::get_elements,
+        &Table::elements,
         "Return the number of elements stored in the table")
     .add_property("hits",
-        &Table::get_hits,
+        &Table::hits,
         "The number of successful retreivals from the table")
     .add_property("misses",
-        &Table::get_misses,
+        &Table::misses,
         "The number of unsuccsessful retreival attempts from the table")
     ;
 

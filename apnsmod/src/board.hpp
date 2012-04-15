@@ -35,12 +35,12 @@ struct piece {
 
   //! Type of the piece. That is, the animal that's used to represent it.
   enum type_t {
-    elephant = 'e',
-    camel = 'm',
-    horse = 'h',
-    dog = 'd',
-    cat = 'c',
-    rabbit = 'r',
+    elephant  = 'e',
+    camel     = 'm',
+    horse     = 'h',
+    dog       = 'd',
+    cat       = 'c',
+    rabbit    = 'r',
 
     type_count = 6  //!< How many animals are there in total in our zoo?
   };
@@ -48,22 +48,24 @@ struct piece {
   //! Init a piece with given color and type.
   piece(color_t color, type_t type);
 
-  color_t get_color() const;  //!< Get the color of this piece.
-  type_t  get_type() const;   //!< Get the type of this piece.
+  color_t color() const;  //!< Get the color of this piece.
+  type_t  type() const;   //!< Get the type of this piece.
 
   //! Compare two pieces.
   bool equal(piece const& other) const;
 
   //! Get the Arimaa letter for this piece.
-  char letter() const { return data; }
+  char letter() const { return data_; }
 
 private:
   friend piece piece_from_letter_unsafe(char);
-  explicit piece(char letter) : data(letter) {
-    assert(data == 'e' || data == 'm' || data == 'h' || data == 'd' || data == 'c' || data == 'r' ||
-           data == 'E' || data == 'M' || data == 'H' || data == 'D' || data == 'C' || data == 'R');
+
+  char data_;
+
+  explicit piece(char letter) : data_(letter) {
+    assert(data_ == 'e' || data_ == 'm' || data_ == 'h' || data_ == 'd' || data_ == 'c' || data_ == 'r' ||
+           data_ == 'E' || data_ == 'M' || data_ == 'H' || data_ == 'D' || data_ == 'C' || data_ == 'R');
   }
-  char data;
 };
 
 typedef boost::array<piece::color_t const, 2> colors_array_t;
@@ -136,14 +138,14 @@ public:
   position(row_t row, col_t column);
   position(row_t row, std::string const& column);
 
-  row_t get_row() const;
-  col_t get_column() const;
-  std::string py_get_column() const;
+  row_t row() const;
+  col_t column() const;
+  std::string py_column() const;
 
 private:
   // Use unsigned char for both so that position is only two chars in size.
-  unsigned char row;
-  unsigned char column;
+  unsigned char row_;
+  unsigned char column_;
 };
 
 bool operator == (position lhs, position rhs);  //!< Compare two positions for equality.
@@ -245,7 +247,7 @@ public:
     //! Iterate to the first non-empty position at or before the current one.
     void reverse_to_nonempty();
 
-    std::size_t pos;  //!< Index into board::pieces that this iterator is currently pointing to.
+    std::size_t pos_;  //!< Index into board::pieces that this iterator is currently pointing to.
   };
 
   board();
@@ -271,17 +273,17 @@ public:
 
   //! Remove all pieces from the board.
   void clear() {
-    std::fill(pieces.begin(), pieces.end(), ' ');
+    std::fill(pieces_.begin(), pieces_.end(), ' ');
   }
 
   pieces_iterator pieces_begin() const;  //!< Get the start iterator of the sequence of all pieces stored within board.
   pieces_iterator pieces_end() const;    //!< Get the one-past-the-end iterator of the sequence.
 
   //! Compare boards;
-  bool equal(board const& other) const { return pieces == other.pieces; }
+  bool equal(board const& other) const { return pieces_ == other.pieces_; }
 
 private:
-  pieces_cont       pieces;
+  pieces_cont pieces_;
 };
 
 bool operator == (board const& lhs, board const& rhs);  //<! Test whether two board contain exactly the same elements.
@@ -337,8 +339,8 @@ private:
   void forward_to_valid();  //!< Forward direction to the first valid direction or keep it where it is, if it already
                             //!< points to a valid direction.
 
-  directions_iter direction;
-  position center;
+  directions_iter direction_;
+  position        center_;
 };
 
 neighbourhood_iter neighbourhood_begin(position center);  //!< Get the beginning of a position's neighbourhood.
@@ -369,7 +371,7 @@ private:
   void forward_to_nonempty();  //!< Forward the underlying neighbourhood_iter to next nonempty position or keep it
                                //!< where it is, if it already points to a nonempty position.
 
-  apns::board const* board;
+  apns::board const* board_;
 };
 
 //! Return the start iterator of a sequence of pieces adjacent to the given center position on the given board.

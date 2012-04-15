@@ -30,31 +30,31 @@ boost::optional<piece::color_t> winner(board const& board, piece::color_t player
 //! Compare children of a vertex according to the apropriate number.
 struct vertex_comparator {
   explicit vertex_comparator(vertex const& parent) :
-    number(parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number),
-    parent_type(parent.type)
+    number_(parent.type == vertex::type_or ? &vertex::proof_number : &vertex::disproof_number),
+    parent_type_(parent.type)
   { }
 
   bool operator () (vertex const& lhs, vertex const& rhs) {
-    return lhs.*number < rhs.*number || (lhs.*number == rhs.*number && lhs.type == parent_type && rhs.type != parent_type);
+    return lhs.*number_ < rhs.*number_ || (lhs.*number_ == rhs.*number_ && lhs.type == parent_type_ && rhs.type != parent_type_);
   }
 
 private:
-  vertex::number_t vertex::*  number;
-  vertex::e_type              parent_type;
+  vertex::number_t vertex::*  number_;
+  vertex::e_type              parent_type_;
 };
 
 //! Compare pointers to children of a vertex according to the apropriate number.
 struct vertex_ptr_comparator {
   explicit vertex_ptr_comparator(vertex const* parent) :
-    comp(*parent)
+    comp_(*parent)
   { }
 
   bool operator () (vertex const* lhs, vertex const* rhs) {
-    return comp(*lhs, *rhs);
+    return comp_(*lhs, *rhs);
   }
 
 private:
-  vertex_comparator comp;
+  vertex_comparator comp_;
 };
 
 //! Return the best successor of a vertex. Can be used as a traversal policy.
@@ -72,23 +72,23 @@ struct null_board_visitor {
 //! board and updates it.
 struct board_stack {
   explicit board_stack(apns::board const& initial_board) :
-    board(initial_board)
+    board_(initial_board)
   { }
 
   apns::board const& top() const {
-    return board;
+    return board_;
   }
 
   void push(step const& s) {
-    apply(s, board);
+    apply(s, board_);
   }
 
   void pop(step const& s) {
-    unapply(s, board);
+    unapply(s, board_);
   }
 
 private:
-  apns::board board;
+  apns::board board_;
 };
 
 //! Container for the history of a path. That is, all board states at the point of the beginnings of each player's turn.
@@ -97,7 +97,7 @@ struct history_stack {
     zobrist_hasher::hash_t  hash;
 
     record() { }
-    record(zobrist_hasher::hash_t hash) :
+    explicit record(zobrist_hasher::hash_t hash) :
       hash(hash)
     { }
   };
@@ -105,14 +105,14 @@ struct history_stack {
   typedef std::vector<record> records_cont;
 
   history_stack();
-  records_cont const& records() const { return current_records; }
+  records_cont const& records() const { return current_records_; }
 
   void push(vertex const& vertex, zobrist_hasher::hash_t hash);
   void pop(vertex const& vertex);
 
 private:
-  records_cont                current_records;
-  std::stack<vertex::e_type>  last;
+  records_cont                current_records_;
+  std::stack<vertex::e_type>  last_;
 };
 
 //! History of hashes met during a traversal.
@@ -120,17 +120,17 @@ struct hashes_stack {
   typedef std::vector<zobrist_hasher::hash_t> hashes_cont;
 
   hashes_stack(zobrist_hasher const& hasher, zobrist_hasher::hash_t initial_hash, piece::color_t attacker) :
-    stack(1, initial_hash),
-    hasher(&hasher)
+    stack_(1, initial_hash),
+    hasher_(&hasher)
   { 
-    last_visited.push(last(vertex::type_or, attacker));
+    last_visited_.push(last(vertex::type_or, attacker));
   }
 
-  zobrist_hasher::hash_t top() const          { return stack.back(); }
-  zobrist_hasher::hash_t opponent_top() const { return hasher->opponent_hash(stack.back()); }
+  zobrist_hasher::hash_t top() const          { return stack_.back(); }
+  zobrist_hasher::hash_t opponent_top() const { return hasher_->opponent_hash(stack_.back()); }
 
   //! Get a container of the encountered hashes. The top of the stack is the last element in the container; bottom is the first.
-  hashes_cont const&     hashes() const { return stack; }
+  hashes_cont const&     hashes() const { return stack_; }
 
   void push(vertex const& v);
   void pop();
@@ -146,9 +146,9 @@ private:
     { }
   };
 
-  hashes_cont           stack;
-  zobrist_hasher const* hasher;
-  std::stack<last>      last_visited;
+  hashes_cont           stack_;
+  zobrist_hasher const* hasher_;
+  std::stack<last>      last_visited_;
 };
 
 //! Killer steps database.
@@ -159,19 +159,19 @@ public:
   typedef ply_killers_t::const_iterator ply_iterator;
 
   //! Make a killer DB that holds at most killer_count killers for each ply.
-  explicit killer_db(std::size_t killer_count) : killer_count(killer_count) { }
+  explicit killer_db(std::size_t killer_count) : killer_count_(killer_count) { }
 
   //! Change the maximal number of killers per ply. This will drop all killers stored in this db.
   void resize_plys(std::size_t new_killer_count) {
-    if (new_killer_count != killer_count) {
-      killers_or.resize(0);
-      killers_and.resize(0);
-      killer_count = new_killer_count;
+    if (new_killer_count != killer_count_) {
+      killers_or_.resize(0);
+      killers_and_.resize(0);
+      killer_count_ = new_killer_count;
     }
   }
 
   //! Get the maximal number of killers in each ply.
-  std::size_t plys_size() const { return killer_count; }
+  std::size_t plys_size() const { return killer_count_; }
 
   //! Add a step to the list of killers for given ply and given parent type.
   void add(std::size_t ply, vertex::e_type type, step const& step);
@@ -196,29 +196,46 @@ public:
 private:
   typedef std::vector<ply_killers_t> plys;
 
-  std::size_t killer_count;       //!< How many killers at most per ply.
-  plys killers_or;
-  plys killers_and;
+  std::size_t killer_count_;       //!< How many killers at most per ply.
+  plys killers_or_;
+  plys killers_and_;
 
   plys& get_plys(vertex::e_type type) {
     switch (type) {
-    case vertex::type_or:   return killers_or;
-    case vertex::type_and:  return killers_and;
+    case vertex::type_or:   return killers_or_;
+    case vertex::type_and:  return killers_and_;
     }
 
     assert(!"Won't get here");
-    return killers_or;
+    return killers_or_;
   }
 
   plys const& get_plys(vertex::e_type type) const {
     switch (type) {
-    case vertex::type_or:   return killers_or;
-    case vertex::type_and:  return killers_and;
+    case vertex::type_or:   return killers_or_;
+    case vertex::type_and:  return killers_and_;
     }
 
     assert(!"Wont' get here");
-    return killers_or;
+    return killers_or_;
   }
+};
+
+//! A move path is a path from the vertex that begins a player's turn to the vertex that ends it. That means that the last
+//! vertex's type is always different from the first one's. Also that all but the last vertex share the same type.
+//!
+//! For simplicity, this is an array of 4 vertices (the maximum path len). The first element is the last vertex. Null pointers
+//! are used when the path is shorter than 4 vertices.
+typedef boost::array<vertex*, 4> move_path;
+
+//! A move terminal is the vertex that ends a player's turn. This is a mapping from such terminals' hashes into their paths.
+typedef boost::unordered_map<zobrist_hasher::hash_t, move_path> terminal_paths;
+
+//! A move tree is a subtree of the whole search tree rooted at the vertex that begins a player's turn and containing the
+//! possible step paths from this root to terminal states.
+struct move_tree {
+  zobrist_hasher::hash_t            root_hash;
+  boost::shared_ptr<terminal_paths> paths;
 };
 
 //! Update proof- and disproof-numbers of a single vertex.
@@ -267,72 +284,78 @@ namespace detail {
 
 } // namespace apns::detail
 
+struct search_stack {
+  std::vector<vertex*> path;
+  std::vector<zobrist_hasher::hash_t> hashes;
+  std::vector<zobrist_hasher::hash_t> history;
+};
+
 //! A CRTP base class for search algorithms.
 template <typename Algo>
 class search_algo : private boost::noncopyable {
 public:
   boost::shared_ptr<apns::game> get_game() const {
-    return game;
+    return game_;
   }
 
   bool finished() const {
-    return game->root.proof_number == 0 || game->root.disproof_number == 0;
+    return game_->root.proof_number == 0 || game_->root.disproof_number == 0;
   }
 
   //! Make the algorithm use a transposition table.
   void use_trans_tbl(std::size_t size) {
-    trans_tbl.reset(new transposition_table(size));
+    trans_tbl_.reset(new transposition_table(size));
   }
 
   //! Get the transposition table, if any, used by this algorithm.
   //! \returns Pointer to the transposition table or null if no table is associated with this algorithm.
   transposition_table const* get_trans_tbl() const {
-    return trans_tbl.get(); 
+    return trans_tbl_.get(); 
   }
 
   //! Make the algorithm use a proof table.
   void use_proof_tbl(std::size_t size) {
-    proof_tbl.reset(new proof_table(size));
+    proof_tbl_.reset(new proof_table(size));
   }
 
   //! Get the proof table, if any, used by this algorithm.
   proof_table const* get_proof_tbl() const {
-    return proof_tbl.get();
+    return proof_tbl_.get();
   }
   
   //! Change the number of killers stored for each ply.
   void set_killer_count(std::size_t new_killer_count) {
-    killers.resize_plys(new_killer_count);
+    killers_.resize_plys(new_killer_count);
   }
 
   //! Get the max. number of killers stored for each ply.
   std::size_t get_killer_count() const {
-    return killers.plys_size();
+    return killers_.plys_size();
   }
 
   //! Set upper GC treshold. If the tree size exceeds this value, GC will be run.
   void set_gc_high(std::size_t new_max) {
-    gc_high = new_max;
+    gc_high_ = new_max;
   }
 
   //! Get upper GC treshold.
   std::size_t get_gc_high() const {
-    return gc_high;
+    return gc_high_;
   }
 
   //! Set lower GC treshold. GC will stop collecting once the tree size falls below this value.
   void set_gc_low(std::size_t new_min) {
-    gc_low = new_min;
+    gc_low_ = new_min;
   }
 
   //! Get lower GC treshold.
   std::size_t get_gc_low() const {
-    return gc_low;
+    return gc_low_;
   }
 
   //! Get the total number of vertices currently held by this algorithm.
   std::size_t get_position_count() const {
-    return position_count;
+    return position_count_;
   }
 
   //! Run the algorithm for ms_how_long milliseconds.
@@ -350,23 +373,23 @@ public:
   }
 
 protected:
-  boost::shared_ptr<apns::game>  game;
-  boost::scoped_ptr<transposition_table>  trans_tbl;
-  boost::scoped_ptr<proof_table>          proof_tbl;
-  zobrist_hasher              hasher;         //!< Hasher to be used during the algorithm.
-  zobrist_hasher::hash_t      initial_hash;   //!< Hash corresponding to initial_state.
-  killer_db                   killers;
-  std::size_t                 position_count;
-  std::size_t                 gc_high;
-  std::size_t                 gc_low;
+  boost::shared_ptr<apns::game>  game_;
+  boost::scoped_ptr<transposition_table>  trans_tbl_;
+  boost::scoped_ptr<proof_table>          proof_tbl_;
+  zobrist_hasher              hasher_;         //!< Hasher to be used during the algorithm.
+  zobrist_hasher::hash_t      initial_hash_;   //!< Hash corresponding to initial_state.
+  killer_db                   killers_;
+  std::size_t                 position_count_;
+  std::size_t                 gc_high_;
+  std::size_t                 gc_low_;
 
   search_algo(boost::shared_ptr<apns::game> const& game, std::size_t position_count = 1) :
-    game(game),
-    initial_hash(hasher.generate_initial(game->initial_state, game->attacker)),
-    killers(2),
-    position_count(position_count),
-    gc_high(0),
-    gc_low(0)
+    game_(game),
+    initial_hash_(hasher_.generate_initial(game->initial_state, game->attacker)),
+    killers_(2),
+    position_count_(position_count),
+    gc_high_(0),
+    gc_low_(0)
   { }
 
   template <typename PathIter>
@@ -376,14 +399,14 @@ protected:
       std::size_t const leaf_ply = std::distance(path_begin, path_end) - 1;
       vertex* leaf = *(path_end - 1);
 
-      if (detail::simulate(*leaf, killers, leaf_ply, game->attacker, proof_tbl.get(), board_stack, hashes_stack, history)) {
+      if (detail::simulate(*leaf, killers_, leaf_ply, game_->attacker, proof_tbl_.get(), board_stack, hashes_stack, history)) {
         vertex_counter counter;
         traverse(*leaf, backtrack(), boost::ref(counter));
-        position_count += counter.count - 1;  // *leaf itself should not be added as it's already in position_count.
+        position_count_ += counter.count - 1;  // *leaf itself should not be added as it's already in position_count.
       } 
       else {
         expand(*leaf, board_stack, hashes_stack, history);
-        position_count += leaf->children_count();
+        position_count_ += leaf->children_count();
       }
 
       update_numbers(std::reverse_iterator<PathIter>(path_end), std::reverse_iterator<PathIter>(path_begin),
@@ -392,13 +415,13 @@ protected:
       leaf = *(path_end - 1);
       if ((leaf->type == vertex::type_or && leaf->proof_number == 0)
           || (leaf->type == vertex::type_and && leaf->disproof_number == 0))
-        killers.add(leaf_ply, leaf->type, *leaf->step);
+        killers_.add(leaf_ply, leaf->type, *leaf->step);
     }
   }
 
   void expand(vertex& leaf, board_stack& state, hashes_stack& hashes, history_stack& history) {
-    apns::detail::expand(leaf, state, game->attacker, trans_tbl.get(), proof_tbl.get(), hashes.hashes().size() - 1, 
-                         killers, hashes, history);
+    apns::detail::expand(leaf, state, game_->attacker, trans_tbl_.get(), proof_tbl_.get(), hashes.hashes().size() - 1, 
+                         killers_, hashes, history);
   }
 
   template <typename HashesRevIter, typename PathRevIter>
@@ -411,11 +434,11 @@ protected:
       vertex& v = **current;
       apns::update_numbers(v);
 
-      if (trans_tbl && v.proof_number != 0 && v.disproof_number != 0)
-        trans_tbl->insert(*hashes_begin, ply, std::make_pair(v.proof_number, v.disproof_number));
+      if (trans_tbl_ && v.proof_number != 0 && v.disproof_number != 0)
+        trans_tbl_->insert(*hashes_begin, ply, std::make_pair(v.proof_number, v.disproof_number));
 
-      else if (proof_tbl && (v.proof_number == 0 || v.disproof_number == 0)) {
-        proof_tbl->insert(
+      else if (proof_tbl_ && (v.proof_number == 0 || v.disproof_number == 0)) {
+        proof_tbl_->insert(
           *hashes_begin, ply,
           proof_entry_t(v.proof_number, v.disproof_number,
                         detail::proof_history_from_records(history.records()))
@@ -427,7 +450,7 @@ protected:
 
         if ((parent.type == vertex::type_or && v.proof_number == 0)
             || (parent.type == vertex::type_and && v.disproof_number == 0))
-          killers.add(ply, parent.type, *v.step);
+          killers_.add(ply, parent.type, *v.step);
       }
 
       if (prev != path_end)
@@ -441,14 +464,16 @@ protected:
     }
   }
 
+  //! If the number of vertices is greater than gc_high, cut vertices until the count drops below gc_low. An effort is made
+  //! to cut the worst and deepest vertices first.
   void garbage_collect() {
-    if (gc_high > 0 && position_count > gc_high) {
+    if (gc_high_ > 0 && position_count_ > gc_high_) {
       // Traverse along the best path cutting children in worst-first manner. Note that gc_traversal never traverses the best
       // vertex itself, so we won't cut the best path.
       
-      vertex* current = &game->root;
-      while (position_count > gc_low && current != 0) {
-        traverse_postorder(*current, gc_traversal(), cutter(position_count), gc_stop(position_count, gc_low));
+      vertex* current = &game_->root;
+      while (position_count_ > gc_low_ && current != 0) {
+        traverse_postorder(*current, gc_traversal(), cutter(position_count_), gc_stop(position_count_, gc_low_));
 
         if (current->children_count() > 0)
           current = &*current->children_begin();
@@ -497,24 +522,25 @@ private:
         return 0;
     }
 
-  //! Recurse to subtree.
-  boost::optional<vertex::reverse_children_iterator&> recurse(vertex& from) {
-    using namespace apns;
+    //! Recurse to subtree.
+    boost::optional<vertex::reverse_children_iterator&> recurse(vertex& from) {
+      using namespace apns;
 
-    vertex* current = &from;
-    while (current->children_count() > LEAVE_OUT) {
-      vertex::reverse_children_iterator end = current->children_rend();
-      std::advance(end, -LEAVE_OUT);
-      stack.push(std::make_pair(current->children_rbegin(), end));
-      current = &*current->children_rbegin();
+      vertex* current = &from;
+      while (current->children_count() > LEAVE_OUT) {
+        vertex::reverse_children_iterator end = current->children_rend();
+        std::advance(end, -LEAVE_OUT);
+        stack.push(std::make_pair(current->children_rbegin(), end));
+        current = &*current->children_rbegin();
+      }
+
+      if (!stack.empty())
+        return stack.top().first;
+      else
+        return boost::none;
     }
+  };
 
-    if (!stack.empty())
-      return stack.top().first;
-    else
-      return boost::none;
-  }
-};
   //! Visitor that cuts children of the visited vertex and decreases the position count.
   struct cutter {
     std::size_t* count;  //!< Pointer to the total position count in the tree.
@@ -526,17 +552,17 @@ private:
   //! Traversal stop policy that stops the algorithm when the position count drops below the given level.
   struct gc_stop {
     gc_stop(std::size_t& count, std::size_t low) :
-      count(&count),
-      low(low)
+      count_(&count),
+      low_(low)
     { }
 
     bool operator () (vertex&) {
-      return *count <= low;
+      return *count_ <= low_;
     }
 
   private:
-    std::size_t* count;
-    std::size_t  low;
+    std::size_t* count_;
+    std::size_t  low_;
   };
 };
 
@@ -558,28 +584,28 @@ public:
 struct depth_first_pns : public search_algo<depth_first_pns> {
   explicit depth_first_pns(boost::shared_ptr<apns::game> const& game, std::size_t position_count = 1) :
     search_algo(game, position_count),
-    path(1, &game->root),
-    limits(1, limits_t(vertex::infty, vertex::infty)),
-    hashes(hasher, initial_hash, game->attacker),
-    boards(game->initial_state)
+    path_(1, &game->root),
+    limits_(1, limits_t(vertex::infty, vertex::infty)),
+    hashes_(hasher_, initial_hash_, game_->attacker),
+    boards_(game_->initial_state)
   { }
 
   void do_iterate();
 
   void do_set_gc_high(std::size_t new_max) {
-    gc_high = new_max;
+    gc_high_ = new_max;
   }
 
   std::size_t do_get_gc_high() const {
-    return gc_high;
+    return gc_high_;
   }
   
   void do_set_gc_low(std::size_t new_min) {
-    gc_low = new_min;
+    gc_low_ = new_min;
   }
 
   std::size_t do_get_gc_low() const {
-    return gc_low;
+    return gc_low_;
   }
   
 private:
@@ -594,11 +620,11 @@ private:
   typedef std::vector<vertex*>  path_cont;
   typedef std::vector<limits_t> limits_cont;
 
-  path_cont       path;
-  limits_cont     limits;
-  history_stack   history;
-  hashes_stack    hashes;
-  board_stack     boards;
+  path_cont       path_;
+  limits_cont     limits_;
+  history_stack   history_;
+  hashes_stack    hashes_;
+  board_stack     boards_;
 
   limits_t make_limits(vertex& v, vertex& parent, boost::optional<vertex&> second_best, limits_t parent_limits);
 };

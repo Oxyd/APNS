@@ -85,10 +85,10 @@ public:
   //! Remove child specified by an iterator into this vertex. May invalidate all existing iterators to children of this vertex.
   void remove_child(children_iterator child);
   
-  children_iterator       children_begin()        { return children.begin(); }
-  children_iterator       children_end()          { return children.end(); }
-  const_children_iterator children_begin() const  { return children.begin(); }
-  const_children_iterator children_end() const    { return children.end(); }
+  children_iterator       children_begin()        { return children_.begin(); }
+  children_iterator       children_end()          { return children_.end(); }
+  const_children_iterator children_begin() const  { return children_.begin(); }
+  const_children_iterator children_end() const    { return children_.end(); }
 
   reverse_children_iterator children_rbegin() {
     return reverse_children_iterator(children_end());
@@ -106,21 +106,21 @@ public:
     return const_reverse_children_iterator(children_begin());
   }
 
-  std::size_t children_count() const { return children.size(); }
-  bool leaf() const { return children.empty(); }
+  std::size_t children_count() const { return children_.size(); }
+  bool leaf() const { return children_.empty(); }
 
   //! Construct an iterator to a child from a pointer to a child of this vertex. The behaviour is undefined if child does not
   //! point to a child of this vertex.
   children_iterator iter_from_ptr(vertex* child) {
     using namespace boost::lambda;
-    return std::find_if(children.begin(), children.end(),
+    return std::find_if(children_.begin(), children_.end(),
                         &_1 == child);
   }
 
   //! Sort the children of this vertex according to a comparator.
   template <typename Compare>
   void sort_children(Compare comp) {
-    std::sort(children.base().begin(), children.base().end(),
+    std::sort(children_.base().begin(), children_.base().end(),
               ptr_compare<Compare>(comp));
   }
 
@@ -138,7 +138,7 @@ public:
   //!
   //! \note As the source vertex's size is reduced, it may be advantageous to .pack() it after this operation.
   void transfer_child(vertex& other, vertex::children_iterator child, vertex::children_iterator before) {
-    children.transfer(before.base(), child.base(), other.children);
+    children_.transfer(before.base(), child.base(), other.children_);
   }
 
   void transfer_child(vertex& other, vertex::children_iterator child) {
@@ -166,25 +166,25 @@ public:
   //void swap(vertex& other);
 
   //! Get an aproximate total memory usage by all vertices of all trees.
-  static std::size_t alloc_size() { return alloc; }
+  static std::size_t alloc_size() { return alloc_; }
   
 private:
-  static std::size_t alloc;
+  static std::size_t alloc_;
 
   //! Compare void*s that point to vertices according to a given comparator.
   template <typename Compare>
   struct ptr_compare {
-    explicit ptr_compare(Compare comp) : comp(comp) { }
+    explicit ptr_compare(Compare comp) : comp_(comp) { }
 
     bool operator () (void* lhs, void* rhs) {
-      return comp(*static_cast<vertex*>(lhs), *static_cast<vertex*>(rhs));
+      return comp_(*static_cast<vertex*>(lhs), *static_cast<vertex*>(rhs));
     }
 
   private:
-    Compare comp;
+    Compare comp_;
   };
 
-  children_container children;
+  children_container children_;
 };
 
 //! Given a vertex type, return its opposite.
@@ -196,13 +196,13 @@ namespace detail {
 
 template <typename Compare>
 struct ptr_compare {
-  explicit ptr_compare(Compare comp = Compare()) : comp(comp) { }
+  explicit ptr_compare(Compare comp = Compare()) : comp_(comp) { }
   bool operator () (vertex const* lhs, vertex const* rhs) {
-    return comp(*lhs, *rhs);
+    return comp_(*lhs, *rhs);
   }
 
 private:
-  Compare comp;
+  Compare comp_;
 };
 
 } // namespace detail
@@ -390,19 +390,19 @@ public:
   vertex* operator () (vertex& current) {
     if (current.children_count() > 0) {
       // This vertex has any children? Good, go to the first one. Also push this level onto the stack.
-      stack.push(std::make_pair(current.children_begin(), current.children_end()));
+      stack_.push(std::make_pair(current.children_begin(), current.children_end()));
       return &*current.children_begin();
 
-    } else while (!stack.empty()) {
+    } else while (!stack_.empty()) {
         // A leaf? Okay, does it have an unvisited sibling?
-        vertex::children_iterator& cur = stack.top().first;
-        vertex::children_iterator& end = stack.top().second;
+        vertex::children_iterator& cur = stack_.top().first;
+        vertex::children_iterator& end = stack_.top().second;
 
         ++cur;
         if (cur != end)
           return &*cur;   // It does, visit that.
         else
-          stack.pop();  // Nope, try one level above.
+          stack_.pop();  // Nope, try one level above.
       }
 
     // No dice either way? Looks like we're done.
@@ -410,7 +410,7 @@ public:
   }
 
 private:
-  stack_t stack;
+  stack_t stack_;
 };
 
 //! Postorder traveral policy for traverse_postorder. Do note that this never traverses the root vertex.
@@ -421,30 +421,30 @@ public:
   vertex* operator () (apns::vertex& v) {
     using namespace apns;
 
-    if (stack.empty()) {
+    if (stack_.empty()) {
       if (v.children_count() > 0) {
-        stack.push(std::make_pair(v.children_begin(), v.children_end()));
-        return inc(recurse(stack.top().first));
+        stack_.push(std::make_pair(v.children_begin(), v.children_end()));
+        return inc(recurse(stack_.top().first));
       } else {
         return 0;
       }
     }
 
-    if (stack.top().first != stack.top().second)
-      return inc(recurse(stack.top().first));
+    if (stack_.top().first != stack_.top().second)
+      return inc(recurse(stack_.top().first));
     else {
-      while (!stack.empty() && stack.top().first == stack.top().second)
-        stack.pop();
+      while (!stack_.empty() && stack_.top().first == stack_.top().second)
+        stack_.pop();
 
-      if (!stack.empty())
-        return inc(stack.top().first);
+      if (!stack_.empty())
+        return inc(stack_.top().first);
       else
         return 0;
     }
   }
 
 private:
-  stack_t stack;
+  stack_t stack_;
 
   //! If an iterator is given, increments it and returns pointer to the originally pointed-to vertex. Otherwise, it returns 0.
   vertex* inc(boost::optional<vertex::children_iterator&> i) {
@@ -459,12 +459,12 @@ private:
 
     vertex::children_iterator current = from;
     while (current->children_count() > 0) {
-      stack.push(std::make_pair(current->children_begin(), current->children_end()));
+      stack_.push(std::make_pair(current->children_begin(), current->children_end()));
       current = current->children_begin();
     }
 
-    if (!stack.empty())
-      return stack.top().first;
+    if (!stack_.empty())
+      return stack_.top().first;
     else
       return boost::none;
   }

@@ -62,20 +62,20 @@ TEST_F(position_test, make_adjacent_test) {
   position pos(1, 'a');
 
   pos = make_adjacent(pos, east);
-  EXPECT_EQ(pos.get_row(), 1);
-  EXPECT_EQ(pos.get_column(), 'b');
+  EXPECT_EQ(pos.row(), 1);
+  EXPECT_EQ(pos.column(), 'b');
 
   pos = make_adjacent(pos, north);
-  EXPECT_EQ(pos.get_row(), 2);
-  EXPECT_EQ(pos.get_column(), 'b');
+  EXPECT_EQ(pos.row(), 2);
+  EXPECT_EQ(pos.column(), 'b');
 
   pos = make_adjacent(pos, west);
-  EXPECT_EQ(pos.get_row(), 2);
-  EXPECT_EQ(pos.get_column(), 'a');
+  EXPECT_EQ(pos.row(), 2);
+  EXPECT_EQ(pos.column(), 'a');
 
   pos = make_adjacent(pos, south);
-  EXPECT_EQ(pos.get_row(), 1);
-  EXPECT_EQ(pos.get_column(), 'a');
+  EXPECT_EQ(pos.row(), 1);
+  EXPECT_EQ(pos.column(), 'a');
 
   EXPECT_THROW(make_adjacent(pos, south), std::logic_error);
   EXPECT_THROW(make_adjacent(pos, west), std::logic_error);
@@ -152,12 +152,12 @@ TEST_F(board_test, put_get_remove_test) {
   }
 
   piece p = *b.get(position(3, 'g'));
-  EXPECT_EQ(p.get_color(), piece::gold);
-  EXPECT_EQ(p.get_type(), piece::horse);
+  EXPECT_EQ(p.color(), piece::gold);
+  EXPECT_EQ(p.type(), piece::horse);
 
   for (int t = piece::elephant; t <= piece::rabbit; ++t) {
     if (t != piece::horse) {
-      EXPECT_TRUE(p.get_type() != t);
+      EXPECT_TRUE(p.type() != t);
     }
   }
 }
@@ -192,13 +192,13 @@ TEST_F(board_test, iteration) {
   unsigned silver_count = 0;
 
   for (board::pieces_iterator piece = b.pieces_begin(); piece != b.pieces_end(); ++piece) {
-    if (piece->second.get_color() == piece::silver) {
+    if (piece->second.color() == piece::silver) {
       ++silver_count;
     } else {
       ++gold_count;
     }
 
-    switch (piece->second.get_type()) {
+    switch (piece->second.type()) {
     case piece::horse:
     case piece::rabbit:
     case piece::elephant:
@@ -292,8 +292,8 @@ protected:
 TEST_F(adjacent_pieces_test, one_adjacent) {
   std::vector<piece> adjacent(adjacent_pieces_begin(b, position(3, 'd')), adjacent_pieces_end());
   ASSERT_EQ(adjacent.size(), 1);
-  EXPECT_EQ(adjacent[0].get_color(), piece::silver);
-  EXPECT_EQ(adjacent[0].get_type(), piece::elephant);
+  EXPECT_EQ(adjacent[0].color(), piece::silver);
+  EXPECT_EQ(adjacent[0].type(), piece::elephant);
 }
 
 bool expect_in_it(std::vector<piece> const& pieces, piece::color_t c, piece::type_t t) {
@@ -331,7 +331,7 @@ std::ostream& operator << (std::ostream& stream, std::vector<piece> const& piece
     } else {
       stream << "[";
     }
-    stream << "(" << piece->get_color() << ", " << piece->get_type() << ")";
+    stream << "(" << piece->color() << ", " << piece->type() << ")";
   }
 
   stream << "]";

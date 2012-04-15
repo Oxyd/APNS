@@ -70,11 +70,11 @@ boost::optional<piece::color_t> winner(board const& board, piece::color_t player
     position position = pos_piece->first;
     piece piece = pos_piece->second;
 
-    if (piece.get_type() == piece::rabbit) {
-      if (piece.get_color() == player) {
+    if (piece.type() == piece::rabbit) {
+      if (piece.color() == player) {
         player_has_rabbits = true;
 
-        if (position.get_row() == players_target_row) {
+        if (position.row() == players_target_row) {
           player_goal = true;
           break;
         }
@@ -82,7 +82,7 @@ boost::optional<piece::color_t> winner(board const& board, piece::color_t player
       } else {
         opponent_has_rabbits = true;
 
-        if (position.get_row() == opponents_target_row) {
+        if (position.row() == opponents_target_row) {
           opponent_goal = true;
         }
       }
@@ -120,55 +120,55 @@ std::pair<vertex*, vertex*> two_best_successors(vertex& parent) {
 }
 
 history_stack::history_stack() {
-  last.push(vertex::type_and);  // Root's type is always OR, so this will force push() below to add the root to history.
+  last_.push(vertex::type_and);  // Root's type is always OR, so this will force push() below to add the root to history.
 }
 
 void history_stack::push(vertex const& v, zobrist_hasher::hash_t hash) {
-  if (v.type != last.top()) {
-    current_records.push_back(record(hash));
+  if (v.type != last_.top()) {
+    current_records_.push_back(record(hash));
   }
 
-  last.push(v.type);
+  last_.push(v.type);
 }
 
 void history_stack::pop(vertex const& v) {
-  last.pop();
+  last_.pop();
 
-  if (!last.empty()) {
-    if (v.type != last.top()) {
-      current_records.pop_back();
+  if (!last_.empty()) {
+    if (v.type != last_.top()) {
+      current_records_.pop_back();
     }
   } else {
-    assert(current_records.empty());
-    last.push(vertex::type_and);
+    assert(current_records_.empty());
+    last_.push(vertex::type_and);
   }
 }
 
 void hashes_stack::push(vertex const& v) {
   if (v.step) {  // Unless this is the root.
-    zobrist_hasher::hash_t const  last_hash           = stack.back();
-    vertex::e_type const          last_visited_type   = last_visited.top().type;
-    piece::color_t const          last_visited_player = last_visited.top().player;
+    zobrist_hasher::hash_t const  last_hash           = stack_.back();
+    vertex::e_type const          last_visited_type   = last_visited_.top().type;
+    piece::color_t const          last_visited_player = last_visited_.top().player;
 
     piece::color_t const next_player = v.type == last_visited_type ? last_visited_player : opponent_color(last_visited_player);
-    zobrist_hasher::hash_t hash = hasher->update(
+    zobrist_hasher::hash_t hash = hasher_->update(
       last_hash, v.step->step_sequence_begin(), v.step->step_sequence_end(),
       last_visited_player, next_player
     );
-    stack.push_back(hash);
-    last_visited.push(last(v.type, next_player));
+    stack_.push_back(hash);
+    last_visited_.push(last(v.type, next_player));
   }
 }
 
 void hashes_stack::pop() {
-  stack.pop_back();
-  last_visited.pop();
+  stack_.pop_back();
+  last_visited_.pop();
 }
 
 void killer_db::add(std::size_t ply, vertex::e_type type, step const& step) {
   plys& p = get_plys(type);
   if (ply >= p.size())
-    p.resize(ply + 1, ply_killers_t(killer_count));
+    p.resize(ply + 1, ply_killers_t(killer_count_));
 
   if (std::find(p[ply].begin(), p[ply].end(), step) == p[ply].end())
     p[ply].push_back(step);
@@ -466,17 +466,17 @@ bool simulate(vertex& parent, killer_db& killers, std::size_t ply, piece::color_
 } // namespace apns::detail
 
 void proof_number_search::do_iterate() {
-  assert(game);
-  assert(!game->root.step);
+  assert(game_);
+  assert(!game_->root.step);
 
-  board_stack     boards(game->initial_state);
+  board_stack     boards(game_->initial_state);
   history_stack   history;
-  hashes_stack    hashes(hasher, initial_hash, game->attacker);
+  hashes_stack    hashes(hasher_, initial_hash_, game_->attacker);
 
   typedef std::vector<vertex*> path_cont;
   path_cont path;
 
-  vertex* current = &game->root;
+  vertex* current = &game_->root;
 
   do {
     path.push_back(current);
@@ -498,57 +498,57 @@ void proof_number_search::do_iterate() {
 void depth_first_pns::do_iterate() {
   using detail::cut;
 
-  assert(game);
-  assert(!game->root.step);
+  assert(game_);
+  assert(!game_->root.step);
 
-  assert(path.empty() || path.back()->children_count() == 0);
-  assert(path.empty() || path.back()->proof_number <= limits.back().pn_limit);
-  assert(path.empty() || path.back()->disproof_number <= limits.back().dn_limit);
+  assert(path_.empty() || path_.back()->children_count() == 0);
+  assert(path_.empty() || path_.back()->proof_number <= limits_.back().pn_limit);
+  assert(path_.empty() || path_.back()->disproof_number <= limits_.back().dn_limit);
 
-  assert(hashes.hashes().size() == path.size());
-  assert(limits.size() == path.size());
+  assert(hashes_.hashes().size() == path_.size());
+  assert(limits_.size() == path_.size());
 
-  process_leaf(path.begin(), path.end(), boards, hashes, history);
+  process_leaf(path_.begin(), path_.end(), boards_, hashes_, history_);
 
   // Go up.
-  while (!path.empty() 
-         && (path.back()->proof_number == 0 || path.back()->proof_number > limits.back().pn_limit 
-             || path.back()->disproof_number > limits.back().dn_limit)) {
-    if (gc_high == 0)
-      position_count -= cut(*path.back());
+  while (!path_.empty() 
+         && (path_.back()->proof_number == 0 || path_.back()->proof_number > limits_.back().pn_limit 
+             || path_.back()->disproof_number > limits_.back().dn_limit)) {
+    if (gc_high_ == 0)
+      position_count_ -= cut(*path_.back());
 
-    history.pop(*path.back());
-    hashes.pop();
-    if (path.back()->step)
-      boards.pop(*path.back()->step);
+    history_.pop(*path_.back());
+    hashes_.pop();
+    if (path_.back()->step)
+      boards_.pop(*path_.back()->step);
 
-    path.pop_back();
-    limits.pop_back();
+    path_.pop_back();
+    limits_.pop_back();
   }
 
-  assert(path.empty() || (path.back()->proof_number > 0 && path.back()->disproof_number > 0));
+  assert(path_.empty() || (path_.back()->proof_number > 0 && path_.back()->disproof_number > 0));
 
   // And go back down.
-  while (!path.empty() && path.back()->children_count() > 0) {
-    std::pair<vertex*, vertex*> best_two = two_best_successors(*path.back());
+  while (!path_.empty() && path_.back()->children_count() > 0) {
+    std::pair<vertex*, vertex*> best_two = two_best_successors(*path_.back());
     assert(best_two.first->proof_number > 0 && best_two.first->disproof_number > 0);
 
     limits_t new_limits = make_limits(
       *best_two.first,
-      *path.back(),
+      *path_.back(),
       best_two.second ? boost::optional<vertex&>(*best_two.second) : boost::none,
-      limits.back()
+      limits_.back()
     );
 
-    limits.push_back(new_limits);
-    path.push_back(best_two.first);
+    limits_.push_back(new_limits);
+    path_.push_back(best_two.first);
 
-    assert(path.back()->proof_number <= limits.back().pn_limit && path.back()->disproof_number <= limits.back().dn_limit);
+    assert(path_.back()->proof_number <= limits_.back().pn_limit && path_.back()->disproof_number <= limits_.back().dn_limit);
 
-    if (path.back()->step)
-      boards.push(*path.back()->step);
-    hashes.push(*path.back());
-    history.push(*path.back(), hashes.top());
+    if (path_.back()->step)
+      boards_.push(*path_.back()->step);
+    hashes_.push(*path_.back());
+    history_.push(*path_.back(), hashes_.top());
   }
 
   garbage_collect();

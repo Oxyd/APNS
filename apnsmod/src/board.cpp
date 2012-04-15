@@ -48,26 +48,26 @@ char letter_from_pair(apns::piece::color_t c, apns::piece::type_t t) {
 namespace apns {
 
 piece::piece(color_t c, type_t t) : 
-  data(letter_from_pair(c, t))
+  data_(letter_from_pair(c, t))
 {
-  assert(data == 'e' || data == 'm' || data == 'h' || data == 'd' || data == 'c' || data == 'r' ||
-         data == 'E' || data == 'M' || data == 'H' || data == 'D' || data == 'C' || data == 'R');
+  assert(data_ == 'e' || data_ == 'm' || data_ == 'h' || data_ == 'd' || data_ == 'c' || data_ == 'r' ||
+         data_ == 'E' || data_ == 'M' || data_ == 'H' || data_ == 'D' || data_ == 'C' || data_ == 'R');
 }
 
-piece::color_t piece::get_color() const {
-  assert(data == 'e' || data == 'm' || data == 'h' || data == 'd' || data == 'c' || data == 'r' ||
-         data == 'E' || data == 'M' || data == 'H' || data == 'D' || data == 'C' || data == 'R');
-  return data & 0x20 ? piece::silver : piece::gold;
+piece::color_t piece::color() const {
+  assert(data_ == 'e' || data_ == 'm' || data_ == 'h' || data_ == 'd' || data_ == 'c' || data_ == 'r' ||
+         data_ == 'E' || data_ == 'M' || data_ == 'H' || data_ == 'D' || data_ == 'C' || data_ == 'R');
+  return data_ & 0x20 ? piece::silver : piece::gold;
 }
 
-piece::type_t piece::get_type() const {
-  assert(data == 'e' || data == 'm' || data == 'h' || data == 'd' || data == 'c' || data == 'r' ||
-         data == 'E' || data == 'M' || data == 'H' || data == 'D' || data == 'C' || data == 'R');
-  return static_cast<piece::type_t>(data | 0x20);
+piece::type_t piece::type() const {
+  assert(data_ == 'e' || data_ == 'm' || data_ == 'h' || data_ == 'd' || data_ == 'c' || data_ == 'r' ||
+         data_ == 'E' || data_ == 'M' || data_ == 'H' || data_ == 'D' || data_ == 'C' || data_ == 'R');
+  return static_cast<piece::type_t>(data_ | 0x20);
 }
 
 bool piece::equal(piece const& other) const {
-  return data == other.data;
+  return data_ == other.data_;
 }
 
 boost::array<piece::color_t const, 2> const COLORS = { { piece::gold, piece::silver } };
@@ -138,8 +138,8 @@ piece::color_t color_from_int(int value) {
 }
 
 position::position(row_t row, col_t column)
-  : row(row)
-  , column(column)
+  : row_(row)
+  , column_(column)
 {
   if (row < board::MIN_ROW || row > board::MAX_ROW
       || column < board::MIN_COLUMN || column > board::MAX_COLUMN) {
@@ -151,36 +151,36 @@ position::position(row_t row, col_t column)
 }
 
 position::position(row_t row, std::string const& col)
-  : row(row)
+  : row_(row)
 {
   if (col.length() != 1)
     throw std::domain_error("position::position: Expected a single-character string");
 
-  column = col[0];
+  column_ = col[0];
 
   if (row < board::MIN_ROW || row > board::MAX_ROW
-      || column < board::MIN_COLUMN || column > board::MAX_COLUMN) {
+      || column_ < board::MIN_COLUMN || column_ > board::MAX_COLUMN) {
     std::ostringstream message;
     message << "position::position: attempted to create an invalid position: "
-            << row << column;
+            << row << column_;
     throw std::domain_error(message.str());
   }
 }
 
-position::row_t position::get_row() const {
-  return row;
+position::row_t position::row() const {
+  return row_;
 }
 
-position::col_t position::get_column() const {
-  return column;
+position::col_t position::column() const {
+  return column_;
 }
 
-std::string position::py_get_column() const {
-  return std::string(1, get_column());
+std::string position::py_column() const {
+  return std::string(1, column());
 }
 
 bool operator == (position lhs, position rhs) {
-  return lhs.get_row() == rhs.get_row() && lhs.get_column() == rhs.get_column();
+  return lhs.row() == rhs.row() && lhs.column() == rhs.column();
 }
 
 bool operator != (position lhs, position rhs) {
@@ -188,13 +188,13 @@ bool operator != (position lhs, position rhs) {
 }
 
 bool operator < (position lhs, position rhs) {
-  return lhs.get_row() * board::COLUMNS + lhs.get_column() - board::MIN_COLUMN
-         < rhs.get_row() * board::COLUMNS + rhs.get_column() - board::MIN_COLUMN;
+  return lhs.row() * board::COLUMNS + lhs.column() - board::MIN_COLUMN
+         < rhs.row() * board::COLUMNS + rhs.column() - board::MIN_COLUMN;
 }
 
 position make_adjacent(position original, direction direction) {
-  int row = original.get_row();
-  char column = original.get_column();
+  int row = original.row();
+  char column = original.column();
 
   switch (direction) {
     case north:   ++row;    break;
@@ -209,10 +209,10 @@ position make_adjacent(position original, direction direction) {
 
 bool adjacent_valid(position pos, direction direction) {
   switch (direction) {
-    case north:   return pos.get_row() < board::MAX_ROW;
-    case south:   return pos.get_row() > board::MIN_ROW;
-    case east:    return pos.get_column() < board::MAX_COLUMN;
-    case west:    return pos.get_column() > board::MIN_COLUMN;
+    case north:   return pos.row() < board::MAX_ROW;
+    case south:   return pos.row() > board::MIN_ROW;
+    case east:    return pos.column() < board::MAX_COLUMN;
+    case west:    return pos.column() > board::MIN_COLUMN;
     default:      assert(!"Can't reach this."); return false;
   }
 }
@@ -221,19 +221,19 @@ bool adjacent(position first, position second) {
   return
     (
         (
-               (first.get_column() == second.get_column() + 1)
-            || (first.get_column() == second.get_column() - 1)
+               (first.column() == second.column() + 1)
+            || (first.column() == second.column() - 1)
         )
         && (
-            first.get_row() == second.get_row()
+            first.row() == second.row()
         )
     )
     || (
         (
-               (first.get_row() == second.get_row() + 1)
-            || (first.get_row() == second.get_row() - 1)
+               (first.row() == second.row() + 1)
+            || (first.row() == second.row() - 1)
         ) && (
-            first.get_column() == second.get_column()
+            first.column() == second.column()
         )
     );
 
@@ -255,21 +255,21 @@ piece::type_t type_from_int(int value) {
 
 board::pieces_iterator::pieces_iterator()
   : board::pieces_iterator::iterator_adaptor_(base_type())
-  , pos(0)
+  , pos_(0)
 { }
 
 board::pieces_iterator::pieces_iterator(base_type original, std::size_t pos)
   : board::pieces_iterator::iterator_adaptor_(original)
-  , pos(pos)
+  , pos_(pos)
 {
   forward_to_nonempty();
 }
 
 board::pieces_iterator::reference board::pieces_iterator::dereference() const {
-  assert(pos < board::ROWS * board::COLUMNS);
+  assert(pos_ < board::ROWS * board::COLUMNS);
   assert(*base() != ' ');
 
-  std::pair<position::row_t, position::col_t> const coordinates = board_from_linear(pos);
+  std::pair<position::row_t, position::col_t> const coordinates = board_from_linear(pos_);
   return std::make_pair(position(coordinates.first, coordinates.second), *piece_from_letter(*base()));
 }
 
@@ -277,7 +277,7 @@ void board::pieces_iterator::increment() {
   // Keep incrementing the iterator until we find a nonempty position. If there is no more nonempty position on the board,
   // let the base iterator go to the one-past-the-end position and let pos = one-past-the-end-index.
 
-  ++pos;
+  ++pos_;
   ++base_reference();
 
   forward_to_nonempty();
@@ -287,18 +287,18 @@ void board::pieces_iterator::decrement() {
   // Iverse algorithm to increment(). Keep decrementing until we reach either a nonempty position or until we reach the
   // (1, 'a') coordinate.
 
-  --pos;
+  --pos_;
   --base_reference();
 
   reverse_to_nonempty();
 }
 
 void board::pieces_iterator::forward_to_nonempty() {
-  while (pos < board::ROWS * board::COLUMNS) {
+  while (pos_ < board::ROWS * board::COLUMNS) {
     if (*base() != ' ')
       return;  // We're done, this is the next nonempty position.
 
-    ++pos;
+    ++pos_;
     ++base_reference();
   }
 
@@ -308,37 +308,37 @@ void board::pieces_iterator::forward_to_nonempty() {
 void board::pieces_iterator::reverse_to_nonempty() {
   // Once it gets down to pos == 0, then we don't have to do anything more: either there's really something here or we got
   // here by decrementing a begin() iterator which results in undefined behaviour.
-  while (pos > 0) {
+  while (pos_ > 0) {
     if (*base() != ' ')
       return;
 
-    --pos;
+    --pos_;
     --base_reference();
   }
 }
 
 board::board() {
-  std::fill(pieces.begin(), pieces.end(), ' ');
+  std::fill(pieces_.begin(), pieces_.end(), ' ');
 }
 
 void board::put(position where, piece what) {
-  std::size_t const linear = linear_from_board(where.get_row(), where.get_column());
-  if (pieces[linear] == ' ')
-    pieces[linear] = letter_from_piece(what);
+  std::size_t const linear = linear_from_board(where.row(), where.column());
+  if (pieces_[linear] == ' ')
+    pieces_[linear] = letter_from_piece(what);
   else
     throw std::logic_error("board: Attempted to put a piece at an occupied position");
 }
 
 void board::remove(position where) {
-  std::size_t const linear = linear_from_board(where.get_row(), where.get_column());
-  if (pieces[linear] != ' ')
-    pieces[linear] = ' ';
+  std::size_t const linear = linear_from_board(where.row(), where.column());
+  if (pieces_[linear] != ' ')
+    pieces_[linear] = ' ';
   else
     throw std::logic_error("board: Attempted to remove a piece from a vacant position");
 }
 
 boost::optional<piece> board::get(position from) const {
-  char const p = pieces[linear_from_board(from.get_row(), from.get_column())];
+  char const p = pieces_[linear_from_board(from.row(), from.column())];
   if (p != ' ')
     return piece_from_letter(p);
   else
@@ -346,12 +346,12 @@ boost::optional<piece> board::get(position from) const {
 }
 
 board::pieces_iterator board::pieces_begin() const {
-  pieces_iterator it(pieces.begin(), 0);
+  pieces_iterator it(pieces_.begin(), 0);
   return it;
 }
 
 board::pieces_iterator board::pieces_end() const {
-  pieces_iterator it(pieces.end(), ROWS * COLUMNS);
+  pieces_iterator it(pieces_.end(), ROWS * COLUMNS);
   return it;
 }
 
@@ -373,7 +373,7 @@ std::string string_from_board(board const& board) {
     position const& pos = pos_piece->first;
     piece const& piece = pos_piece->second;
 
-    output << pos.get_row() << pos.get_column() << letter_from_piece(piece);
+    output << pos.row() << pos.column() << letter_from_piece(piece);
   }
 
   return output.str();
@@ -404,8 +404,8 @@ bool empty(position pos, board const& board) {
 }
 
 bool trap(position pos) {
-  return (pos.get_column() == 'c' && (pos.get_row() == 3 || pos.get_row() == 6))
-         || (pos.get_column() == 'f' && (pos.get_row() == 3 || pos.get_row() == 6));
+  return (pos.column() == 'c' && (pos.row() == 3 || pos.row() == 6))
+         || (pos.column() == 'f' && (pos.row() == 3 || pos.row() == 6));
 }
 
 directions_iter directions_begin() {
@@ -417,36 +417,36 @@ directions_iter directions_end() {
 }
 
 neighbourhood_iter::neighbourhood_iter()
-  : direction(directions_end())
-  , center(1, 'a')  // Need to initialise this somehow
+  : direction_(directions_end())
+  , center_(1, 'a')  // Need to initialise this somehow
 { }
 
 neighbourhood_iter::neighbourhood_iter(position center)
-  : direction(directions_begin())
-  , center(center)
+  : direction_(directions_begin())
+  , center_(center)
 {
   forward_to_valid();
 }
 
 void neighbourhood_iter::increment() {
-  ++direction;
+  ++direction_;
   forward_to_valid();
 }
 
 neighbourhood_iter::reference neighbourhood_iter::dereference() const {
-  return make_adjacent(center, *direction);
+  return make_adjacent(center_, *direction_);
 }
 
 bool neighbourhood_iter::equal(neighbourhood_iter const& other) const {
   return
-    (direction == directions_end() && other.direction == directions_end())
-    || (direction == other.direction
-        && center == other.center);
+    (direction_ == directions_end() && other.direction_ == directions_end())
+    || (direction_ == other.direction_
+        && center_ == other.center_);
 }
 
 void neighbourhood_iter::forward_to_valid() {
-  while (direction != directions_end() && !adjacent_valid(center, *direction)) {
-    ++direction;
+  while (direction_ != directions_end() && !adjacent_valid(center_, *direction_)) {
+    ++direction_;
   }
 }
 
@@ -459,12 +459,12 @@ neighbourhood_iter neighbourhood_end() {
 }
 
 adjacent_pieces_iter::adjacent_pieces_iter()
-  : board(0)
+  : board_(0)
 { }
 
 adjacent_pieces_iter::adjacent_pieces_iter(position center, apns::board const& board)
   : iterator_adaptor_(center)
-  , board(&board)
+  , board_(&board)
 {
   forward_to_nonempty();
 }
@@ -475,24 +475,24 @@ void adjacent_pieces_iter::increment() {
 }
 
 adjacent_pieces_iter::reference adjacent_pieces_iter::dereference() const {
-  return *board->get(*base());
+  return *board_->get(*base());
 }
 
 bool adjacent_pieces_iter::equal(adjacent_pieces_iter const& other) const {
   return
-    (board == 0 && other.board == 0)
+    (board_ == 0 && other.board_ == 0)
     || (
-        board == other.board
+        board_ == other.board_
         && base_reference() == other.base_reference());
 }
 
 void adjacent_pieces_iter::forward_to_nonempty() {
-  while (base_reference() != base_type() && empty(*base(), *board)) {
+  while (base_reference() != base_type() && empty(*base(), *board_)) {
     ++base_reference();
   }
 
   if (base_reference() == base_type()) {
-    board = 0;
+    board_ = 0;
   }
 }
 

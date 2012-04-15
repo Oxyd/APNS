@@ -31,7 +31,7 @@ namespace apns {
 
 vertex::number_t const vertex::max_num = std::numeric_limits<vertex::number_t>::max();
 vertex::number_t const vertex::infty   = std::numeric_limits<vertex::number_t>::max() - 1;
-std::size_t vertex::alloc = 0;
+std::size_t vertex::alloc_ = 0;
 
 vertex::vertex() :
   proof_number(0),
@@ -39,43 +39,43 @@ vertex::vertex() :
   steps_remaining(0),
   type(vertex::type_or)
 {
-  alloc += sizeof *this;
+  alloc_ += sizeof *this;
 }
 
 vertex::~vertex() {
-  alloc -= bytes(children);
-  alloc -= sizeof *this;
+  alloc_ -= bytes(children_);
+  alloc_ -= sizeof *this;
 }
 
 vertex::children_iterator vertex::add_child() {
-  resize(children.size()  + 1);
+  resize(children_.size()  + 1);
   return boost::prior(children_end());
 }
 
 void vertex::remove_child(children_iterator child) {
-  children.erase(child.base());
+  children_.erase(child.base());
 }
 
 void vertex::reserve(std::size_t new_size) {
-  alloc -= bytes(children);
-  children.reserve(new_size);
-  alloc += bytes(children);
+  alloc_ -= bytes(children_);
+  children_.reserve(new_size);
+  alloc_ += bytes(children_);
 }
 
 void vertex::resize(std::size_t new_size) {
-  alloc -= bytes(children);
-  children.resize(new_size);
-  alloc += bytes(children);
+  alloc_ -= bytes(children_);
+  children_.resize(new_size);
+  alloc_ += bytes(children_);
 }
 
 void vertex::pack() {
-  alloc -= bytes(children);
+  alloc_ -= bytes(children_);
 
   children_container new_children;
-  new_children.transfer(new_children.begin(), children);
-  children.swap(new_children);
+  new_children.transfer(new_children.begin(), children_);
+  children_.swap(new_children);
 
-  alloc += bytes(children);
+  alloc_ += bytes(children_);
 }
 
 namespace {

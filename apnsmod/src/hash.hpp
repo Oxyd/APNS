@@ -69,8 +69,8 @@ public:
 
   //! Given a hash, return the hash value corresponding to the same board state, but with the opposite player to move.
   hash_t opponent_hash(hash_t h) const {
-    h ^= players[0];
-    h ^= players[1];
+    h ^= players_[0];
+    h ^= players_[1];
     return h;
   }
 
@@ -79,8 +79,8 @@ private:
   typedef boost::array<hash_t, 2>         players_cont;
   typedef boost::array<hash_t, 4>         steps_cont;
 
-  codes_cont    codes;
-  players_cont  players;
+  codes_cont    codes_;
+  players_cont  players_;
 };
 
 template <typename Iter>
@@ -89,27 +89,27 @@ zobrist_hasher::hash_t zobrist_hasher::update(hash_t old_hash, Iter steps_begin,
   hash_t hash = old_hash;
 
   for (Iter step = steps_begin; step != steps_end; ++step) {
-    position const& old_position = step->get_from();
-    piece const& piece = *step->get_what();  // Assumed to be non-empty.
+    position const& old_position = step->from();
+    piece const& piece = *step->what();  // Assumed to be non-empty.
 
     // First remove the piece from its old position. If this is a displacement, add the piece's new position to the
     // hash later.
-    hash ^= codes[index_from_type(piece.get_type())]
-                 [index_from_color(piece.get_color())]
-                 [old_position.get_row() - board::MIN_ROW]
-                 [old_position.get_column() - board::MIN_COLUMN];
+    hash ^= codes_[index_from_type(piece.type())]
+                  [index_from_color(piece.color())]
+                  [old_position.row() - board::MIN_ROW]
+                  [old_position.column() - board::MIN_COLUMN];
 
-    if (!step->is_capture()) {
-      position new_position = make_adjacent(old_position, step->get_where());
-      hash ^= codes[index_from_type(piece.get_type())]
-                   [index_from_color(piece.get_color())]
-                   [new_position.get_row() - board::MIN_ROW]
-                   [new_position.get_column() - board::MIN_COLUMN];
+    if (!step->capture()) {
+      position new_position = make_adjacent(old_position, step->where());
+      hash ^= codes_[index_from_type(piece.type())]
+                    [index_from_color(piece.color())]
+                    [new_position.row() - board::MIN_ROW]
+                    [new_position.column() - board::MIN_COLUMN];
     }
   }
 
-  hash ^= players[current_player];
-  hash ^= players[next_player];
+  hash ^= players_[current_player];
+  hash ^= players_[next_player];
 
   return hash;
 }
@@ -129,9 +129,9 @@ public:
 private:
   //! One record in the table.
   struct record {
-    entry_t     entry;
-    int         depth;
-    hash_t      hash;
+    entry_t entry;
+    int     depth;
+    hash_t  hash;
 
     record() : depth(-1), hash(0) { }
 
@@ -147,16 +147,16 @@ public:
    * \param keep_time How long should a record be kept before it can be replaced by another one?
    */
   table(std::size_t table_size)
-    : table_size(table_size)
-    , pages((table_size / PAGE_RECORDS) + (table_size % PAGE_RECORDS != 0 ? 1 : 0))  // pages := ceil(table_size / PAGE_RECORDS)
-    , dir(new page_ptr[pages])
-    , allocated_pages(0)
-    , elements(0)
-    , hits(0)
-    , misses(0)
+    : table_size_(table_size)
+    , pages_((table_size / PAGE_RECORDS_) + (table_size % PAGE_RECORDS_ != 0 ? 1 : 0))  // pages := ceil(table_size / PAGE_RECORDS)
+    , dir_(new page_ptr[pages_])
+    , allocated_pages_(0)
+    , elements_(0)
+    , hits_(0)
+    , misses_(0)
   {
-    assert(sizeof(page) <= PAGE_SIZE);
-    assert(pages * PAGE_RECORDS >= table_size);
+    assert(sizeof(page) <= PAGE_SIZE_);
+    assert(pages_ * PAGE_RECORDS_ >= table_size_);
   }
 
   /**
@@ -170,7 +170,7 @@ public:
 
     if (!r->is_set() || r->hash == hash || depth < r->depth) {
       if (!r->is_set())
-        ++elements;
+        ++elements_;
       r->entry = entry;
       r->depth = depth;
       r->hash = hash;
@@ -185,10 +185,10 @@ public:
   boost::optional<entry_t> query(hash_t hash) {
     record* r = find_record(hash, false);
     if (r && r->is_set() && r->hash == hash) {
-      ++hits;
+      ++hits_;
       return r->entry;
     } else {
-      ++misses;
+      ++misses_;
       return boost::none;
     }
   }
@@ -196,60 +196,60 @@ public:
   //! Inform the table that the client code rejected the last successful query and that is should thus be counted as a miss
   //! rather than a hit.
   void reject() {
-    assert(hits > 0);
+    assert(hits_ > 0);
 
-    --hits;
-    ++misses;
+    --hits_;
+    ++misses_;
   }
 
-  std::size_t get_memory_usage() const {                      //!< Get the amount of memory, in bytes, of this table.
-    return allocated_pages * PAGE_SIZE + pages * sizeof(page_ptr);
+  std::size_t memory_usage() const {                       //!< Get the amount of memory, in bytes, of this table.
+    return allocated_pages_ * PAGE_SIZE_ + pages_ * sizeof(page_ptr);
   }
 
-  std::size_t get_table_size() const  { return table_size; }  //!< Get the maximal number of elements storeable in this table.
-  std::size_t get_elements() const    { return elements; }    //!< Get the number of elements currently stored in the table.
-  std::size_t get_hits() const        { return hits; }        //!< Get the number of successful retreivals from the table.
-  std::size_t get_misses() const      { return misses; }      //!< Get the number of unsuccessful retreival attempts.
+  std::size_t table_size() const  { return table_size_; }  //!< Get the maximal number of elements storeable in this table.
+  std::size_t elements() const    { return elements_; }    //!< Get the number of elements currently stored in the table.
+  std::size_t hits() const        { return hits_; }        //!< Get the number of successful retreivals from the table.
+  std::size_t misses() const      { return misses_; }      //!< Get the number of unsuccessful retreival attempts.
 
 private:
-  static std::size_t const PAGE_SIZE = 1024 * 1024;  //!< One megabyte.
-  static std::size_t const PAGE_RECORDS = PAGE_SIZE / sizeof(record);  //!< Number of records that can fit into one page.
+  static std::size_t const PAGE_SIZE_ = 1024 * 1024;  //!< One megabyte.
+  static std::size_t const PAGE_RECORDS_ = PAGE_SIZE_ / sizeof(record);  //!< Number of records that can fit into one page.
 
-  typedef boost::array<record, PAGE_RECORDS> page;  //!< One page of records.
+  typedef boost::array<record, PAGE_RECORDS_> page;  //!< One page of records.
   typedef boost::scoped_ptr<page> page_ptr;         //!< Pointer to page.
-  typedef boost::scoped_array<page_ptr> directory;  //!< Directory of pages.
+  typedef boost::scoped_array<page_ptr> directory;  //!< Directory of pages_.
 
   std::size_t page_number(std::size_t index) const {  //!< Given an index of an element, get the index into the directory.
-    return index / PAGE_RECORDS;
+    return index / PAGE_RECORDS_;
   }
   std::size_t page_offset(std::size_t index) const {  //!< Given an index of an element, get the index into the page.
-    return index % PAGE_RECORDS;
+    return index % PAGE_RECORDS_;
   }
   
   //! Get the record for given hash.
   record* find_record(hash_t hash, bool allocate) {
-    page_ptr& pg = dir[page_number(hash % table_size)];
+    page_ptr& pg = dir_[page_number(hash % table_size_)];
 
     if (pg == 0 && allocate) {
       pg.reset(new page);
-      ++allocated_pages;
+      ++allocated_pages_;
     }
 
     if (pg != 0)
-      return &((*pg)[page_offset(hash % table_size)]);
+      return &((*pg)[page_offset(hash % table_size_)]);
     else
       return 0;
   }
 
-  std::size_t const table_size;    //!< How many elements are there in one page?
-  std::size_t const pages;         //!< How many pages are there?
+  std::size_t const table_size_;    //!< How many elements are there in one page?
+  std::size_t const pages_;         //!< How many pages are there?
 
-  directory dir;                   //!< The table itself.
+  directory dir_;                   //!< The table itself.
 
-  std::size_t allocated_pages;     //!< Number of pages allocated.
-  std::size_t elements;            //!< Number of elements stored.
-  std::size_t hits;                //!< Number of successful retreivals from the table.
-  std::size_t misses;              //!< Number of unsuccessful retreival attempts.
+  std::size_t allocated_pages_;     //!< Number of pages allocated.
+  std::size_t elements_;            //!< Number of elements stored.
+  std::size_t hits_;                //!< Number of successful retreivals from the table.
+  std::size_t misses_;              //!< Number of unsuccessful retreival attempts.
 };
 
 template <typename Entry, typename Hash>

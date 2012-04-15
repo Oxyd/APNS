@@ -32,7 +32,7 @@ apns::board board_copy(apns::board const& original) {
 
 //! Return a hash for a position.
 unsigned position_hash(apns::position const& p) {
-  return p.get_column() + std::numeric_limits<apns::position::col_t>::max() + p.get_row();
+  return p.column() + std::numeric_limits<apns::position::col_t>::max() + p.row();
 }
 
 boost::optional<apns::piece> py_piece_from_letter(std::string const& letter) {
@@ -62,8 +62,8 @@ void export_board() {
         class_<apns::piece>("Piece",
           "Represents a single Arimaa game piece",
           init<apns::piece::color_t, apns::piece::type_t>())
-          .add_property("color", &apns::piece::get_color)
-          .add_property("type", &apns::piece::get_type)
+          .add_property("color", &apns::piece::color)
+          .add_property("type", &apns::piece::type)
           ;
 
     enum_<apns::piece::color_t>("Color",
@@ -99,8 +99,8 @@ void export_board() {
   class_<apns::position>("Position",
     "A position on the board. Position is immutable.",
     init<apns::position::row_t, std::string const&>())
-    .add_property("row", &apns::position::get_row)
-    .add_property("column", &apns::position::py_get_column)
+    .add_property("row", &apns::position::row)
+    .add_property("column", &apns::position::py_column)
 
     .def(self == self)
     .def(self != self)
