@@ -73,6 +73,8 @@ def main():
                       help='How many killers should be kept for each level')
   parser.add_argument('-q', '--quiet', const=True, default=False, action='store_const', dest='quiet',
                       help='Don\'t print any messages to standard output.')
+  parser.add_argument('-Q', '--no-progress', const=True, default=False, action='store_const', dest='noProgress',
+                      help='Don\'t print any progress information, only the summary at the end.')
   args = parser.parse_args()
 
   if args.searchFile is None and args.position is None:
@@ -136,6 +138,8 @@ def main():
   controller.loadGameCallbacks.add(cancelCallback)
   controller.saveGameCallbacks.add(cancelCallback)
 
+  if args.noProgress: args.quiet = True
+
   if args.position is not None:
     try:
       controller.newGame(args.position)
@@ -158,14 +162,18 @@ def main():
       show('Cancelled')
       raise SystemExit(0)
 
-  def printProgress(ctrl, progress):
-    show('Still working:')
+  def printProgress(ctrl, progress, summary=False):
+    if summary:
+      show('Search summary:')
+    else:
+      show('Still working:')
+
     show('  -- {0} seconds elapsed'.format(int(progress.timeElapsed)))
-    if progress.timeLeft:
+    if progress.timeLeft and not summary:
       show('  -- {0} seconds left'.format(int(progress.timeLeft)))
     show('  -- Root vertex PN: {0}'.format(strFromNum(progress.rootPN)))
     show('  -- Root vertex DN: {0}'.format(strFromNum(progress.rootDN)))
-    show('  -- {0} Search memory used'.format(strFromMem(progress.memUsed)))
+    show('  -- {0} tree memory used'.format(strFromMem(progress.memUsed)))
     show('  -- {0} unique positions total'.format(progress.positionCount))
     show('  -- {0} new positions per second'.format(int(progress.positionsPerSecond)))
 
@@ -177,7 +185,7 @@ def main():
 
     if progress.proofTblSize:
       show('  -- Proof table:')
-      show('    -- Site: {0:.2f} MB'.format(float(progress.proofTblSize) / MB))
+      show('    -- Size: {0:.2f} MB'.format(float(progress.proofTblSize) / MB))
       show('    -- Hits: {0}'.format(progress.proofTblHits))
       show('    -- Misses: {0}'.format(progress.proofTblMisses))
 
@@ -190,7 +198,7 @@ def main():
     print >> sys.stderr, 'Error: The program ran out of memory while trying to expand the tree.'
     raise SystemExit(1)
 
-  if not args.quiet:
+  if not args.quiet or args.noProgress:
     print 'Search finished:',
     if controller.root.proofNumber == 0:        print 'Root vertex is proved'
     elif controller.root.disproofNumber == 0:   print 'Root vertex is disproved'
@@ -203,6 +211,11 @@ def main():
     elif interruptHandler.interrupted:
       print 'User interrupted'
       interruptHandler.reset()
+
+    if args.noProgress:
+      args.quiet = False
+      printProgress(controller, controller.stats, summary=True)
+      args.quiet = True
 
   show('Saving result to {0}'.format(args.destination))
   controller.saveGame(args.destination)
