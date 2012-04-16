@@ -262,7 +262,7 @@ class Controller(object):
       self._search.useTransTbl(numElementsFromMbSize(self.searchParameters.transTblSize, apnsmod.TranspositionTable))
 
     if self.searchParameters.proofTblSize > 0 and (
-        self._search.proofTable is None or self._searchProofTable.size != self.searchParameters.proofTblSize):
+        self._search.proofTable is None or self._search.proofTable.size != self.searchParameters.proofTblSize):
       self._search.useProofTbl(numElementsFromMbSize(self.searchParameters.proofTblSize, apnsmod.ProofTable))
 
     self._search.killerCount = self.searchParameters.killersCount
@@ -300,8 +300,9 @@ class Controller(object):
 
   def _limitsExceeded(self):
     timeExceeded = self.searchParameters.timeLimit and time.clock() - self._searchStart >= self.searchParameters.timeLimit
-    memExceeded = self.searchParameters.memoryLimit and apnsmod.Vertex.allocSize / float(MB) > self.searchParameters.memoryLimit
-    return timeExceeded or memExceeded
+    posExceeded = self.searchParameters.positionLimit and self._search.positionCount >= self.searchParameters.positionLimit
+    memExceeded = self.searchParameters.memoryLimit and apnsmod.Vertex.allocSize / float(MB) >= self.searchParameters.memoryLimit
+    return timeExceeded or memExceeded or posExceeded
 
   def _makeStats(self):
     now = time.clock()

@@ -1106,7 +1106,7 @@ class RunSearchController(object):
     self._runSearchDlg.algo = get('algo', 'pns')
     self._runSearchDlg.timeLimit = get('timeLimit', 60)
     self._runSearchDlg.timeLimitCheck = get('timeLimitCheck', True)
-    self._runSearchDlg.positionLimit = get('positionLimit', 10000000)
+    self._runSearchDlg.positionLimit = get('positionLimit', 1000000)
     self._runSearchDlg.positionLimitCheck = get('positionLimitCheck', False)
     self._runSearchDlg.memLimit = get('memLimit', 1500)
     self._runSearchDlg.memLimitCheck = get('memLimitCheck', not is64Bit)

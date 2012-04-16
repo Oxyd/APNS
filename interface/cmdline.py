@@ -198,7 +198,7 @@ def main():
       print 'Time limit exceeded'
     elif params.positionLimit > 0 and controller.stats.positionCount >= params.positionLimit:
       print 'Position limit exceeded'
-    elif params.memoryLimit > 0 and (memoryUsedTotal() / (1024 ** 2)) >= params.memoryLimit:
+    elif params.memoryLimit > 0 and (apnsmod.Vertex.allocSize / (1024 ** 2)) >= params.memoryLimit:
       print 'Memory limit exceeded'
     elif interruptHandler.interrupted:
       print 'User interrupted'
