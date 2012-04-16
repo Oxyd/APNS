@@ -181,10 +181,7 @@ class MainWindowController(object):
         pars.transTblSize = newPrefs.transTblSize
         pars.proofTblSize = newPrefs.proofTblSize
         pars.killersCount = newPrefs.killersCount
-        pars.gcHigh = newPrefs.gcHigh if newPrefs.gcCheck else 0
-        pars.gcLow = newPrefs.gcLow if newPrefs.gcCheck else 0
 
-        #self._search.useTransTbl(runSearchCtrl.transTblSize, 16)  # XXX: Trans tbl keep time not user-settable.
         try:
           dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
           searchProgressCtrl = SearchProgressController(dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit,
@@ -842,12 +839,6 @@ class RunSearchDialog(Observable):
                           lambda self, val: self.setProofTblSize(val))
   killersCount = property(lambda self: self._killersSpinVar.get(),
                           lambda self, val: self.setKillers(val))
-  gcCheck = property(lambda self: self._gcCheckVar.get() == '1',
-                     lambda self, val: self.enableGC(val))
-  gcHigh = property(lambda self: self._gcHigh.get(),
-                    lambda self, val: self.setGCHigh(val))
-  gcLow = property(lambda self: self._gcLow.get(),
-                   lambda self, val: self.setGCLow(val))
 
   class Command:
     timeLimitCheck, positionLimitCheck, memLimitCheck, gcCheck, start = range(5)
@@ -866,30 +857,8 @@ class RunSearchDialog(Observable):
     pnsRadio = ttk.Radiobutton(algoFrame, text='Proof-Number Search', variable=self._algoVar, value='pns')
     dfPnRadio = ttk.Radiobutton(algoFrame, text='Depth-First Proof-Number Search', variable=self._algoVar, value='dfpns')
 
-    pnsRadio.grid(row=0, column=0, columnspan=3, sticky='WE')
-    dfPnRadio.grid(row=1, column=0, columnspan=3, sticky='WE')
-
-    self._gcCheckVar = Tkinter.StringVar(value='1')
-    gcCheck = ttk.Checkbutton(algoFrame, text='Garbage Collector', variable=self._gcCheckVar,
-                              command=lambda: self.notifyObservers(command=RunSearchDialog.Command.gcCheck))
-    gcHighLabel = ttk.Label(algoFrame, text='High threshold:')
-    gcLowLabel = ttk.Label(algoFrame, text='Low threshold:')
-    gcHighUnits = ttk.Label(algoFrame, text='positions')
-    gcLowUnits = ttk.Label(algoFrame, text='positions')
-
-    self._gcHigh = Tkinter.StringVar(value='5000000')
-    self._gcLow = Tkinter.StringVar(value='1000000')
-
-    self._gcHighSpin = Tkinter.Spinbox(algoFrame, from_=1, to=9999999999, textvariable=self._gcHigh)
-    self._gcLowSpin = Tkinter.Spinbox(algoFrame, from_=1, to=9999999999, textvariable=self._gcLow)
-
-    gcCheck.grid(row=2, column=0, columnspan=3, sticky='WE', pady=(5, 0))
-    gcHighLabel.grid(row=3, column=0, sticky='E', padx=(30, 0))
-    self._gcHighSpin.grid(row=3, column=1, sticky='WE', padx=5)
-    gcHighUnits.grid(row=3, column=2, sticky='W')
-    gcLowLabel.grid(row=4, column=0, sticky='E', padx=(30, 0))
-    self._gcLowSpin.grid(row=4, column=1, sticky='WE', padx=5)
-    gcLowUnits.grid(row=4, column=2, sticky='W')
+    pnsRadio.grid(row=0, column=0, sticky='WE')
+    dfPnRadio.grid(row=1, column=0, sticky='WE')
 
     limitsFrame = ttk.Labelframe(self._dialog.content, text='Search limits:', padding=5)
 
@@ -1115,8 +1084,6 @@ class RunSearchController(object):
   proofTblSize = property(lambda self: self._proofTblSize)
   killersCount = property(lambda self: self._killersCount)
   showTimeLeft = property(lambda self: self._showTimeLeft)
-  gcHigh = property(lambda self: self._gcHigh)
-  gcLow = property(lambda self: self._gcLow)
 
   def __init__(self, runSearchDlg, parameters):
     '''Create the controller and attach it to the dialog and search.
@@ -1137,10 +1104,6 @@ class RunSearchController(object):
 
     self._runSearchDlg.addObserver(self)
     self._runSearchDlg.algo = get('algo', 'pns')
-    self._runSearchDlg.gcHigh = get('gcHigh', '5000000')
-    self._runSearchDlg.gcLow = get('gcLow', '1000000')
-    #self._runSearchDlg.gcCheck = get('gcCheck', True)
-    self._runSearchDlg.gcCheck = False
     self._runSearchDlg.timeLimit = get('timeLimit', 60)
     self._runSearchDlg.timeLimitCheck = get('timeLimitCheck', True)
     self._runSearchDlg.positionLimit = get('positionLimit', 10000000)
@@ -1191,13 +1154,6 @@ class RunSearchController(object):
         else:
           memLimit = None
 
-        if self._runSearchDlg.gcCheck:
-          gcHigh = int(self._runSearchDlg.gcHigh)
-          gcLow = int(self._runSearchDlg.gcLow)
-        else:
-          gcHigh = None
-          gcLow = None
-
         self._algo = self._runSearchDlg.algo
         self._transTblSize = (int(self._runSearchDlg.transTblSize) * MB) / apnsmod.TranspositionTable.sizeOfElement
         self._proofTblSize = (int(self._runSearchDlg.proofTblSize) * MB) / apnsmod.ProofTable.sizeOfElement
@@ -1206,8 +1162,6 @@ class RunSearchController(object):
         self._memLimit = memLimit
         self._showTimeLeft = showTimeLeft
         self._killersCont = self._runSearchDlg.killersCount
-        self._gcHigh = gcHigh
-        self._gcLow = gcLow
 
         self._lastSetValues = SearchParameters()
         last = self._lastSetValues
@@ -1222,9 +1176,6 @@ class RunSearchController(object):
         last.transTblSize = int(self._runSearchDlg.transTblSize)
         last.proofTblSize = int(self._runSearchDlg.proofTblSize)
         last.killersCount = int(self._runSearchDlg.killersCount)
-        last.gcCheck = bool(self._runSearchDlg.gcCheck)
-        last.gcHigh = int(self._runSearchDlg.gcHigh)
-        last.gcLow = int(self._runSearchDlg.gcLow)
 
         self._doRun = True
         self._runSearchDlg.close()
@@ -1237,11 +1188,6 @@ class RunSearchController(object):
 
     elif command == RunSearchDialog.Command.memLimitCheck:
       self._runSearchDlg.enableMemLimit(self._runSearchDlg.memLimitCheck)
-
-    elif command == RunSearchDialog.Command.gcCheck:
-      #self._runSearchDlg.enableGC(self._runSearchDlg.gcCheck)
-      self._runSearchDlg.gcCheck = False
-      pass
 
 
   def _validateInput(self):
@@ -1266,9 +1212,7 @@ class RunSearchController(object):
             and checkVar(dlg.memLimitCheck, dlg.memLimit, 'Memory limit')
             and checkVar(True, dlg.transTblSize, 'Size of transposition table')
             and checkVar(True, dlg.proofTblSize, 'Size of proof table')
-            and checkVar(True, dlg.killersCount, 'Killers count')
-            and checkVar(dlg.gcCheck, dlg.gcHigh, 'GC high threshold')
-            and checkVar(dlg.gcCheck, dlg.gcLow, 'GC low threshold'))
+            and checkVar(True, dlg.killersCount, 'Killers count'))
 
 
 class SearchProgressDialog(Observable):
@@ -1473,7 +1417,7 @@ class SearchProgressController(object):
     Returns a dictionary with the statistics, that can later be fed into PositionStatsController.
     '''
 
-    MS_BURST_TIME = 100
+    MS_BURST_TIME = 250
 
     self._searchProgressDlg.run()
 

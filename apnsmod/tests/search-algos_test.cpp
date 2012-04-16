@@ -4,6 +4,7 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/bind.hpp>
 
 using namespace apns;
 
@@ -66,7 +67,7 @@ boost::shared_ptr<game> make_game() {
 
 TEST(traversing, find_best_vertex_test) {
   boost::shared_ptr<game> g = make_game();
-  vertex* found = traverse(g->root, &best_successor);
+  vertex* found = traverse(g->root, static_cast<fun_tp>(&best_successor));
 
   ASSERT_TRUE(found);
   EXPECT_EQ(1, found->proof_number);
@@ -142,77 +143,6 @@ TEST(winner_test, defender_out_of_rabbits) {
   boost::optional<piece::color_t> w = winner(b, piece::gold);
   ASSERT_TRUE(w);
   EXPECT_EQ(*w, piece::gold);
-}
-
-TEST(history_stack_test, push_pop_test) {
-  board b;
-  b.put(position(1, 'a'), piece(piece::gold, piece::dog));
-  b.put(position(8, 'h'), piece(piece::silver, piece::cat));
-
-  zobrist_hasher hasher;
-  zobrist_hasher::hash_t first_hash = hasher.generate_initial(b, piece::gold);
-
-  vertex first;
-  first.type = vertex::type_or;
-  first.step = step::validate_ordinary_step(b, elementary_step::displacement(position(1, 'a'), north));
-
-  apply(*first.step, b);
-
-  vertex second;
-  second.type = vertex::type_or;
-  second.step = step::validate_ordinary_step(b, elementary_step::displacement(position(2, 'a'), north));
-
-  apply(*second.step, b);
-
-  vertex third;
-  third.type = vertex::type_and;
-  third.step = step::validate_ordinary_step(b, elementary_step::displacement(position(8, 'h'), south));
-
-  apply(*third.step, b);
-
-  zobrist_hasher::hash_t second_hash = hasher.generate_initial(b, piece::silver);
-
-  vertex fourth;
-  fourth.type = vertex::type_and;
-  fourth.step = step::validate_ordinary_step(b, elementary_step::displacement(position(7, 'h'), south));
-
-  history_stack h;
-
-  unapply(*third.step, b);
-  unapply(*second.step, b);
-  unapply(*first.step, b);
-
-  h.push(first, first_hash);
-  ASSERT_EQ(1, h.records().size());
-  EXPECT_EQ(first_hash, h.records().back().hash);
-
-  apply(*first.step, b);
-
-  h.push(second, 0);
-  EXPECT_EQ(1, h.records().size());
-
-  apply(*second.step, b);
-  h.push(third, second_hash);
-
-  EXPECT_EQ(2, h.records().size());
-  EXPECT_EQ(second_hash, h.records().back().hash);
-
-  apply(*third.step, b);
-  h.push(fourth, 0);
-
-  EXPECT_EQ(2, h.records().size());
-
-  h.pop(fourth);
-  EXPECT_EQ(2, h.records().size());
-
-  h.pop(third);
-  EXPECT_EQ(1, h.records().size());
-
-  h.pop(second);
-  EXPECT_EQ(1, h.records().size());
-
-  h.pop(first);
-  EXPECT_EQ(0, h.records().size());
 }
 
 TEST(search_stack, push_pop_test) {
@@ -332,6 +262,47 @@ TEST(search_stack, checkpoint_test) {
 
   EXPECT_EQ(2, stack.path().size());
   EXPECT_EQ(child, stack.path().back());
+}
+
+TEST(search_tree, expand_test) {
+  board b;
+  b.put(position(1, 'a'), piece(piece::gold, piece::dog));
+  b.put(position(8, 'h'), piece(piece::silver, piece::cat));
+
+  vertex root;
+  root.steps_remaining = MAX_STEPS;
+
+  zobrist_hasher hasher;
+  zobrist_hasher::hash_t initial_hash = hasher.generate_initial(b, piece::gold);
+
+  search_tree tree(&root, piece::gold, 1, hasher, initial_hash, b);
+  tree.expand();
+
+  EXPECT_EQ(4, root.children_count());
+  EXPECT_EQ(2, std::count_if(root.children_begin(), root.children_end(),
+                             boost::bind(&vertex::type, _1) == vertex::type_or));
+}
+
+TEST(search_tree, cut_test) {
+  board b;
+  b.put(position(1, 'a'), piece(piece::gold, piece::dog));
+  b.put(position(8, 'h'), piece(piece::silver, piece::cat));
+
+  vertex root;
+  root.steps_remaining = MAX_STEPS;
+  root.proof_number = 1;
+  root.disproof_number = 1;
+
+  zobrist_hasher hasher;
+  zobrist_hasher::hash_t initial_hash = hasher.generate_initial(b, piece::gold);
+
+  search_tree tree(&root, piece::gold, 1, hasher, initial_hash, b);
+  tree.expand();
+
+  tree.select_root();
+  tree.cut_children();
+
+  EXPECT_EQ(0, root.children_count());
 }
 
 int main(int argc, char** argv) {

@@ -71,10 +71,6 @@ def main():
                       help='Size of the proof table to use, in megabytes. If set to 0, don\'t use proof table')
   parser.add_argument('-l', '--killer-count', type=int, default=2, metavar='number of killers', dest='killerCount',
                       help='How many killers should be kept for each level')
-  parser.add_argument('-G', '--gc-high', type=int, default=0, metavar='GC high', dest='gcHigh',
-                      help='Each time the number of vertices exceeds this threshold, GC will be run. Value of 0 disables GC.')
-  parser.add_argument('-g', '--gc-low', type=int, default=0, metavar='GC low', dest='gcLow',
-                      help='Running GC will stop once the number of vertices falls below this threshold.')
   parser.add_argument('-q', '--quiet', const=True, default=False, action='store_const', dest='quiet',
                       help='Don\'t print any messages to standard output.')
   args = parser.parse_args()
@@ -100,8 +96,6 @@ def main():
   checkNum(args.transTblSize, 'Size of transposition table')
   checkNum(args.proofTblSize, 'Size of proof table')
   checkNum(args.killerCount, 'Number of killers')
-  checkNum(args.gcHigh, 'GC high threshold')
-  checkNum(args.gcLow, 'GC low threshold')
   checkNum(args.timeLimit, 'Time limit')
   checkNum(args.posLimit, 'Position limit')
   checkNum(args.memLimit, 'Memory limit')
@@ -114,8 +108,6 @@ def main():
   params.transTblSize = args.transTblSize
   params.proofTblSize = args.proofTblSize
   params.killersCount = args.killerCount
-  params.gcHigh = args.gcHigh
-  params.gcLow = args.gcLow
 
   controller = Controller()
   controller.searchParameters = params

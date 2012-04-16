@@ -290,6 +290,14 @@ TEST(traverser, virtual_visitor) {
   traverse(*tree, bfs_traversal(), virtual_visitor(boost::make_shared<poly_visitor>()));
 }
 
+TEST(traverser, backtrack_test) {
+  boost::shared_ptr<vertex> tree = make_tree();
+  vertex_counter counter;
+  traverse(*tree, backtrack(), boost::ref(counter));
+
+  EXPECT_EQ(8, counter.count);
+}
+
 TEST(general, swap_test) {
   vertex parent;
 

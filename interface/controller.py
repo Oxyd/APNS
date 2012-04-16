@@ -143,8 +143,6 @@ class SearchParameters:
     self.transTblSize       = None
     self.proofTblSize       = None
     self.killersCount       = 2
-    self.gcHigh             = 5000000
-    self.gcLow              = 3000000
 
 
 class SearchProgress:
@@ -268,8 +266,6 @@ class Controller(object):
       self._search.useProofTbl(numElementsFromMbSize(self.searchParameters.proofTblSize, apnsmod.ProofTable))
 
     self._search.killerCount = self.searchParameters.killersCount
-    self._search.gcHigh = self.searchParameters.gcHigh
-    self._search.gcLow  = self.searchParameters.gcLow
 
     self._searchStart = time.clock()
     self._lastMeasurement = time.clock()

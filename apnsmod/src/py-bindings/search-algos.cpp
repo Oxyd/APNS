@@ -51,13 +51,6 @@ void export_algo(char const* name, char const* description) {
     .add_property("killerCount",
                   &Algo::get_killer_count, &Algo::set_killer_count,
                   "Maximal number of killers per each ply.")
-    .add_property("gcHigh",
-                  &Algo::get_gc_high, &Algo::set_gc_high,
-                  "When the number of vertices in the tree exceeds this threshold, GC will be run. This value may be ignored "
-                  "by the algorithm. Value of 0 disables GC completely.")
-    .add_property("gcLow",
-                  &Algo::get_gc_low, &Algo::set_gc_low,
-                  "Running GC will stop once the number of vertices falls below this threshold.")
     ;
 }
 
@@ -67,7 +60,7 @@ void export_algo(char const* name, char const* description) {
 void export_search_algos() {
   using namespace boost::python;
 
-  def("bestSuccessor", &apns::best_successor,
+  def("bestSuccessor", static_cast<apns::vertex* (*)(apns::vertex&)>(&apns::best_successor),
       return_internal_reference<>(),
       "bestSuccessor(Vertex) -> Vertex\n\nReturns the best of all vertex's successors, or None if the given vertex is a leaf.");
 

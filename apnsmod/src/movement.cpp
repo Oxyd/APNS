@@ -383,34 +383,36 @@ bool step::revalidate(board const& board, piece::color_t player) const {
                                                      !boost::bind(&elementary_step::capture, _1));
 
   step_holder new_step;
-  switch (step_kind(*this, player, board)) {
-  case ordinary: {
-    new_step = step::validate_ordinary_step(board, *step_sequence_begin());
-    if (new_step) {
-      el_steps_iterator first = new_step->step_sequence_begin();
-      assert(first->what());
+  if (board.get(step_sequence_begin()->from())) {  // If first step points to an occupied position on the board.
+    switch (step_kind(*this, player, board)) {
+    case ordinary: {
+      new_step = step::validate_ordinary_step(board, *step_sequence_begin());
+      if (new_step) {
+        el_steps_iterator first = new_step->step_sequence_begin();
+        assert(first->what());
 
-      if (first->what()->color() != player)
-        return false;
+        if (first->what()->color() != player)
+          return false;
+      }
+    } break;
+
+    case push: {
+      assert(second_noncapture != step_sequence_end());
+      new_step = step::validate_push(board, *step_sequence_begin(), *second_noncapture);
+    } break;
+
+    case pull: {
+      assert(second_noncapture != step_sequence_end());
+      new_step = step::validate_pull(board, *step_sequence_begin(), *second_noncapture);
+    } break;
     }
-  } break;
 
-  case push: {
-    assert(second_noncapture != step_sequence_end());
-    new_step = step::validate_push(board, *step_sequence_begin(), *second_noncapture);
-  } break;
+    if (new_step) {
+      std::size_t const old_size = std::distance(step_sequence_begin(), step_sequence_end());
+      std::size_t const new_size = std::distance(new_step->step_sequence_begin(), new_step->step_sequence_end());
 
-  case pull: {
-    assert(second_noncapture != step_sequence_end());
-    new_step = step::validate_pull(board, *step_sequence_begin(), *second_noncapture);
-  } break;
-  }
-
-  if (new_step) {
-    std::size_t const old_size = std::distance(step_sequence_begin(), step_sequence_end());
-    std::size_t const new_size = std::distance(new_step->step_sequence_begin(), new_step->step_sequence_end());
-
-    return old_size == new_size && std::equal(step_sequence_begin(), step_sequence_end(), new_step->step_sequence_begin());
+      return old_size == new_size && std::equal(step_sequence_begin(), step_sequence_end(), new_step->step_sequence_begin());
+    }
   }
 
   return false;
