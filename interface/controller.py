@@ -142,7 +142,6 @@ class SearchParameters:
     self.memoryLimit        = None
     self.transTblSize       = None
     self.proofTblSize       = None
-    self.killersCount       = 2
     self.moveCacheSize      = 32
 
 
@@ -161,7 +160,6 @@ class SearchProgress:
     self.proofTblSize = None
     self.proofTblHits = None
     self.proofTblMisses = None
-    self.killerProofs = None
     self.moveCacheHits = None
     self.moveCacheMisses = None
 
@@ -270,7 +268,6 @@ class Controller(object):
       self._search.useProofTbl(numElementsFromMbSize(self.searchParameters.proofTblSize, apnsmod.ProofTable))
     
     self._search.moveCacheSize = self.searchParameters.moveCacheSize
-    self._search.killerCount = self.searchParameters.killersCount
 
     self._searchStart = time.clock()
     self._lastMeasurement = time.clock()
@@ -338,7 +335,6 @@ class Controller(object):
       progress.proofTblHits = pt.hits
       progress.proofTblMisses = pt.misses
 
-    progress.killerProofs = self._search.killerProofs
     progress.moveCacheHits = self._search.moveCacheHits
     progress.moveCacheMisses = self._search.moveCacheMisses
 
