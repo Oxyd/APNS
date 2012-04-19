@@ -320,6 +320,8 @@ inline bool operator != (step_holder const& lhs, step_holder const& rhs) {
   return !operator == (lhs, rhs);
 }
 
+inline std::size_t hash_value(step const& s) { return boost::hash<std::string>()(s.to_string()); }
+
 //! Kind of a step.
 enum e_step_kind {
   ordinary,

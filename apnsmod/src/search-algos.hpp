@@ -138,6 +138,26 @@ private:
   }
 };
 
+//! History table serves for step-ordering within a vertex.
+class history_table {
+public:
+  //! Advice the table that step caused a cut-off at depth.
+  void insert(step const& step, std::size_t depth);
+
+  //! Sort the children of a vertex.
+  void sort(vertex& v);
+
+private:
+  typedef boost::unordered_map<step, boost::uint64_t> table_t;
+  struct compare {
+    table_t* table;
+    explicit compare(table_t& t) : table(&t) { }
+    bool operator () (vertex const& lhs, vertex const& rhs);
+  };
+
+  boost::unordered_map<step, boost::uint64_t> table_;
+};
+
 //! Update proof- and disproof-numbers of a single vertex.
 void update_numbers(vertex& v);
 
@@ -327,7 +347,7 @@ public:
     size_(size),
     stack_(hasher, initial_hash, root, attacker, initial_state),
     hasher_(&hasher),
-    killer_proofs_(0),
+    history_(new history_table),
     moves_(DEFAULT_MOVES_CACHED_)
   { }
 
@@ -373,32 +393,26 @@ public:
 
   void use_trans_tbl(std::size_t size)        { trans_tbl_.reset(new transposition_table(size)); }
   void use_proof_tbl(std::size_t size)        { proof_tbl_.reset(new proof_table(size)); }
-  void use_killers(std::size_t size_per_ply)  { killers_.reset(new killer_db(size_per_ply)); }
   void cache_moves(std::size_t how_many)      { moves_.moves_cached(how_many); }
 
   transposition_table const*  trans_tbl() const     { return trans_tbl_.get(); }
   proof_table const*          proof_tbl() const     { return proof_tbl_.get(); }
-  killer_db const*            killers() const       { return killers_.get(); }
   std::size_t                 cached_moves() const  { return moves_.moves_cached(); }
 
   moves const& move_cache() const { return moves_; }
 
   std::size_t size() const { return size_; }
-  std::size_t killer_proofs() const { return killer_proofs_; }
 
 private:
   piece::color_t        attacker_;
   std::size_t           size_;
   search_stack          stack_;
   zobrist_hasher const* hasher_;
-  std::size_t           killer_proofs_;
 
   boost::shared_ptr<transposition_table>  trans_tbl_;
   boost::shared_ptr<proof_table>          proof_tbl_;
-  boost::shared_ptr<killer_db>            killers_;
+  boost::shared_ptr<history_table>        history_;
   moves                                   moves_;
-
-  bool simulate();
 
   //! Get the move root of the currently-selected vertex.
   //! \param root Will be set to the move-root vertex.
@@ -445,12 +459,6 @@ public:
   //! Get the proof table, if any, used by this algorithm.
   proof_table const* get_proof_tbl() const { return tree_.proof_tbl(); }
   
-  //! Change the number of killers stored for each ply.
-  void killer_count(std::size_t new_killer_count) { tree_.use_killers(new_killer_count); }
-
-  //! Get the max. number of killers stored for each ply.
-  std::size_t killer_count() const { return tree_.killers()->plys_size(); }
-
   //! Change the number of moves stored in the move cache.
   void move_cache_size(std::size_t new_size) { tree_.cache_moves(new_size); }
 
@@ -462,9 +470,6 @@ public:
 
   //! Get the number of misses in the move cache.
   std::size_t move_cache_misses() const { return tree_.move_cache().misses(); }
-
-  //! Get the number of vertices proved by a killer.
-  std::size_t killer_proofs() const { return tree_.killer_proofs(); }
 
   //! Get the total number of vertices currently held by this algorithm.
   std::size_t get_position_count() const {

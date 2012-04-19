@@ -192,6 +192,24 @@ bool killer_db::is_killer(std::size_t ply, vertex::e_type type, step const& step
   return false;
 }
 
+void history_table::insert(step const& step, std::size_t depth) {
+  table_[step] = 1 << depth;
+}
+
+void history_table::sort(vertex& v) {
+  v.sort_children(compare(table_));
+}
+
+bool history_table::compare::operator () (vertex const& lhs, vertex const& rhs) {
+  history_table::table_t::iterator l = table->find(*lhs.step);
+  history_table::table_t::iterator r = table->find(*rhs.step);
+
+  boost::uint64_t const left = l != table->end() ? l->second : 0;
+  boost::uint64_t const right = r != table->end() ? r->second : 0;
+
+  return left < right;
+}
+
 void update_numbers(vertex& v) {
   vertex::number_t vertex::* minimise_num;  // The number to take the min of.
   vertex::number_t vertex::* sum_num;       // The number to take the sum of.
@@ -455,54 +473,42 @@ void search_tree::expand() {
     attacker_
   );
 
-  // Try to simulate the leaf first.
-  if (!killers_ || !simulate()) {
-    // Make a list of all possible steps.
-    typedef std::vector<std::pair<step, vertex::e_type> > steps_seq;
-    steps_seq steps;
+  // Make a list of all possible steps.
+  typedef std::vector<std::pair<step, vertex::e_type> > steps_seq;
+  steps_seq steps;
 
-    piece::color_t const player = vertex_player(*leaf, attacker_);
-    for (all_steps_iter new_step = all_steps_begin(stack_.state(), player); new_step != all_steps_end(); ++new_step) {
-      int const remaining = leaf->steps_remaining - static_cast<signed>(new_step->steps_used());
+  piece::color_t const player = vertex_player(*leaf, attacker_);
+  for (all_steps_iter new_step = all_steps_begin(stack_.state(), player); new_step != all_steps_end(); ++new_step) {
+    int const remaining = leaf->steps_remaining - static_cast<signed>(new_step->steps_used());
 
-      if (remaining >= 0) {
-        steps.push_back(std::make_pair(*new_step, opposite_type(leaf->type)));
-        if (remaining >= 1)
-          steps.push_back(std::make_pair(*new_step, leaf->type));
-      }
+    if (remaining >= 0) {
+      steps.push_back(std::make_pair(*new_step, opposite_type(leaf->type)));
+      if (remaining >= 1)
+        steps.push_back(std::make_pair(*new_step, leaf->type));
     }
+  }
 
-    leaf->resize(steps.size());
+  leaf->resize(steps.size());
 
-    vertex::children_iterator child       = leaf->children_begin();
-    for (steps_seq::const_iterator s = steps.begin(); s != steps.end(); ++s, ++child) {
-      child->step = s->first;
-      child->type = s->second;
+  vertex::children_iterator child       = leaf->children_begin();
+  for (steps_seq::const_iterator s = steps.begin(); s != steps.end(); ++s, ++child) {
+    child->step = s->first;
+    child->type = s->second;
 
-      if (child->type == leaf->type)
-        child->steps_remaining = leaf->steps_remaining - static_cast<signed>(child->step->steps_used());
-      else
-        child->steps_remaining = MAX_STEPS;
+    if (child->type == leaf->type)
+      child->steps_remaining = leaf->steps_remaining - static_cast<signed>(child->step->steps_used());
+    else
+      child->steps_remaining = MAX_STEPS;
 
-      child->proof_number = 1;
-      child->disproof_number = 1;
+    child->proof_number = 1;
+    child->disproof_number = 1;
 
-    }
-  } else {
-    ++killer_proofs_;
   }
 
   size_ += leaf->children_count();
 
   reduce(moves, move_len);
-
-  if (killers_) {
-    vertex::children_iterator killers_end = leaf->children_begin();
-    for (vertex::children_iterator child = leaf->children_begin(); child != leaf->children_end(); ++child) {
-      if (killers_->is_killer(stack_.size() + 1, child->type, *child->step) && child != killers_end)
-        leaf->swap_children(child, killers_end++);
-    }
-  }
+  history_->sort(*leaf);
 }
 
 void search_tree::evaluate() {
@@ -616,6 +622,15 @@ void search_tree::update_path() {
 
     update_numbers(current);
 
+    if (history_ && boost::next(path_current) != stack_.path().rend()) {
+      vertex const& parent = **(boost::next(path_current));
+      if ((parent.type == vertex::type_or && current.proof_number == 0) ||
+          (parent.type == vertex::type_and && current.disproof_number == 0)) {
+        history_->insert(*current.step, ply);
+      }
+    }
+
+#if 0
     if (killers_ && boost::next(path_current) != stack_.path().rend()) {
       vertex const& parent = **(boost::next(path_current));
       if ((parent.type == vertex::type_or && current.proof_number == 0) ||
@@ -623,6 +638,7 @@ void search_tree::update_path() {
         killers_->add(ply, parent.type, *current.step);
       }
     }
+#endif
 
     if (proof_tbl_ && (current.proof_number == 0 || current.disproof_number == 0)) {
       proof_entry_t entry(current.proof_number, current.disproof_number,
@@ -648,53 +664,6 @@ void search_tree::update_path() {
       break;
     }
   }
-}
-
-bool search_tree::simulate() {
-  assert(stack_.path_top()->leaf());
-  assert(killers_);
-
-  search_stack_checkpoint checkpoint(stack_);
-
-  vertex* const         parent  = stack_.path_top();
-  std::size_t const     ply     = stack_.history().size();
-  piece::color_t const  player  = vertex_player(*parent, attacker_);
-
-  for (killer_db::ply_iterator killer = killers_->ply_begin(ply, parent->type);
-       killer != killers_->ply_end(ply, parent->type); ++killer) {
-    if (killer->revalidate(stack_.state(), player)) {
-      int const remaining = parent->steps_remaining - static_cast<signed>(killer->steps_used());
-
-      vertex::e_type type;
-      if (remaining >= 1)
-        type = parent->type;
-      else if (remaining == 0)
-        type = opposite_type(parent->type);
-      else
-        continue;
-
-      vertex::children_iterator child = parent->add_child();
-      child->step = *killer;
-      child->type = type;
-      child->steps_remaining = remaining;
-      evaluate_children();
-
-      if ((parent->type == vertex::type_or && child->proof_number == 0) ||
-          (parent->type == vertex::type_and && child->disproof_number == 0)) {
-        update_numbers(*parent);
-        return true;
-      }
-      else if (parent->type == child->type) {
-        stack_.push(&*child);
-        if (simulate()) {
-          update_numbers(*parent);
-          return true;
-        }
-      }
-    }
-  }
-
-  return false;
 }
 
 void search_tree::find_move_root(vertex*& root, zobrist_hasher::hash_t& root_hash, board& position,
