@@ -630,16 +630,6 @@ void search_tree::update_path() {
       }
     }
 
-#if 0
-    if (killers_ && boost::next(path_current) != stack_.path().rend()) {
-      vertex const& parent = **(boost::next(path_current));
-      if ((parent.type == vertex::type_or && current.proof_number == 0) ||
-          (parent.type == vertex::type_and && current.disproof_number == 0)) {
-        killers_->add(ply, parent.type, *current.step);
-      }
-    }
-#endif
-
     if (proof_tbl_ && (current.proof_number == 0 || current.disproof_number == 0)) {
       proof_entry_t entry(current.proof_number, current.disproof_number,
                           history_t(std::distance(history_current, stack_.history().rend())));
