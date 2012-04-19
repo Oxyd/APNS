@@ -225,12 +225,15 @@ piece::type_t type_from_int(int value) {
   }
 }
 
+// MSVS doesn't seem to like this.
+#ifndef _MSC_VER
 position::row_t const board::ROWS;
 position::col_t const board::COLUMNS;
 position::row_t const board::MIN_ROW;
 position::row_t const board::MAX_ROW;
 position::col_t const board::MIN_COLUMN;
 position::col_t const board::MAX_COLUMN;
+#endif
 
 board::pieces_iterator::pieces_iterator()
   : board::pieces_iterator::iterator_adaptor_(base_type())

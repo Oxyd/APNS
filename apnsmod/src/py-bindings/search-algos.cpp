@@ -29,6 +29,10 @@ struct virtual_algo_wrap : public apns::virtual_algo, boost::python::wrapper<apn
     this->get_override("doIterate")();
   }
 
+  boost::shared_ptr<apns::game> game() { return game_; }
+  apns::zobrist_hasher& hasher() { return hasher_; }
+  apns::zobrist_hasher::hash_t initial_hash() { return initial_hash_; }
+  apns::search_tree& tree() { return tree_; }
   using apns::virtual_algo::game_;
   using apns::virtual_algo::hasher_;
   using apns::virtual_algo::initial_hash_;
@@ -145,27 +149,21 @@ void export_search_algos() {
   def("selectBest", &apns::select_best,
       "selectBest(SearchTree) -> None\n\nSelect the best successor of the current vertex in the tree");
 
-  //export_algo<apns::search_algo<apns::proof_number_search> >(
   export_algo<apns::proof_number_search>(
     "ProofNumberSearch",
     "The basic variant of the Proof-Number Search algorithm"
   );
 
-  //export_algo<apns::search_algo<apns::depth_first_pns> >(
   export_algo<apns::depth_first_pns>(
     "DepthFirstPNS",
     "Depth-First variant of the algorithm"
   );
 
-  //export_algo<virtual_algo_wrap, bases<> >(
-  export_algo<virtual_algo_wrap, apns::search_algo<apns::virtual_algo> >(
-    "SearchAlgorithm",
-    "Base class for custom search algorithms")
+  export_algo<virtual_algo_wrap, apns::search_algo<apns::virtual_algo> >("SearchAlgorithm", "Abstract base-class for search algorithms")
     .def("doIterate", pure_virtual(&virtual_algo_wrap::really_do_iterate))
-
-    .def_readonly("game", &virtual_algo_wrap::game_)
-    .def_readonly("hasher", &virtual_algo_wrap::hasher_)
-    .def_readonly("initialHash", &virtual_algo_wrap::initial_hash_)
-    .def_readonly("tree", &virtual_algo_wrap::tree_)
+    .add_property("game", &virtual_algo_wrap::game)
+    .add_property("hasher", make_function(&virtual_algo_wrap::hasher, return_internal_reference<>()))
+    .add_property("initialHash", &virtual_algo_wrap::initial_hash)
+    .add_property("tree", make_function(&virtual_algo_wrap::tree, return_internal_reference<>()))
     ;
 }
