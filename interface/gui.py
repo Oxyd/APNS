@@ -1,7 +1,5 @@
 # -*- Encoding: utf-8 -*-
 
-#from apnsmod import Board, Vertex, Piece, Position, OperationController, Step, empty, apply, opponentColor,\
-                    #memoryUsedTotal, TranspositionTable, saveGame, loadGame
 import apnsmod
 from interface.observable import Observable
 from interface.controller import Controller, SearchParameters, loadBoard, saveBoard
@@ -181,6 +179,7 @@ class MainWindowController(object):
         pars.transTblSize = newPrefs.transTblSize
         pars.proofTblSize = newPrefs.proofTblSize
         pars.killersCount = newPrefs.killersCount
+        pars.moveCacheSize = newPrefs.moveCacheSize
 
         try:
           dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
@@ -839,6 +838,8 @@ class RunSearchDialog(Observable):
                           lambda self, val: self.setProofTblSize(val))
   killersCount = property(lambda self: self._killersSpinVar.get(),
                           lambda self, val: self.setKillers(val))
+  moveCacheSize = property(lambda self: self._moveCacheSpinVar.get(),
+                           lambda self, val: self.setMoveCache(val))
 
   class Command:
     timeLimitCheck, positionLimitCheck, memLimitCheck, gcCheck, start = range(5)
@@ -893,6 +894,7 @@ class RunSearchDialog(Observable):
 
     algoParamsFrame = ttk.Labelframe(self._dialog.content, text='Algorithm parameters:', padding=5)
     killersLabel = ttk.Label(algoParamsFrame, text='Killers for each level: ')
+    moveCacheLabel = ttk.Label(algoParamsFrame, text='Move cache size: ')
 
     sizeLabel = ttk.Label(algoParamsFrame, text='Transposition table size: ')
     sizeUnits = ttk.Label(algoParamsFrame, text='MB')
@@ -903,8 +905,10 @@ class RunSearchDialog(Observable):
     self._killersSpinVar = Tkinter.StringVar(value='0')
     self._memorySpinVar = Tkinter.StringVar(value='0')
     self._proofSpinVar = Tkinter.StringVar(value='0')
+    self._moveCacheSpinVar = Tkinter.StringVar(value='0')
 
     self._killersSpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=50, textvariable=self._killersSpinVar)
+    self._moveCacheSpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=1024, textvariable=self._moveCacheSpinVar)
     self._memorySpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=99999999,
                                        textvariable=self._memorySpinVar)
     self._proofSpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=99999999,
@@ -935,14 +939,17 @@ class RunSearchDialog(Observable):
 
     killersLabel.grid(row=0, column=0, sticky='W')
     self._killersSpin.grid(row=0, column=1, sticky='WE', padx=5)
+    
+    moveCacheLabel.grid(row=1, column=0, sticky='W')
+    self._moveCacheSpin.grid(row=1, column=1, sticky='WE', padx=5)
 
-    sizeLabel.grid(row=1, column=0, sticky='W')
-    self._memorySpin.grid(row=1, column=1, sticky='WE', padx=5)
-    sizeUnits.grid(row=1, column=2)
+    sizeLabel.grid(row=2, column=0, sticky='W')
+    self._memorySpin.grid(row=2, column=1, sticky='WE', padx=5)
+    sizeUnits.grid(row=2, column=2)
 
-    proofLabel.grid(row=2, column=0, sticky='W')
-    self._proofSpin.grid(row=2, column=1, sticky='WE', padx=5)
-    proofUnits.grid(row=2, column=2)
+    proofLabel.grid(row=3, column=0, sticky='W')
+    self._proofSpin.grid(row=3, column=1, sticky='WE', padx=5)
+    proofUnits.grid(row=3, column=2)
 
     algoParamsFrame.columnconfigure(1, weight=1)
     algoParamsFrame.grid(row=3, column=0, sticky='EW', pady=(5, 0))
@@ -1023,31 +1030,6 @@ class RunSearchDialog(Observable):
     self._memLimitVar.set(int(value))
 
 
-  def enableGC(self, enable):
-    '''Enable or disable garbage collector.'''
-
-    if enable:
-      self._gcHighSpin['state'] = ['normal']
-      self._gcLowSpin['state'] = ['normal']
-      self._gcCheckVar.set('1')
-    else:
-      self._gcHighSpin['state'] = ['disabled']
-      self._gcLowSpin['state'] = ['disabled']
-      self._gcCheckVar.set('0')
-
-
-  def setGCHigh(self, val):
-    '''Set GC high threshold.'''
-
-    self._gcHigh.set(val)
-
-
-  def setGCLow(self, val):
-    '''Set GC low threshold.'''
-
-    self._gcLow.set(val)
-
-
   def setTransTblSize(self, value):
     '''Set the transposition table size spinbox to the given value.'''
 
@@ -1064,6 +1046,12 @@ class RunSearchDialog(Observable):
     '''Set the killer count for each level.'''
 
     self._killersSpinVar.set(int(value))
+  
+  
+  def setMoveCache(self, value):
+    '''Set the move cache size.'''
+    
+    self._moveCacheSpinVar.set(int(value))
 
   def _execute(self):
     '''User has clicked the 'Run' button: Dispatch the command to the controller.'''
@@ -1083,6 +1071,7 @@ class RunSearchController(object):
   transTblSize = property(lambda self: self._transTblSize)
   proofTblSize = property(lambda self: self._proofTblSize)
   killersCount = property(lambda self: self._killersCount)
+  moveCacheSize = property(lambda self: self._moveCacheSize)
   showTimeLeft = property(lambda self: self._showTimeLeft)
 
   def __init__(self, runSearchDlg, parameters):
@@ -1113,6 +1102,7 @@ class RunSearchController(object):
     self._runSearchDlg.transTblSize = get('transTblSize', 32)
     self._runSearchDlg.proofTblSize = get('proofTblSize', 32)
     self._runSearchDlg.killersCount = get('killersCount', 2)
+    self._runSearchDlg.moveCacheSize = get('moveCacheSize', 32)
 
     self._doRun = False
     self._lastSetValues = None
@@ -1162,6 +1152,7 @@ class RunSearchController(object):
         self._memLimit = memLimit
         self._showTimeLeft = showTimeLeft
         self._killersCont = self._runSearchDlg.killersCount
+        self._moveCachesize = self._runSearchDlg.moveCacheSize
 
         self._lastSetValues = SearchParameters()
         last = self._lastSetValues
@@ -1176,6 +1167,7 @@ class RunSearchController(object):
         last.transTblSize = int(self._runSearchDlg.transTblSize)
         last.proofTblSize = int(self._runSearchDlg.proofTblSize)
         last.killersCount = int(self._runSearchDlg.killersCount)
+        last.moveCacheSize = int(self._runSearchDlg.moveCacheSize)
 
         self._doRun = True
         self._runSearchDlg.close()
@@ -1212,7 +1204,8 @@ class RunSearchController(object):
             and checkVar(dlg.memLimitCheck, dlg.memLimit, 'Memory limit')
             and checkVar(True, dlg.transTblSize, 'Size of transposition table')
             and checkVar(True, dlg.proofTblSize, 'Size of proof table')
-            and checkVar(True, dlg.killersCount, 'Killers count'))
+            and checkVar(True, dlg.killersCount, 'Killers count')
+            and checkVar(True, dlg.moveCacheSize, 'Move cache size'))
 
 
 class SearchProgressDialog(Observable):
@@ -1239,25 +1232,31 @@ class SearchProgressDialog(Observable):
 
     stats = ttk.Labelframe(self._dialog.content, text='Statistics:', padding=3)
 
-    memoryAllocLbl = ttk.Label(stats, text='Tree memory usage:')
-    transTblSizeLbl = ttk.Label(stats, text='Transposition table size:')
-    transTblHitsLbl = ttk.Label(stats, text='Transposition table hits:')
-    transTblMissesLbl = ttk.Label(stats, text='Transposition table misses:')
-    proofTblSizeLbl = ttk.Label(stats, text='Proof table size:')
-    proofTblHitsLbl = ttk.Label(stats, text='Proof table hits:')
-    proofTblMissesLbl = ttk.Label(stats, text='Proof table misses:')
-    posCountLbl = ttk.Label(stats, text='Unique positions total:')
-    posPerSecLbl = ttk.Label(stats, text='New positions per second:')
+    memoryAllocLbl      = ttk.Label(stats, text='Tree memory usage:')
+    transTblSizeLbl     = ttk.Label(stats, text='Transposition table size:')
+    transTblHitsLbl     = ttk.Label(stats, text='Transposition table hits:')
+    transTblMissesLbl   = ttk.Label(stats, text='Transposition table misses:')
+    proofTblSizeLbl     = ttk.Label(stats, text='Proof table size:')
+    proofTblHitsLbl     = ttk.Label(stats, text='Proof table hits:')
+    proofTblMissesLbl   = ttk.Label(stats, text='Proof table misses:')
+    killerProofsLbl     = ttk.Label(stats, text='Killer proofs:')
+    moveCacheHitsLbl    = ttk.Label(stats, text='Move cache hits:')
+    moveCacheMissesLbl  = ttk.Label(stats, text='Move cache misses:')
+    posCountLbl         = ttk.Label(stats, text='Unique positions total:')
+    posPerSecLbl        = ttk.Label(stats, text='New positions per second:')
 
-    self._memoryAlloc = ttk.Label(stats)
-    self._transTblSize = ttk.Label(stats)
-    self._transTblHits = ttk.Label(stats)
-    self._transTblMisses = ttk.Label(stats)
-    self._proofTblSize = ttk.Label(stats)
-    self._proofTblHits = ttk.Label(stats)
-    self._proofTblMisses = ttk.Label(stats)
-    self._posCount = ttk.Label(stats)
-    self._posPerSec = ttk.Label(stats)
+    self._memoryAlloc     = ttk.Label(stats)
+    self._transTblSize    = ttk.Label(stats)
+    self._transTblHits    = ttk.Label(stats)
+    self._transTblMisses  = ttk.Label(stats)
+    self._proofTblSize    = ttk.Label(stats)
+    self._proofTblHits    = ttk.Label(stats)
+    self._proofTblMisses  = ttk.Label(stats)
+    self._killerProofs    = ttk.Label(stats)
+    self._moveCacheHits   = ttk.Label(stats)
+    self._moveCacheMisses = ttk.Label(stats)
+    self._posCount        = ttk.Label(stats)
+    self._posPerSec       = ttk.Label(stats)
 
     self._cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel' if running else 'OK', command=self._cancel)
     self._dialog.setDeleteAction(lambda: self._cancelBtn.invoke())
@@ -1302,8 +1301,11 @@ class SearchProgressDialog(Observable):
     proofTblSizeLbl.grid(row=4, column=0, sticky='E')
     proofTblHitsLbl.grid(row=5, column=0, sticky='E')
     proofTblMissesLbl.grid(row=6, column=0, sticky='E')
-    posCountLbl.grid(row=7, column=0, sticky='E')
-    posPerSecLbl.grid(row=8, column=0, sticky='E')
+    killerProofsLbl.grid(row=7, column=0, sticky='E')
+    moveCacheHitsLbl.grid(row=8, column=0, sticky='E')
+    moveCacheMissesLbl.grid(row=9, column=0, sticky='E')
+    posCountLbl.grid(row=10, column=0, sticky='E')
+    posPerSecLbl.grid(row=11, column=0, sticky='E')
 
     self._memoryAlloc.grid(row=0, column=1, sticky='W', padx=(5, 0))
     self._transTblSize.grid(row=1, column=1, sticky='W', padx=(5, 0))
@@ -1312,8 +1314,11 @@ class SearchProgressDialog(Observable):
     self._proofTblSize.grid(row=4, column=1, sticky='W', padx=(5, 0))
     self._proofTblHits.grid(row=5, column=1, sticky='W', padx=(5, 0))
     self._proofTblMisses.grid(row=6, column=1, sticky='W', padx=(5, 0))
-    self._posCount.grid(row=7, column=1, sticky='W', padx=(5, 0))
-    self._posPerSec.grid(row=8, column=1, sticky='W', padx=(5, 0))
+    self._killerProofs.grid(row=7, column=1, sticky='W', padx=(5, 0))
+    self._moveCacheHits.grid(row=8, column=1, sticky='W', padx=(5, 0))
+    self._moveCacheMisses.grid(row=9, column=1, sticky='W', padx=(5, 0))
+    self._posCount.grid(row=10, column=1, sticky='W', padx=(5, 0))
+    self._posPerSec.grid(row=11, column=1, sticky='W', padx=(5, 0))
 
     stats.columnconfigure(1, weight=1)
 
@@ -1378,6 +1383,19 @@ class SearchProgressDialog(Observable):
     self._proofTblSize['text'] = '%s' % memUsed
     self._proofTblHits['text'] = '%s' % hits
     self._proofTblMisses['text'] = '%s' % misses
+  
+  
+  def showKillerProofs(self, proofs):
+    '''Show the number of vertices proved by killers.'''
+    
+    self._killerProofs['text'] = '%s' % proofs
+  
+  
+  def showMoveCacheStats(self, hits, misses):
+    '''Show statistics about the move cache.'''
+    
+    self._moveCacheHits['text'] = '%s' % hits
+    self._moveCacheMisses['text'] = '%s' % misses
 
 
   def showPosCount(self, posCount, posPerSec):
@@ -1456,6 +1474,9 @@ class SearchProgressController(object):
         else:
           dlg.showProofTblStats(memUsed='0 B', hits='0', misses='0')
 
+        dlg.showKillerProofs(progress.killerProofs)        
+        dlg.showMoveCacheStats(hits=progress.moveCacheHits, misses=progress.moveCacheMisses)
+
         dlg.showPosCount(posCount=progress.positionCount, posPerSec=progress.positionsPerSecond)
         dlg.showRootPnDn(progress.rootPN, progress.rootDN)
         dlg.updateGui()
@@ -1466,6 +1487,8 @@ class SearchProgressController(object):
     controller.searchProgressCallbacks.add(updater.updateDlg)
     try:
       controller.runSearch(MS_BURST_TIME)
+    except RuntimeError, e:
+      tkMessageBox.showerror('Error', 'An internal error has happened. This is likely a bug.\n\n{0}'.format(e))
     finally:
       controller.searchProgressCallbacks.remove(updater.updateDlg)
       self._searchProgressDlg.close()
@@ -1492,6 +1515,9 @@ class SearchStatsController(object):
       searchProgressDlg.showProofTblStats(ptSize, hits=s.proofTblHits, misses=s.proofTblMisses)
     else:
       searchProgressDlg.showProofTblStats('0 B', '0', '0')
+      
+    searchProgressDlg.showKillerProofs(s.killerProofs)
+    searchProgressDlg.showMoveCacheStats(hits=s.moveCacheHits, misses=s.moveCacheMisses)
 
     searchProgressDlg.addObserver(self)
     searchProgressDlg.run()

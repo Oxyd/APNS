@@ -3,6 +3,7 @@
 
 #include <boost/utility.hpp>
 #include <boost/timer.hpp>
+#include <boost/function.hpp>
 
 void export_util();
 
@@ -86,6 +87,26 @@ public:
                                                                  // get slowed down too much.
 private:
   virtual void do_update() { }
+};
+
+//! Helper to provide the Strong Guarantee. Upon destruction of this object, unless .commit() has been called, the rollback
+//! function shall be called.
+struct transaction {
+  explicit transaction(boost::function<void ()> const& rollback) : rollback_(rollback), commited_(false) { }
+
+  //! Convenience constructor -- calls perform() once before any initialisation. This is to allow constructions like
+  //! transaction t(&do_something, &guard); instead of do_something(); transaction t(&guard);.
+  transaction(boost::function<void ()> const& perform,
+              boost::function<void ()> const& rollback) : rollback_(rollback), commited_(false) {
+    perform();  // If this throws, the destructor won't be called as transaction has not begun its lifetime yet.
+  }
+
+  ~transaction()  { if (!commited_) rollback_(); }
+  void commit()   { commited_ = true; }
+
+private:
+  boost::function<void ()>  rollback_;
+  bool                      commited_;
 };
 
 } // namespace apns

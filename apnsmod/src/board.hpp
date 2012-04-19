@@ -136,6 +136,7 @@ public:
    * \throws std::domain_error Specified row or column was not valid.
    */
   position(row_t row, col_t column);
+
   position(row_t row, std::string const& column);
 
   row_t row() const;
@@ -170,7 +171,20 @@ bool operator < (position lhs, position rhs);
  * \param direction Where to?
  * \throws std::logic_error No such position exists in the Arimaa world.
  */
-position make_adjacent(position original, direction direction);
+inline position make_adjacent(position original, direction direction) {
+  int row = original.row();
+  char column = original.column();
+
+  switch (direction) {
+    case north:   ++row;    break;
+    case south:   --row;    break;
+    case east:    ++column; break;
+    case west:    --column; break;
+    default:      assert(!"Can't reach this.");
+  }
+
+  return position(row, column);  // Will throw if the position is invalid.
+}
 
 /**
  * Is a position adjacent to the given one valid?
@@ -269,7 +283,13 @@ public:
    *
    * \return The piece retreived from the position #from, or the empty value if there is no piece at that position.
    */
-  boost::optional<piece> get(position from) const;
+  boost::optional<piece> get(position from) const {
+    char const p = pieces_[(from.row() - board::MIN_ROW) * board::COLUMNS + (from.column() - board::MIN_COLUMN)];
+    if (p != ' ')
+      return piece_from_letter_unsafe(p);
+    else
+      return boost::none;
+  }
 
   //! Remove all pieces from the board.
   void clear() {
@@ -281,6 +301,7 @@ public:
 
   //! Compare boards;
   bool equal(board const& other) const { return pieces_ == other.pieces_; }
+  bool less(board const& other) const  { return pieces_ < other.pieces_; }
 
 private:
   pieces_cont pieces_;
@@ -288,6 +309,7 @@ private:
 
 bool operator == (board const& lhs, board const& rhs);  //<! Test whether two board contain exactly the same elements.
 bool operator != (board const& lhs, board const& rhs);
+inline bool operator <  (board const& lhs, board const& rhs) { return lhs.less(rhs); }
 
 //! Create a single-line string representation of a board.
 std::string string_from_board(board const& board);
@@ -379,6 +401,18 @@ adjacent_pieces_iter adjacent_pieces_begin(board const& board, position center);
 
 //! Return the singular iterator of adjacent pieces sequence.
 adjacent_pieces_iter adjacent_pieces_end();
+
+// Why? Because I can. This is an often-used constructor, it might be advantageous to give the compiler a better chance at inlining
+// it.
+inline position::position(row_t row, col_t column)
+  : row_(row)
+  , column_(column)
+{
+  if (row < board::MIN_ROW || row > board::MAX_ROW
+      || column < board::MIN_COLUMN || column > board::MAX_COLUMN) {
+    throw std::domain_error("position::position: attempted to create an invalid position");
+  }
+}
 
 } // namespace apns
 

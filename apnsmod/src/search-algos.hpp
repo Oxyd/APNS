@@ -11,10 +11,14 @@
 #include <boost/timer.hpp>
 #include <boost/ref.hpp>
 #include <boost/circular_buffer.hpp>
+#include <boost/lambda/lambda.hpp>
+#include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 
 #include <vector>
 #include <stack>
 #include <cassert>
+#include <utility>
 
 namespace apns {
 
@@ -134,23 +138,6 @@ private:
   }
 };
 
-//! A move path is a path from the vertex that begins a player's turn to the vertex that ends it. That means that the last
-//! vertex's type is always different from the first one's. Also that all but the last vertex share the same type.
-//!
-//! For simplicity, this is an array of 4 vertices (the maximum path len). The first element is the last vertex. Null pointers
-//! are used when the path is shorter than 4 vertices.
-typedef boost::array<vertex*, 4> move_path;
-
-//! A move terminal is the vertex that ends a player's turn. This is a mapping from such terminals' hashes into their paths.
-typedef boost::unordered_map<zobrist_hasher::hash_t, move_path> terminal_paths;
-
-//! A move tree is a subtree of the whole search tree rooted at the vertex that begins a player's turn and containing the
-//! possible step paths from this root to terminal states.
-struct move_tree {
-  zobrist_hasher::hash_t            root_hash;
-  boost::shared_ptr<terminal_paths> paths;
-};
-
 //! Update proof- and disproof-numbers of a single vertex.
 void update_numbers(vertex& v);
 
@@ -202,7 +189,7 @@ private:
 struct search_stack_checkpoint {
   explicit search_stack_checkpoint(search_stack& stack) :
       stack_(&stack),
-      original_length_(stack.path().size())
+      original_top_(stack.path_top())
   { }
 
   ~search_stack_checkpoint() { revert(); }
@@ -212,7 +199,118 @@ struct search_stack_checkpoint {
 
 private:
   search_stack* stack_;
-  std::size_t   original_length_;
+  vertex*       original_top_;
+};
+
+//! A move path is a path from the vertex that begins a player's turn to the vertex that ends it. That means that the last
+//! vertex's type is always different from the first one's. Also that all but the last vertex share the same type.
+//!
+//! For simplicity, this is an array of 4 vertices (the maximum path len). The first element is the move-root vertex. Null
+//! pointers are used when the path is shorter than 4 vertices.
+typedef boost::array<vertex*, 4> move_path;
+
+inline std::size_t move_depth(move_path const& path) {
+  return 4 - std::count(path.begin(), path.end(), static_cast<vertex*>(0));
+}
+
+inline move_path::iterator terminal(move_path& path) {
+  using namespace boost::lambda;
+  return std::find_if(path.begin(), path.end(), _1 == static_cast<vertex*>(0)) - 1;
+}
+
+// Try to apply the given move path to the given board. If successful, returns true. Otherwise returns false and the board
+// is left unmodified.
+bool try_apply(move_path const& path, board& board);
+
+// Unapply a move from a board.
+void unapply(move_path const& path, board& board);
+
+//! All possible moves from one position for one player. This serves as a kind of a cache.
+class player_moves {
+public:
+  explicit player_moves(board const& root_position) : root_position_(root_position) { }
+
+  //! Insert a move into the table.
+  //! \param hash Zobrist's hash value for the terminal vertex of the path.
+  void insert(zobrist_hasher::hash_t hash, move_path const& path) { moves_.insert(std::make_pair(hash, path)); }
+
+  //! Remove a move from the table.
+  void remove(zobrist_hasher::hash_t hash) { moves_.erase(hash); }
+
+  //! Query for a pre-stored move in the table.
+  //! \param hash Key used for the query.
+  //! \param expected_position The expected target position for verification in the even of hash collisions.
+  boost::optional<move_path> query(zobrist_hasher::hash_t hash, board const& expected_position);
+
+  //! The move-root position for this move.
+  board const& root_position() const { return root_position_; }
+
+  //! Number of moves stored in this table.
+  std::size_t size() const { return moves_.size(); }
+
+private:
+  typedef boost::unordered_map<zobrist_hasher::hash_t, move_path> moves_map;
+  moves_map moves_;
+  board     root_position_;
+
+  bool verify(move_path const& found_path, board const& expected);
+};
+
+//! Cache of moves in the tree.
+class moves {
+public:
+  explicit moves(std::size_t moves_cached) :
+    moves_cached_(moves_cached),
+    time_(0),
+    hits_(0),
+    misses_(0)
+  { }
+
+  //! Get moves for the given move.
+  //! \param ply The ply.
+  //! \param root_hash Hash value of the move root vertex.
+  //! \param root_pos The board position in the move root vertex.
+  //! \param root The move-root vertex itself.
+  //! \param hasher Hasher used for making the hashes.
+  //! \param attacker Attacker for the whole search tree (that is, *not* the player who moves from the given root).
+  boost::shared_ptr<player_moves> get(zobrist_hasher::hash_t root_hash, board const& root_pos,
+                                      vertex* root, zobrist_hasher const& hasher, piece::color_t attacker);
+
+  //! Remove moves.
+  void remove(zobrist_hasher::hash_t root_hash);
+
+  //! Set how many moves to cache.
+  void moves_cached(std::size_t new_moves_cached);
+
+  //! Get how many moves at most are currently cached.
+  std::size_t moves_cached() const { return moves_cached_; }
+
+  std::size_t hits() const    { return hits_; }
+  std::size_t misses() const  { return misses_; }
+
+private:
+  struct move_record {
+    unsigned                        last_used;
+    boost::shared_ptr<player_moves> moves;
+
+    move_record() : last_used(0) { }
+    move_record(unsigned last_used, boost::shared_ptr<player_moves> const& moves) :
+      last_used(last_used),
+      moves(moves)
+    { }
+  };
+
+  typedef boost::unordered_map<zobrist_hasher::hash_t, move_record> records_map;
+
+  records_map records_;
+  std::size_t moves_cached_;
+  std::size_t time_;
+  std::size_t hits_;
+  std::size_t misses_;
+
+  void gather(boost::shared_ptr<player_moves> const& moves, search_stack& stack);
+  void resize_records(std::size_t new_size);
+  bool records_compare(records_map::value_type const& lhs, records_map::value_type const& rhs);
 };
 
 //! A search tree is more than just a wrapper around a pointer to the tree's root: It cooperates with transposition and proof
@@ -220,12 +318,17 @@ private:
 //! and what heuristics are enabled. It assumes that during its lifetime it is the only thing that modifies the tree. It,
 //! however, does not take ownership of the tree.
 class search_tree : boost::noncopyable {
+  static std::size_t const DEFAULT_MOVES_CACHED_ = 32;
+
 public:
   search_tree(vertex* root, piece::color_t attacker, std::size_t size, zobrist_hasher const& hasher,
               zobrist_hasher::hash_t initial_hash, board const& initial_state) :
     attacker_(attacker),
     size_(size),
-    stack_(hasher, initial_hash, root, attacker, initial_state)
+    stack_(hasher, initial_hash, root, attacker, initial_state),
+    hasher_(&hasher),
+    killer_proofs_(0),
+    moves_(DEFAULT_MOVES_CACHED_)
   { }
 
   vertex const& current() const { return *stack_.path_top(); }
@@ -238,6 +341,9 @@ public:
   //! Make the parent of the current vertex the new current vertex.
   //! \throws std::logic_error if root is currently selected
   void select_parent() { stack_.pop(); }
+
+  //! See the parent vertex without selecting it. The behaviour is undefined if this tree is currently .at_root().
+  vertex const& parent() const { return **(stack_.path().rbegin() + 1); }
 
   //! Drop the current path and select root.
   void select_root() { while (!at_root()) select_parent(); }
@@ -253,6 +359,12 @@ public:
   //! \throws std::logic_error if the currently selected vertex is not a leaf.
   void expand();
 
+  //! Evaluate the currently-selected vertex.
+  void evaluate();
+
+  //! Evaluate every child of the currently-selected vertex.
+  void evaluate_children();
+
   //! Cut the current vertex's children. Children that constitute proof or disproof are not cut.
   void cut_children();
 
@@ -262,24 +374,45 @@ public:
   void use_trans_tbl(std::size_t size)        { trans_tbl_.reset(new transposition_table(size)); }
   void use_proof_tbl(std::size_t size)        { proof_tbl_.reset(new proof_table(size)); }
   void use_killers(std::size_t size_per_ply)  { killers_.reset(new killer_db(size_per_ply)); }
+  void cache_moves(std::size_t how_many)      { moves_.moves_cached(how_many); }
 
-  transposition_table const*  trans_tbl() const   { return trans_tbl_.get(); }
-  proof_table const*          proof_tbl() const   { return proof_tbl_.get(); }
-  killer_db const*            killers() const     { return killers_.get(); }
+  transposition_table const*  trans_tbl() const     { return trans_tbl_.get(); }
+  proof_table const*          proof_tbl() const     { return proof_tbl_.get(); }
+  killer_db const*            killers() const       { return killers_.get(); }
+  std::size_t                 cached_moves() const  { return moves_.moves_cached(); }
+
+  moves const& move_cache() const { return moves_; }
 
   std::size_t size() const { return size_; }
+  std::size_t killer_proofs() const { return killer_proofs_; }
 
 private:
-  piece::color_t  attacker_;
-  std::size_t     size_;
-  search_stack    stack_;
+  piece::color_t        attacker_;
+  std::size_t           size_;
+  search_stack          stack_;
+  zobrist_hasher const* hasher_;
+  std::size_t           killer_proofs_;
 
   boost::shared_ptr<transposition_table>  trans_tbl_;
   boost::shared_ptr<proof_table>          proof_tbl_;
   boost::shared_ptr<killer_db>            killers_;
+  moves                                   moves_;
 
   bool simulate();
-  void make_child(vertex& child, step const& step, vertex::e_type type);
+
+  //! Get the move root of the currently-selected vertex.
+  //! \param root Will be set to the move-root vertex.
+  //! \param root_hash Will be set to move-root's hash.
+  //! \param position Will be set to the move-root's position.
+  //! \param move_len Will be set to the number of steps in the move.
+  void find_move_root(vertex*& root, zobrist_hasher::hash_t& root_hash, board& position, std::size_t& move_len);
+
+  //! Assuming the current vertex has just been expanded, reduce the tree -- discard vertices that ultimately represent the
+  //! same move.
+  void reduce(boost::shared_ptr<player_moves> const& moves, std::size_t current_depth);
+
+  //! Store the current child to the moves table.
+  void store_move(boost::shared_ptr<player_moves> const& moves, std::size_t current_depth);
 };
 
 inline void select_best(search_tree& tree) {
@@ -300,35 +433,38 @@ public:
   }
 
   //! Make the algorithm use a transposition table.
-  void use_trans_tbl(std::size_t size) {
-    tree_.use_trans_tbl(size);
-  }
+  void use_trans_tbl(std::size_t size) { tree_.use_trans_tbl(size); }
 
   //! Get the transposition table, if any, used by this algorithm.
   //! \returns Pointer to the transposition table or null if no table is associated with this algorithm.
-  transposition_table const* get_trans_tbl() const {
-    return tree_.trans_tbl();
-  }
+  transposition_table const* get_trans_tbl() const { return tree_.trans_tbl(); }
 
   //! Make the algorithm use a proof table.
-  void use_proof_tbl(std::size_t size) {
-    tree_.use_proof_tbl(size);
-  }
+  void use_proof_tbl(std::size_t size) { tree_.use_proof_tbl(size); }
 
   //! Get the proof table, if any, used by this algorithm.
-  proof_table const* get_proof_tbl() const {
-    return tree_.proof_tbl();
-  }
+  proof_table const* get_proof_tbl() const { return tree_.proof_tbl(); }
   
   //! Change the number of killers stored for each ply.
-  void set_killer_count(std::size_t new_killer_count) {
-    tree_.use_killers(new_killer_count);
-  }
+  void killer_count(std::size_t new_killer_count) { tree_.use_killers(new_killer_count); }
 
   //! Get the max. number of killers stored for each ply.
-  std::size_t get_killer_count() const {
-    return tree_.killers()->plys_size();
-  }
+  std::size_t killer_count() const { return tree_.killers()->plys_size(); }
+
+  //! Change the number of moves stored in the move cache.
+  void move_cache_size(std::size_t new_size) { tree_.cache_moves(new_size); }
+
+  //! Get the number of moves stored in the move cache.
+  std::size_t move_cache_size() const { return tree_.cached_moves(); }
+
+  //! Get the number of hits into the move cache.
+  std::size_t move_cache_hits() const { return tree_.move_cache().hits(); }
+
+  //! Get the number of misses in the move cache.
+  std::size_t move_cache_misses() const { return tree_.move_cache().misses(); }
+
+  //! Get the number of vertices proved by a killer.
+  std::size_t killer_proofs() const { return tree_.killer_proofs(); }
 
   //! Get the total number of vertices currently held by this algorithm.
   std::size_t get_position_count() const {

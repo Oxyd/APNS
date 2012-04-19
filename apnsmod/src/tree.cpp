@@ -52,8 +52,8 @@ vertex::children_iterator vertex::add_child() {
   return boost::prior(children_end());
 }
 
-void vertex::remove_child(children_iterator child) {
-  children_.erase(child.base());
+vertex::children_iterator vertex::remove_child(children_iterator child) {
+  return children_.erase(child.base());
 }
 
 void vertex::reserve(std::size_t new_size) {

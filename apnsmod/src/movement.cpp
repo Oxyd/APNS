@@ -450,6 +450,18 @@ std::size_t step::steps_used() const {
       !boost::bind(&elementary_step::capture, _1));
 }
 
+bool step::moves_rabbit() const {
+  std::string::size_type i = 0;
+  while (i < representation_.get().length()) {
+    if (representation_.get()[i] == 'r' || representation_.get()[i] == 'R')
+      return true;
+    else
+      i += 5;
+  }
+
+  return false;
+}
+
 step step::make_push_pull(board const& board, elementary_step first_step, elementary_step second_step) {
   elementary_step_seq sequence;
   piece const first_piece = *board.get(first_step.from());  // Assumed to be non-empty.
@@ -498,49 +510,116 @@ e_step_kind step_kind(step const& step, piece::color_t player, board const& boar
   }
 }
 
-void apply(step const& step, board& board) {
-  for (apns::step::el_steps_iterator es = step.step_sequence_begin();
-      es != step.step_sequence_end(); ++es) {
-    boost::optional<piece> maybe_what = board.get(es->from());
-    if (maybe_what) {
-      piece const what = *maybe_what;
+namespace {
 
-      board.remove(es->from());
+//! Attempt to apply an elementary step to the board. If possible, returns true; otherwise returns false and the board is left
+//! unmodified.
+bool apply_elementary(elementary_step const& es, board& board) {
+  boost::optional<piece> maybe_what = board.get(es.from());
+  if (maybe_what) {
+    piece const what = *maybe_what;
+    board.remove(es.from());
 
-      if (!es->capture()) {
-        position const new_position = make_adjacent(es->from(), es->where());
-        board.put(new_position, what);
+    if (!es.capture()) {
+      position const target_pos = make_adjacent(es.from(), es.where());
+      if (!board.get(target_pos)) {
+        board.put(target_pos, what);
       }
-    } else {
-      throw std::logic_error("apply: given step doesn't correspond to given board");
+      else {
+        // Target position is not empty -- can't apply. But we've already removed a piece -- we need to put it back.
+        board.put(es.from(), what);
+        return false;
+      }
     }
+
+    return true;
+  } else {
+    return false;
   }
 }
 
-void unapply(step const& step, board& board) {
-  // Traverse the sequence of elementary steps *backwards*.
-  for (apns::step::reverse_el_steps_iterator es = step.step_sequence_rbegin();
-      es != step.step_sequence_rend(); ++es) {
-    position const original_position = es->from();
+//! Attempt to undo the application of an elementary step to the board. If possible, returns true; otherwise returns false and
+//! the board is left unmodified.
+bool unapply_elementary(elementary_step const& es, board& board) {
+  position const original_pos = es.from();
 
-    if (!es->capture()) {
-      assert(adjacent_valid(original_position, es->where()));
-      position const destination = make_adjacent(original_position, es->where());
-      boost::optional<piece> maybe_what = board.get(destination);
+  if (!es.capture()) {
+    assert(adjacent_valid(original_pos, es.where()));
+    position const destination = make_adjacent(original_pos, es.where());
 
-      if (maybe_what) {
-        piece const what = *maybe_what;
-        board.remove(destination);
-        board.put(original_position, what);
+    boost::optional<piece> maybe_what = board.get(destination);
+    if (maybe_what) {
+      piece const what = *maybe_what;
+      board.remove(destination);
+
+      if (!board.get(original_pos)) {
+        board.put(original_pos, what);
       } else {
-        throw std::logic_error("unapply: given step doesn't correspond to given board");
+        // Unapply failed -- revert.
+        board.put(destination, what);
+        return false;
       }
+      return true;
     } else {
-      assert(es->what());
-      piece const what = *es->what();
-      board.put(original_position, what);
+      return false;
+    }
+  } else if (!board.get(original_pos)) {
+    assert(es.what());
+    piece const what = *es.what();
+    board.put(original_pos, what);
+    return true;
+  } else {
+    return false;
+  }
+}
+
+}  // namespace apns::<anonymous>
+
+void apply(step const& step, board& board) {
+  if (!try_apply(step, board))
+    throw std::logic_error("apply: Given step doesn't correspond to the given board");
+}
+
+bool try_apply(step const& step, board& board) {
+  for (apns::step::el_steps_iterator es = step.step_sequence_begin(); es != step.step_sequence_end(); ++es) {
+    if (!apply_elementary(*es, board)) {
+      // The application has failed. We now need to roll back everything that's been done.
+      if (es != step.step_sequence_begin()) {
+        do {
+          --es;
+          unapply_elementary(*es, board);
+        } while (es != step.step_sequence_begin());
+      }
+
+      return false;
     }
   }
+
+  return true;
+}
+
+void unapply(step const& step, board& board) {
+  if (!try_unapply(step, board))
+    throw std::logic_error("unapply: given step doesn't correspond to given board");
+}
+
+bool try_unapply(step const& step, board& board) {
+  for (apns::step::reverse_el_steps_iterator es = step.step_sequence_rbegin(); es != step.step_sequence_rend(); ++es) {
+    if (!unapply_elementary(*es, board)) {
+      // It's failed. That means we need to turn back the board to its original state.
+
+      if (es != step.step_sequence_rbegin()) {
+        do {
+          --es;
+          apply_elementary(*es, board);
+        } while (es != step.step_sequence_rbegin());
+      }
+
+      return false;
+    }
+  }
+
+  return true;
 }
 
 bool frozen(position position, board const& board) {

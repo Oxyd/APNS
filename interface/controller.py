@@ -143,6 +143,7 @@ class SearchParameters:
     self.transTblSize       = None
     self.proofTblSize       = None
     self.killersCount       = 2
+    self.moveCacheSize      = 32
 
 
 class SearchProgress:
@@ -160,6 +161,9 @@ class SearchProgress:
     self.proofTblSize = None
     self.proofTblHits = None
     self.proofTblMisses = None
+    self.killerProofs = None
+    self.moveCacheHits = None
+    self.moveCacheMisses = None
 
 MB = 1024 * 1024
 
@@ -264,7 +268,8 @@ class Controller(object):
     if self.searchParameters.proofTblSize > 0 and (
         self._search.proofTable is None or self._search.proofTable.size != self.searchParameters.proofTblSize):
       self._search.useProofTbl(numElementsFromMbSize(self.searchParameters.proofTblSize, apnsmod.ProofTable))
-
+    
+    self._search.moveCacheSize = self.searchParameters.moveCacheSize
     self._search.killerCount = self.searchParameters.killersCount
 
     self._searchStart = time.clock()
@@ -332,6 +337,10 @@ class Controller(object):
       progress.proofTblSize = pt.memoryUsage
       progress.proofTblHits = pt.hits
       progress.proofTblMisses = pt.misses
+
+    progress.killerProofs = self._search.killerProofs
+    progress.moveCacheHits = self._search.moveCacheHits
+    progress.moveCacheMisses = self._search.moveCacheMisses
 
     return progress
 

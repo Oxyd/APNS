@@ -13,7 +13,9 @@ typedef boost::multi_array_types::index_range range;
 apns::zobrist_hasher::zobrist_hasher() 
   : codes_(boost::extents[piece::type_count][piece::color_count][board::ROWS][board::COLUMNS])
 {
-  boost::random::mt19937 prng;
+  boost::random::mt19937::result_type const SEED = 36992299;
+
+  boost::random::mt19937 prng(SEED);
   boost::random::uniform_int_distribution<hash_t> rand_distrib;
 
   for (types_array_t::const_iterator type = TYPES.begin(); type != TYPES.end(); ++type)

@@ -234,9 +234,13 @@ public:
   //! used steps.
   std::size_t steps_used() const;
 
+  //! Does this step involve rabbits in any way?
+  bool moves_rabbit() const;
+
   std::string to_string() const;
 
   void swap(step& other) { representation_.swap(other.representation_); }
+
 
 private:
   typedef boost::flyweight<std::string, boost::flyweights::no_locking> representation_t;
@@ -336,6 +340,10 @@ e_step_kind step_kind(step const& step, piece::color_t player, board const& boar
  */
 void apply(step const& step, board& board);
 
+//! Tro to apply the step to the given board. If the step is not applicable, returns false and doesn't modify the board.
+//! Returns true if the step was applied successfuly.
+bool try_apply(step const& step, board& board);
+
 /**
  * Undo the application of a step on a board.
  *
@@ -346,6 +354,10 @@ void apply(step const& step, board& board);
  * \param board The board to be reverted.
  */
 void unapply(step const& step, board& board);
+
+//! Try to unapply the step from the board. If successful, returns true. If the step can't be undone, returns false and leaves
+//! the original board unmodified.
+bool try_unapply(step const& step, board& board);
 
 //! Is given piece frozen on the given board?
 bool frozen(position position, board const& board);

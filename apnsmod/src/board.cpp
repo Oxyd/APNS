@@ -137,19 +137,6 @@ piece::color_t color_from_int(int value) {
   }
 }
 
-position::position(row_t row, col_t column)
-  : row_(row)
-  , column_(column)
-{
-  if (row < board::MIN_ROW || row > board::MAX_ROW
-      || column < board::MIN_COLUMN || column > board::MAX_COLUMN) {
-    std::ostringstream message;
-    message << "position::position: attempted to create an invalid position: "
-            << row << column;
-    throw std::domain_error(message.str());
-  }
-}
-
 position::position(row_t row, std::string const& col)
   : row_(row)
 {
@@ -190,21 +177,6 @@ bool operator != (position lhs, position rhs) {
 bool operator < (position lhs, position rhs) {
   return lhs.row() * board::COLUMNS + lhs.column() - board::MIN_COLUMN
          < rhs.row() * board::COLUMNS + rhs.column() - board::MIN_COLUMN;
-}
-
-position make_adjacent(position original, direction direction) {
-  int row = original.row();
-  char column = original.column();
-
-  switch (direction) {
-    case north:   ++row;    break;
-    case south:   --row;    break;
-    case east:    ++column; break;
-    case west:    --column; break;
-    default:      assert(!"Can't reach this.");
-  }
-
-  return position(row, column);  // Will throw if the position is invalid.
 }
 
 bool adjacent_valid(position pos, direction direction) {
@@ -252,6 +224,13 @@ piece::type_t type_from_int(int value) {
     throw std::domain_error("Invalid integer representation of piece::type_t was given");
   }
 }
+
+position::row_t const board::ROWS;
+position::col_t const board::COLUMNS;
+position::row_t const board::MIN_ROW;
+position::row_t const board::MAX_ROW;
+position::col_t const board::MIN_COLUMN;
+position::col_t const board::MAX_COLUMN;
 
 board::pieces_iterator::pieces_iterator()
   : board::pieces_iterator::iterator_adaptor_(base_type())
@@ -337,14 +316,6 @@ void board::remove(position where) {
     throw std::logic_error("board: Attempted to remove a piece from a vacant position");
 }
 
-boost::optional<piece> board::get(position from) const {
-  char const p = pieces_[linear_from_board(from.row(), from.column())];
-  if (p != ' ')
-    return piece_from_letter(p);
-  else
-    return boost::none;
-}
-
 board::pieces_iterator board::pieces_begin() const {
   pieces_iterator it(pieces_.begin(), 0);
   return it;
@@ -370,10 +341,12 @@ std::string string_from_board(board const& board) {
     if (pos_piece != board.pieces_begin())
       output << ' ';
 
-    position const& pos = pos_piece->first;
-    piece const& piece = pos_piece->second;
+    position const pos  = pos_piece->first;
+    piece const piece   = pos_piece->second;
 
-    output << pos.row() << pos.column() << letter_from_piece(piece);
+    output << static_cast<unsigned>(pos.row())
+           << static_cast<char>(pos.column())
+           << letter_from_piece(piece);
   }
 
   return output.str();

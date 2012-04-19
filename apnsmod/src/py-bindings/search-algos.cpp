@@ -49,8 +49,22 @@ void export_algo(char const* name, char const* description) {
                   &Algo::get_position_count,
                   "Total number of vertices currently held by this algorithm")
     .add_property("killerCount",
-                  &Algo::get_killer_count, &Algo::set_killer_count,
+                  static_cast<std::size_t (Algo::*)() const>(&Algo::killer_count),
+                  static_cast<void (Algo::*)(std::size_t)>(&Algo::killer_count),
                   "Maximal number of killers per each ply.")
+    .add_property("moveCacheSize",
+                  static_cast<std::size_t (Algo::*)() const>(&Algo::move_cache_size),
+                  static_cast<void (Algo::*)(std::size_t)>(&Algo::move_cache_size),
+                  "Size of the moves cache.")
+    .add_property("moveCacheHits",
+                  &Algo::move_cache_hits,
+                  "Number of hits in the move cache.")
+    .add_property("moveCacheMisses",
+                  &Algo::move_cache_misses,
+                  "Number of misses in the move cache.")
+    .add_property("killerProofs",
+                  &Algo::killer_proofs,
+                  "Number of vertices proved by killers.")
     ;
 }
 

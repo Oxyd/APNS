@@ -83,7 +83,8 @@ public:
   children_iterator add_child();
 
   //! Remove child specified by an iterator into this vertex. May invalidate all existing iterators to children of this vertex.
-  void remove_child(children_iterator child);
+  //! \returns Iterator to the child following the removed one.
+  children_iterator remove_child(children_iterator child);
   
   children_iterator       children_begin()        { return children_.begin(); }
   children_iterator       children_end()          { return children_.end(); }

@@ -32,7 +32,7 @@ void export_table(char const* name, char const* description) {
     .add_property("memoryUsage",
         &Table::memory_usage,
         "Return the number of bytes used by the transposition table")
-    .add_property("size", &apns::transposition_table::table_size,
+    .add_property("size", &Table::table_size,
                   "Maximal number of elements storeable in this table.")
     .add_property("elements",
         &Table::elements,

@@ -305,6 +305,51 @@ TEST(search_tree, cut_test) {
   EXPECT_EQ(0, root.children_count());
 }
 
+TEST(reducer, move_apply_test) {
+  board expected;
+  boost::shared_ptr<game> g = make_game(expected);
+  vertex* first = &g->root;
+  vertex* second = &*first->children_begin();
+  vertex* third = &*second->children_begin();
+  vertex* fourth = &*third->children_begin();
+
+  move_path p = {{ first, second, third, fourth }};
+  board b = g->initial_state;
+  bool success = try_apply(p, b);
+  ASSERT_TRUE(success);
+  EXPECT_EQ(expected, b);
+
+  unapply(p, b);
+  EXPECT_EQ(g->initial_state, b);
+}
+
+TEST(reducer, depth_test) {
+  boost::shared_ptr<game> g = make_game();
+
+  vertex* first = &g->root;
+  vertex* second = &*first->children_begin();
+  vertex* third = &*second->children_begin();
+  vertex* fourth = &*third->children_begin();
+
+  move_path a = {{ first }};
+  EXPECT_EQ(1, move_depth(a));
+  EXPECT_EQ(first, *terminal(a));
+
+  move_path b = {{ first, second }};
+  EXPECT_EQ(2, move_depth(b));
+  EXPECT_EQ(second, *terminal(b));
+
+  move_path c = {{ first, second, third }};
+  EXPECT_EQ(3, move_depth(c));
+  EXPECT_EQ(third, *terminal(c));
+
+  move_path d = {{ first, second, third, fourth }};
+  EXPECT_EQ(4, move_depth(d));
+  EXPECT_EQ(fourth, *terminal(d));
+}
+
+
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
