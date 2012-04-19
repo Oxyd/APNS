@@ -341,7 +341,4 @@ class Controller(object):
     return progress
 
   def _algoType(self, algo):
-    return {
-        'pns':    apnsmod.ProofNumberSearch,
-        'dfpns':  apnsmod.DepthFirstPNS
-        }[algo]
+    return apnsmod.algos[algo][0]

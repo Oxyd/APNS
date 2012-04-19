@@ -543,6 +543,22 @@ private:
                        boost::optional<vertex const&> second_best, limits_t parent_limits);
 };
 
+//! A virtual algorithm -- to allow defining algos in Python.
+struct virtual_algo : public search_algo<virtual_algo> {
+  explicit virtual_algo(boost::shared_ptr<apns::game> const& game, std::size_t position_count = 1) :
+    search_algo(game, position_count)
+  { }
+
+  virtual ~virtual_algo() { }
+
+  void do_iterate() {
+    really_do_iterate();
+  }
+
+  //! This is the function to be overriden.
+  virtual void really_do_iterate() = 0;
+};
+
 } // namespace apns
 
 #endif

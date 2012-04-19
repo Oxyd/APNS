@@ -127,6 +127,7 @@ void export_tree() {
           static_cast<apns::vertex::children_iterator (apns::vertex::*)()>(&apns::vertex::children_begin),
           static_cast<apns::vertex::children_iterator (apns::vertex::*)()>(&apns::vertex::children_end)))
       .add_property("childrenCount", &apns::vertex::children_count)
+      .add_property("leaf", &apns::vertex::leaf)
       
       .def("addChild", &vertex_add_child,
            return_internal_reference<>(),

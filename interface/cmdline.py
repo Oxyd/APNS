@@ -57,7 +57,8 @@ def main():
   parser.add_argument('-d', '--destination', type=str, required=True,
                       help='Name of the output file')
   parser.add_argument('-a', '--algorithm', type=str, default='pns', metavar='algorithm', dest='algo',
-                      help='Algorithm to use. Valid values are "pns" and "dfpns"')
+                      help='Algorithm to use. Valid values are {0}'.format(
+                          ', '.join(apnsmod.algos.keys()[:-1]) + ', and ' + apnsmod.algos.keys()[-1]))
   parser.add_argument('-t', '--time', type=int, default=60, metavar='time limit', dest='timeLimit',
                       help='Maximum running time of the algorithm, excluding any I/O operations, in seconds')
   parser.add_argument('-n', '--positions', type=int, default=0, metavar='position limit', dest='posLimit',
@@ -69,8 +70,8 @@ def main():
                       'at all')
   parser.add_argument('-o', '--proof-tbl-size', type=int, default=32, metavar='proof tbl size', dest='proofTblSize',
                       help='Size of the proof table to use, in megabytes. If set to 0, don\'t use proof table')
-  parser.add_argument('-l', '--killer-count', type=int, default=2, metavar='number of killers', dest='killerCount',
-                      help='How many killers should be kept for each level')
+  parser.add_argument('-M', '--move-cache-size', type=int, default=32, metavar='move cache size', dest='moveCacheSize',
+                      help='Size of the move cache')
   parser.add_argument('-q', '--quiet', const=True, default=False, action='store_const', dest='quiet',
                       help='Don\'t print any messages to standard output.')
   parser.add_argument('-Q', '--no-progress', const=True, default=False, action='store_const', dest='noProgress',
@@ -85,9 +86,8 @@ def main():
     print >> sys.stderr, 'Error: Initial position and previous search can\'t be specified at the same time.'
     raise SystemExit(1)
 
-  ALGOS = ('pns', 'dfpns')
-  if args.algo not in ALGOS:
-    print >> sys.stderr, 'Error: Algorithm must be one of', ', '.join(ALGOS)
+  if args.algo not in apnsmod.algos:
+    print >> sys.stderr, 'Error: Algorithm must be one of', ', '.join(apnsmod.algos)
     raise SystemExit(1)
 
   def checkNum(value, name):
@@ -97,7 +97,7 @@ def main():
 
   checkNum(args.transTblSize, 'Size of transposition table')
   checkNum(args.proofTblSize, 'Size of proof table')
-  checkNum(args.killerCount, 'Number of killers')
+  checkNum(args.moveCacheSize, 'Size of move cache')
   checkNum(args.timeLimit, 'Time limit')
   checkNum(args.posLimit, 'Position limit')
   checkNum(args.memLimit, 'Memory limit')
@@ -109,7 +109,7 @@ def main():
   params.memoryLimit = args.memLimit
   params.transTblSize = args.transTblSize
   params.proofTblSize = args.proofTblSize
-  params.killersCount = args.killerCount
+  params.moveCacheSize = args.moveCacheSize
 
   controller = Controller()
   controller.searchParameters = params
@@ -179,15 +179,19 @@ def main():
 
     if progress.transTblSize:
       show('  -- Transposition table:')
-      show('    -- Size: {0:.2f} MB'.format(float(progress.transTblSize) / MB))
-      show('    -- Hits: {0}'.format(progress.transTblHits))
+      show('    -- Size:   {0:.2f} MB'.format(float(progress.transTblSize) / MB))
+      show('    -- Hits:   {0}'.format(progress.transTblHits))
       show('    -- Misses: {0}'.format(progress.transTblMisses))
 
     if progress.proofTblSize:
       show('  -- Proof table:')
-      show('    -- Size: {0:.2f} MB'.format(float(progress.proofTblSize) / MB))
-      show('    -- Hits: {0}'.format(progress.proofTblHits))
+      show('    -- Size:   {0:.2f} MB'.format(float(progress.proofTblSize) / MB))
+      show('    -- Hits:   {0}'.format(progress.proofTblHits))
       show('    -- Misses: {0}'.format(progress.proofTblMisses))
+    
+    show('  -- Move cache:')
+    show('    -- Hits:   {0}'.format(progress.moveCacheHits))
+    show('    -- Misses: {0}'.format(progress.moveCacheMisses))
 
   controller.searchProgressCallbacks.add(printProgress)
   show('Starting search. Pres Control-C to stop the search at any time.')

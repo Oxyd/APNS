@@ -163,7 +163,11 @@ class MainWindowController(object):
         self._mainWindowDsply.enableSearch()
 
     elif command == MainWindow.Command.runSearch:
-      dlg = RunSearchDialog(self._mainWindowDsply.window)
+      algoList = []
+      for algo in apnsmod.algos:
+        algoList.append((algo, apnsmod.algos[algo][1]))
+      
+      dlg = RunSearchDialog(self._mainWindowDsply.window, algoList)
       runSearchCtrl = RunSearchController(dlg, self._searchPreferences)
       (doRun, newPrefs) = runSearchCtrl.run()
 
@@ -841,7 +845,7 @@ class RunSearchDialog(Observable):
   class Command:
     timeLimitCheck, positionLimitCheck, memLimitCheck, gcCheck, start = range(5)
 
-  def __init__(self, parent):
+  def __init__(self, parent, algos):
     '''Create the dialog.'''
 
     Observable.__init__(self)
@@ -851,13 +855,14 @@ class RunSearchDialog(Observable):
     infoLabel = ttk.Label(self._dialog.content, text='Enter parameters of the search:')
 
     algoFrame = ttk.Labelframe(self._dialog.content, text='Algorithm:', padding=5)
-    self._algoVar = Tkinter.StringVar(value='pns')
-    pnsRadio = ttk.Radiobutton(algoFrame, text='Proof-Number Search', variable=self._algoVar, value='pns')
-    dfPnRadio = ttk.Radiobutton(algoFrame, text='Depth-First Proof-Number Search', variable=self._algoVar, value='dfpns')
-
-    pnsRadio.grid(row=0, column=0, sticky='WE')
-    dfPnRadio.grid(row=1, column=0, sticky='WE')
-
+    
+    self._algoVar = Tkinter.StringVar(value=algos[0][0])
+    algoRadios = []
+    for row, (algo, description) in enumerate(algos):
+      radio = ttk.Radiobutton(algoFrame, text=description, variable=self._algoVar, value=algo)
+      radio.grid(row=row, column=0, sticky='WE')
+      algoRadios.append(radio)
+    
     limitsFrame = ttk.Labelframe(self._dialog.content, text='Search limits:', padding=5)
 
     self._timeLimitCheckVar = Tkinter.StringVar(value='0')
@@ -1076,7 +1081,7 @@ class RunSearchController(object):
         return default
 
     self._runSearchDlg.addObserver(self)
-    self._runSearchDlg.algo = get('algo', 'pns')
+    self._runSearchDlg.algo = get('algo', apnsmod.algos.keys()[0])
     self._runSearchDlg.timeLimit = get('timeLimit', 60)
     self._runSearchDlg.timeLimitCheck = get('timeLimitCheck', True)
     self._runSearchDlg.positionLimit = get('positionLimit', 1000000)
