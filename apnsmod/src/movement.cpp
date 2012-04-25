@@ -18,11 +18,13 @@ bool stronger(apns::piece a, apns::piece b) {
 /*
  * Is there a piece of the given colour adjacent to the specified position?
  *
- * \param where Neighbourhood of this position will be considered. Position referred to by where may be empty.
+ * \param where Neighbourhood of this position will be considered. Position 
+ *   referred to by where may be empty.
  * \param color What color to search for.
  * \param board Board with the pieces on it.
  */
-bool colour_adjacent(apns::position where, apns::piece::color_t color, apns::board const& board) {
+bool colour_adjacent(apns::position where, apns::piece::color_t color,
+                     apns::board const& board) {
   using namespace apns;
   return std::find_if(
       adjacent_pieces_begin(board, where), adjacent_pieces_end(),
@@ -48,7 +50,8 @@ bool friendly_adjacent(apns::position where, apns::board const& board) {
  * \param where Where is the given piece. This position must be nonempty.
  * \param board Board with the pieces.
  */
-bool stronger_opponent_adjacent(apns::position where, apns::board const& board) {
+bool stronger_opponent_adjacent(apns::position where, 
+                                apns::board const& board) {
   using namespace apns;
   piece const what = *board.get(where);  // Assuming the position is non-empty.
 
@@ -62,16 +65,21 @@ bool stronger_opponent_adjacent(apns::position where, apns::board const& board) 
 /**
  * Decide whether there would be a capture if a certain move were performed.
  *
- * The hypothetical move is #what moving from #old_position to #new_position. #old_position is thus assumed to be empty
- * by this function, while #new_position is assumed to contain #what. (It doesn't matter if this position actually contains
- * any other piece on the board.)
+ * The hypothetical move is #what moving from #old_position to #new_position. 
+ * #old_position is thus assumed to be empty by this function, while 
+ * #new_position is assumed to contain #what. (It doesn't matter if this 
+ * position actually contains any other piece on the board.)
  *
  * \return Would #what be captured after such move?
  */
-bool would_be_capture(apns::piece what, apns::position old_position, apns::position new_position, apns::board const& board) {
+bool would_be_capture(
+  apns::piece what, apns::position old_position, apns::position new_position, 
+  apns::board const& board
+) {
   using namespace apns;
   if (trap(new_position)) {
-    for (neighbourhood_iter neighbour = neighbourhood_begin(new_position); neighbour != neighbourhood_end(); ++neighbour) {
+    for (neighbourhood_iter neighbour = neighbourhood_begin(new_position);
+         neighbour != neighbourhood_end(); ++neighbour) {
       // Is there a friendly piece adjacent?
       if (*neighbour != old_position    // Old position is assumed to be empty.
           && !empty(*neighbour, board)
@@ -89,18 +97,23 @@ bool would_be_capture(apns::piece what, apns::position old_position, apns::posit
 /**
  * Decide whether there would be a capture if a certain move were performed.
  *
- * The hypothetical move is #what moving from position #from to position #where. The question now is whether
- * the piece standing on #pos would be captured after such move.
+ * The hypothetical move is #what moving from position #from to position 
+ * #where. The question now is whether the piece standing on #pos would be 
+ * captured after such move.
  *
  * \return Would piece from #pos be captured?
  */
-bool would_be_capture(apns::position pos, apns::piece what, apns::position from, apns::position where, apns::board const& board) {
+bool would_be_capture(
+  apns::position pos, apns::piece what, apns::position from,
+  apns::position where, apns::board const& board
+) {
   using namespace apns;
   if (!empty(pos, board)
       && trap(pos)) {
     piece const target = *board.get(pos);
 
-    for (neighbourhood_iter neighbour = neighbourhood_begin(pos); neighbour != neighbourhood_end(); ++neighbour) {
+    for (neighbourhood_iter neighbour = neighbourhood_begin(pos);
+         neighbour != neighbourhood_end(); ++neighbour) {
       if (*neighbour != from &&
           *neighbour != where &&
           !empty(*neighbour, board) &&
@@ -123,8 +136,9 @@ typedef std::vector<apns::elementary_step> elementary_steps_cont;
 /**
  * Check for captures and insert them into a sequence of elementary steps.
  *
- * Assuming that the piece #what has moved from position #from to position #destination, this function calculates
- * all captures that would have resulted from this move and inserts them into #sequence.
+ * Assuming that the piece #what has moved from position #from to position 
+ * #destination, this function calculates all captures that would have resulted 
+ * from this move and inserts them into #sequence.
  *
  * \param what What piece has moved.
  * \param from From where it has moved.
@@ -132,15 +146,18 @@ typedef std::vector<apns::elementary_step> elementary_steps_cont;
  * \param board Contains the pieces.
  * \param sequence All detected captures will be inserted here.
  */
-void check_for_captures(apns::piece what, apns::position from, apns::position destination,
-                        apns::board const& board, elementary_steps_cont& sequence) {
+void check_for_captures(
+  apns::piece what, apns::position from, apns::position destination,
+  apns::board const& board, elementary_steps_cont& sequence
+) {
   using namespace apns;
   if (would_be_capture(what, from, destination, board)) {
     elementary_step capture = elementary_step::make_capture(destination);
     capture.set_what(what);
     sequence.insert(sequence.end(), capture);
   } else {
-    for (neighbourhood_iter neighbour = neighbourhood_begin(from); neighbour != neighbourhood_end(); ++neighbour) {
+    for (neighbourhood_iter neighbour = neighbourhood_begin(from);
+         neighbour != neighbourhood_end(); ++neighbour) {
       if (would_be_capture(*neighbour, what, from, destination, board)) {
         elementary_step capture = elementary_step::make_capture(*neighbour);
         capture.set_what(*board.get(*neighbour));
@@ -164,11 +181,15 @@ apns::direction inverse_dir(apns::direction dir) {
   return north;
 }
 
-//! Convert a string description of an elementary step into a real elementary step, or nothing if the description isn't valid.
-boost::optional<apns::elementary_step> elementary_step_from_string(std::string const& string) {
+//! Convert a string description of an elementary step into a real elementary 
+//! step, or nothing if the description isn't valid.
+boost::optional<apns::elementary_step> 
+elementary_step_from_string(std::string const& string) {
   using namespace apns;
 
-  if (string.length() == 4) {  // Each elementary step is exactly four characters long.
+  if (string.length() == 4) {  // Each elementary step is exactly four 
+                               // characters long.
+
     boost::optional<piece> maybe_piece = piece_from_letter(string[0]);
     position::col_t const column = string[1];
     position::row_t const row = string[2] - '0';
@@ -225,7 +246,8 @@ std::size_t const DIR_INDEX = 3;
 namespace apns {
 
 position elementary_step::from() const {
-  return position(representation_[ROW_INDEX] - '0', representation_[COLUMN_INDEX]);
+  return position(representation_[ROW_INDEX] - '0', 
+                  representation_[COLUMN_INDEX]);
 }
 
 direction elementary_step::where() const {
@@ -257,15 +279,18 @@ bool elementary_step::equal(elementary_step const& other) const {
                     other.representation_.begin());
 }
 
-elementary_step elementary_step::displacement(position from, direction where, boost::optional<piece> what) {
+elementary_step elementary_step::displacement(position from, direction where,
+                                              boost::optional<piece> what) {
   return elementary_step(from, where, what);
 }
 
-elementary_step elementary_step::make_capture(position from, boost::optional<piece> what) {
+elementary_step elementary_step::make_capture(position from,
+                                              boost::optional<piece> what) {
   return elementary_step(from, what);
 }
 
-elementary_step::elementary_step(position from, direction where, boost::optional<piece> what) {
+elementary_step::elementary_step(position from, direction where,
+                                 boost::optional<piece> what) {
   representation_[ROW_INDEX] = '0' + from.row();
   representation_[COLUMN_INDEX] = from.column();
   representation_[DIR_INDEX] = letter_from_direction(where);
@@ -287,7 +312,8 @@ bool operator != (elementary_step const& lhs, elementary_step const& rhs) {
   return !operator == (lhs, rhs);
 }
 
-step_holder step::validate_ordinary_step(board const& board, elementary_step step) {
+step_holder step::validate_ordinary_step(board const& board, 
+                                         elementary_step step) {
   position const from    = step.from();
   direction const where  = step.where();
 
@@ -296,7 +322,7 @@ step_holder step::validate_ordinary_step(board const& board, elementary_step ste
       && !frozen(from, board)
       && apns::empty(make_adjacent(from, where), board)) {
     position const destination  = make_adjacent(from, where);
-    piece const what            = *board.get(from);  // Guaranteed to be non-empty by the if above.
+    piece const what            = *board.get(from);
 
     if (what.type() == piece::rabbit
         && ((what.color() == piece::gold && where == south)
@@ -322,12 +348,20 @@ step_holder step::validate_push(board const& board,
   if (adjacent(first_step.from(), second_step.from())
       && !apns::empty(first_step.from(), board)
       && !apns::empty(second_step.from(), board)
-      && stronger(*board.get(second_step.from()), *board.get(first_step.from()))
-      && board.get(second_step.from())->color() == opponent_color(board.get(first_step.from())->color())
+      && stronger(
+           *board.get(second_step.from()), 
+           *board.get(first_step.from())
+         )
+      && board.get(second_step.from())->color() ==
+           opponent_color(board.get(first_step.from())->color())
       && adjacent_valid(first_step.from(), first_step.where())
       && adjacent_valid(second_step.from(), second_step.where())
-      && make_adjacent(second_step.from(), second_step.where()) == first_step.from()
-      && apns::empty(make_adjacent(first_step.from(), first_step.where()), board)
+      && make_adjacent(second_step.from(), second_step.where()) == 
+           first_step.from()
+      && apns::empty(
+           make_adjacent(first_step.from(), first_step.where()), 
+           board
+         )
       && !frozen(second_step.from(), board)) {
     return make_push_pull(board, first_step, second_step);
   } else {
@@ -340,12 +374,20 @@ step_holder step::validate_pull(board const& board,
   if (adjacent(first_step.from(), second_step.from())
       && !apns::empty(first_step.from(), board)
       && !apns::empty(second_step.from(), board)
-      && stronger(*board.get(first_step.from()), *board.get(second_step.from()))
-      && board.get(first_step.from())->color() == opponent_color(board.get(second_step.from())->color())
+      && stronger(
+           *board.get(first_step.from()), 
+           *board.get(second_step.from())
+         )
+      && board.get(first_step.from())->color() ==
+           opponent_color(board.get(second_step.from())->color())
       && adjacent_valid(first_step.from(), first_step.where())
       && adjacent_valid(second_step.from(), second_step.where())
-      && make_adjacent(second_step.from(), second_step.where()) == first_step.from()
-      && apns::empty(make_adjacent(first_step.from(), first_step.where()), board)
+      && make_adjacent(second_step.from(), second_step.where()) == 
+           first_step.from()
+      && apns::empty(
+           make_adjacent(first_step.from(), first_step.where()), 
+           board
+         )
       && !frozen(first_step.from(), board)
       ) {
     return make_push_pull(board, first_step, second_step);
@@ -355,15 +397,18 @@ step_holder step::validate_pull(board const& board,
 }
 
 step_holder step::from_string(std::string const& string) {
-  // Split the input up into elementary steps separated by spaces. Convert each elementary step separately.
+  // Split the input up into elementary steps separated by spaces. Convert each 
+  // elementary step separately.
 
-  std::size_t const MAX_ELEMENTARY_STEPS_POSSIBLE = 4;  // At most four elementary steps per one step are possible.
+  std::size_t const MAX_ELEMENTARY_STEPS_POSSIBLE = 4;
 
   elementary_step_seq elementary_steps;
   std::string el_step_description;
   std::istringstream input(string);
   while (std::getline(input, el_step_description, ' ')) {
-    boost::optional<elementary_step> el_step = elementary_step_from_string(el_step_description);
+    boost::optional<elementary_step> el_step = 
+      elementary_step_from_string(el_step_description);
+
     if (el_step) {
       elementary_steps.insert(elementary_steps.end(), *el_step);
     } else {
@@ -379,11 +424,14 @@ step_holder step::from_string(std::string const& string) {
 }
 
 bool step::revalidate(board const& board, piece::color_t player) const {
-  el_steps_iterator second_noncapture = std::find_if(boost::next(step_sequence_begin()), step_sequence_end(),
-                                                     !boost::bind(&elementary_step::capture, _1));
+  el_steps_iterator second_noncapture = std::find_if(
+    boost::next(step_sequence_begin()), step_sequence_end(),
+    !boost::bind(&elementary_step::capture, _1)
+  );
 
   step_holder new_step;
-  if (board.get(step_sequence_begin()->from())) {  // If first step points to an occupied position on the board.
+
+  if (board.get(step_sequence_begin()->from())) {  
     switch (step_kind(*this, player, board)) {
     case ordinary: {
       new_step = step::validate_ordinary_step(board, *step_sequence_begin());
@@ -398,20 +446,29 @@ bool step::revalidate(board const& board, piece::color_t player) const {
 
     case push: {
       assert(second_noncapture != step_sequence_end());
-      new_step = step::validate_push(board, *step_sequence_begin(), *second_noncapture);
+      new_step = step::validate_push(board, *step_sequence_begin(), 
+                                     *second_noncapture);
     } break;
 
     case pull: {
       assert(second_noncapture != step_sequence_end());
-      new_step = step::validate_pull(board, *step_sequence_begin(), *second_noncapture);
+      new_step = step::validate_pull(board, *step_sequence_begin(), 
+                                     *second_noncapture);
     } break;
     }
 
     if (new_step) {
-      std::size_t const old_size = std::distance(step_sequence_begin(), step_sequence_end());
-      std::size_t const new_size = std::distance(new_step->step_sequence_begin(), new_step->step_sequence_end());
+      std::size_t const old_size = 
+        std::distance(step_sequence_begin(), step_sequence_end());
+      std::size_t const new_size =
+        std::distance(new_step->step_sequence_begin(),
+                      new_step->step_sequence_end());
 
-      return old_size == new_size && std::equal(step_sequence_begin(), step_sequence_end(), new_step->step_sequence_begin());
+      return old_size == new_size && 
+        std::equal(
+          step_sequence_begin(), step_sequence_end(), 
+          new_step->step_sequence_begin()
+        );
     }
   }
 
@@ -419,7 +476,8 @@ bool step::revalidate(board const& board, piece::color_t player) const {
 }
 
 bool step::capture() const {
-  for (el_steps_iterator el_step = step_sequence_begin(); el_step != step_sequence_end(); ++el_step)
+  for (el_steps_iterator el_step = step_sequence_begin();
+       el_step != step_sequence_end(); ++el_step)
     if (el_step->capture())
       return true;
   return false;
@@ -430,11 +488,13 @@ std::string step::to_string() const {
 }
 
 step::el_steps_iterator step::step_sequence_begin() const {
-  return el_steps_iterator(representation_.get().begin(), representation_.get().end());
+  return el_steps_iterator(representation_.get().begin(), 
+                           representation_.get().end());
 }
 
 step::el_steps_iterator step::step_sequence_end() const {
-  return el_steps_iterator(representation_.get().end(), representation_.get().end());
+  return el_steps_iterator(representation_.get().end(),
+                           representation_.get().end());
 }
 
 step::reverse_el_steps_iterator step::step_sequence_rbegin() const {
@@ -462,23 +522,28 @@ bool step::moves_rabbit() const {
   return false;
 }
 
-step step::make_push_pull(board const& board, elementary_step first_step, elementary_step second_step) {
+step step::make_push_pull(board const& board, elementary_step first_step,
+                          elementary_step second_step) {
   elementary_step_seq sequence;
-  piece const first_piece = *board.get(first_step.from());  // Assumed to be non-empty.
+  piece const first_piece = *board.get(first_step.from());
   first_step.set_what(first_piece);
   sequence.insert(sequence.begin(), first_step);
 
-  position const first_destination = make_adjacent(first_step.from(), first_step.where());
+  position const first_destination =
+    make_adjacent(first_step.from(), first_step.where());
 
-  check_for_captures(first_piece, first_step.from(), first_destination, board, sequence);
+  check_for_captures(first_piece, first_step.from(), first_destination, board, 
+                     sequence);
 
-  piece const second_piece = *board.get(second_step.from());  // Assumed to be non-empty.
+  piece const second_piece = *board.get(second_step.from());
   second_step.set_what(second_piece);
   sequence.insert(sequence.end(), second_step);
 
-  position const second_destination = make_adjacent(second_step.from(), second_step.where());
+  position const second_destination =
+    make_adjacent(second_step.from(), second_step.where());
 
-  check_for_captures(second_piece, second_step.from(), second_destination, board, sequence);
+  check_for_captures(second_piece, second_step.from(), second_destination,
+                     board, sequence);
 
   return step(sequence.begin(), sequence.end());
 }
@@ -489,7 +554,8 @@ bool operator == (step const& lhs, step const& rhs) {
   step::el_steps_iterator left = lhs.step_sequence_begin();
   step::el_steps_iterator right = rhs.step_sequence_begin();
 
-  for (; left != lhs.step_sequence_end() && right != rhs.step_sequence_end(); ++left, ++right)
+  for (; left != lhs.step_sequence_end() && right != rhs.step_sequence_end(); 
+       ++left, ++right)
     if (*left != *right)
       return false;
 
@@ -500,20 +566,20 @@ bool operator != (step const& lhs, step const& rhs) {
   return !operator == (lhs, rhs);
 }
 
-e_step_kind step_kind(step const& step, piece::color_t player, board const& board) {
-  if (step.steps_used() == 1) {
+e_step_kind step_kind(step const& step, piece::color_t player, 
+                      board const& board) {
+  if (step.steps_used() == 1)
     return ordinary;
-  } else if (board.get(step.step_sequence_begin()->from())->color() == player) {
+  else if (board.get(step.step_sequence_begin()->from())->color() == player)
     return pull;
-  } else {
+  else
     return push;
-  }
 }
 
 namespace {
 
-//! Attempt to apply an elementary step to the board. If possible, returns true; otherwise returns false and the board is left
-//! unmodified.
+//! Attempt to apply an elementary step to the board. If possible, returns 
+//! true; otherwise returns false and the board is left unmodified.
 bool apply_elementary(elementary_step const& es, board& board) {
   boost::optional<piece> maybe_what = board.get(es.from());
   if (maybe_what) {
@@ -526,7 +592,8 @@ bool apply_elementary(elementary_step const& es, board& board) {
         board.put(target_pos, what);
       }
       else {
-        // Target position is not empty -- can't apply. But we've already removed a piece -- we need to put it back.
+        // Target position is not empty -- can't apply. But we've already 
+        // removed a piece -- we need to put it back.
         board.put(es.from(), what);
         return false;
       }
@@ -538,8 +605,9 @@ bool apply_elementary(elementary_step const& es, board& board) {
   }
 }
 
-//! Attempt to undo the application of an elementary step to the board. If possible, returns true; otherwise returns false and
-//! the board is left unmodified.
+//! Attempt to undo the application of an elementary step to the board. If 
+//! possible, returns true; otherwise returns false and the board is left 
+//! unmodified.
 bool unapply_elementary(elementary_step const& es, board& board) {
   position const original_pos = es.from();
 
@@ -577,13 +645,17 @@ bool unapply_elementary(elementary_step const& es, board& board) {
 
 void apply(step const& step, board& board) {
   if (!try_apply(step, board))
-    throw std::logic_error("apply: Given step doesn't correspond to the given board");
+    throw std::logic_error(
+      "apply: Given step doesn't correspond to the given board"
+    );
 }
 
 bool try_apply(step const& step, board& board) {
-  for (apns::step::el_steps_iterator es = step.step_sequence_begin(); es != step.step_sequence_end(); ++es) {
+  for (apns::step::el_steps_iterator es = step.step_sequence_begin();
+       es != step.step_sequence_end(); ++es) {
     if (!apply_elementary(*es, board)) {
-      // The application has failed. We now need to roll back everything that's been done.
+      // The application has failed. We now need to roll back everything 
+      // that's been done.
       if (es != step.step_sequence_begin()) {
         do {
           --es;
@@ -600,13 +672,17 @@ bool try_apply(step const& step, board& board) {
 
 void unapply(step const& step, board& board) {
   if (!try_unapply(step, board))
-    throw std::logic_error("unapply: given step doesn't correspond to given board");
+    throw std::logic_error(
+      "unapply: given step doesn't correspond to given board"
+    );
 }
 
 bool try_unapply(step const& step, board& board) {
-  for (apns::step::reverse_el_steps_iterator es = step.step_sequence_rbegin(); es != step.step_sequence_rend(); ++es) {
+  for (apns::step::reverse_el_steps_iterator es = step.step_sequence_rbegin();
+       es != step.step_sequence_rend(); ++es) {
     if (!unapply_elementary(*es, board)) {
-      // It's failed. That means we need to turn back the board to its original state.
+      // It's failed. That means we need to turn back the board to its original 
+      // state.
 
       if (es != step.step_sequence_rbegin()) {
         do {
@@ -624,7 +700,9 @@ bool try_unapply(step const& step, board& board) {
 
 bool frozen(position position, board const& board) {
   if (!empty(position, board)) {
-    return stronger_opponent_adjacent(position, board) && !friendly_adjacent(position, board);
+    return 
+      stronger_opponent_adjacent(position, board) && 
+      !friendly_adjacent(position, board);
   } else {
     throw std::logic_error("frozen: Specified position is empty");
   }
@@ -652,7 +730,8 @@ steps_iter::steps_iter(position what_piece, apns::board const& board)
 {
   assert(this->board_);
 
-  while (first_dir_ != directions_end() && !adjacent_valid(piece_pos_, *first_dir_)) {
+  while (first_dir_ != directions_end() && 
+         !adjacent_valid(piece_pos_, *first_dir_)) {
     ++first_dir_;
   }
 
@@ -696,7 +775,8 @@ void steps_iter::do_increment() {
 
   switch (state) {
     case ordinary: {
-      // target_dir points to an empty position and we have generated the ordinary move already. Generate pulls then.
+      // target_dir points to an empty position and we have generated the 
+      // ordinary move already. Generate pulls then.
       state = pull;
     }
 
@@ -711,12 +791,17 @@ void steps_iter::do_increment() {
         advance_first();
         generate_ordinary_or_push();
       } else {
-        // There is a weaker enemy adjacent, and second_dir is pointing to it. Reverse direction to
-        // second_dir, then, is the direction in which it will move when pulled.
-        result_ = step::validate_pull(*board_,
-            elementary_step::displacement(piece_pos_, *first_dir_),
-            elementary_step::displacement(make_adjacent(piece_pos_, *second_dir_),
-                inverse_dir(*second_dir_)));
+        // There is a weaker enemy adjacent, and second_dir is pointing to it. 
+        // Reverse direction to second_dir, then, is the direction in which it 
+        // will move when pulled.
+        result_ = step::validate_pull(
+          *board_,
+          elementary_step::displacement(piece_pos_, *first_dir_),
+          elementary_step::displacement(
+            make_adjacent(piece_pos_, *second_dir_),
+            inverse_dir(*second_dir_)
+          )
+        );
       }
     } break;
 
@@ -729,7 +814,8 @@ void steps_iter::do_increment() {
 void steps_iter::advance_first() {
   assert(board_);
   ++first_dir_;
-  while (first_dir_ != directions_end() && !adjacent_valid(piece_pos_, *first_dir_)) {
+  while (first_dir_ != directions_end() && 
+         !adjacent_valid(piece_pos_, *first_dir_)) {
     ++first_dir_;
   }
 }
@@ -766,7 +852,8 @@ void steps_iter::advance_second_to_weaker() {
 
     if (adjacent_valid(second_center, *second_dir_)
         && !apns::empty(make_adjacent(second_center, *second_dir_), *board_)) {
-      piece const second_piece = *board_->get(make_adjacent(second_center, *second_dir_));
+      piece const second_piece =
+        *board_->get(make_adjacent(second_center, *second_dir_));
 
       if (second_piece.color() == opponent_color(first_piece.color())
           && stronger(first_piece, second_piece)) {
@@ -798,11 +885,16 @@ void steps_iter::generate_push() {
 
   if (second_dir_ != directions_end()) {
     // There is a space for the second piece to be pushed to.
-    result_ = step::validate_push(*board_,
-        elementary_step::displacement(make_adjacent(piece_pos_, *first_dir_), *second_dir_),
-        elementary_step::displacement(piece_pos_, *first_dir_));
+    result_ = step::validate_push(
+      *board_,
+      elementary_step::displacement(
+        make_adjacent(piece_pos_, *first_dir_), *second_dir_
+      ),
+      elementary_step::displacement(piece_pos_, *first_dir_)
+    );
   } else {
-    // No more space for the second piece to be pushed to. Go to the next primary position around the piece.
+    // No more space for the second piece to be pushed to. Go to the next 
+    // primary position around the piece.
     state = ordinary;
     advance_first();
     generate_ordinary_or_push();
@@ -890,8 +982,9 @@ void all_steps_iter::forward() {
 
 void all_steps_iter::forward_to_mobile() {
   assert(board_);
-  while (current_piece_ != board_->pieces_end()
-      && (current_piece_->second.color() != player_ || frozen(current_piece_->first, *board_))) {
+  while (current_piece_ != board_->pieces_end() && 
+         (current_piece_->second.color() != player_ || 
+          frozen(current_piece_->first, *board_))) {
     ++current_piece_;
   }
 
@@ -899,7 +992,8 @@ void all_steps_iter::forward_to_mobile() {
     board_ = 0;
   }
 
-  assert(board_ == 0 || (current_piece_->second.color() == player_ && !frozen(current_piece_->first, *board_)));
+  assert(board_ == 0 || (current_piece_->second.color() == player_ && 
+                         !frozen(current_piece_->first, *board_)));
 }
 
 all_steps_iter all_steps_begin(board const& board, piece::color_t player) {

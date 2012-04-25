@@ -2,7 +2,8 @@
 
 import apnsmod
 from interface.observable import Observable
-from interface.controller import Controller, SearchParameters, loadBoard, saveBoard
+from interface.controller import Controller, SearchParameters, loadBoard, \
+    saveBoard
 
 import time, gc, sys, itertools
 
@@ -12,22 +13,26 @@ try:
   import tkMessageBox
   import ttk
 except ImportError:
-  print >> sys.stderr, 'Importing one of Tkinter modules has failed. Please make sure you have Tkinter installed.'
+  print >> sys.stderr, 'Importing one of Tkinter modules has failed. ' +\
+                       'Please make sure you have Tkinter installed.'
   raise SystemExit(1)
 
 _COLORS = (apnsmod.Piece.Color.gold, apnsmod.Piece.Color.silver)
-_TYPES = (apnsmod.Piece.Type.elephant, apnsmod.Piece.Type.camel, apnsmod.Piece.Type.horse,
-          apnsmod.Piece.Type.dog, apnsmod.Piece.Type.cat, apnsmod.Piece.Type.rabbit)
+_TYPES = (apnsmod.Piece.Type.elephant, apnsmod.Piece.Type.camel,
+          apnsmod.Piece.Type.horse, apnsmod.Piece.Type.dog,
+          apnsmod.Piece.Type.cat, apnsmod.Piece.Type.rabbit)
 
 _BOARD_SIZE = (_BOARD_WIDTH, _BOARD_HEIGHT) = (402, 402)
 _TILE_SIZE = (_TILE_WIDTH, _TILE_HEIGHT) = (48, 48)
 
-_OUTER_BORDER = 6  # Amount of space between the physical board background image border and the actual squares on it.
-_INNER_BORDER = 1  # Amount of space between individual squares on the board background image.
+_OUTER_BORDER = 6  # Amount of space between the physical board background 
+                   # image border and the actual squares on it.
+_INNER_BORDER = 1  # Amount of space between individual squares on the board 
+                   # background image.
 
 class MainWindow(Observable):
-  '''Main window of the application. Displays a toolbar, the search tree and a position display. This object will also create
-  an ImageManager instance.
+  '''Main window of the application. Displays a toolbar, the search tree and a
+  position display. This object will also create an ImageManager instance.
   '''
 
   imageManager = property(lambda self: self._imageManager)
@@ -35,8 +40,11 @@ class MainWindow(Observable):
   searchResultsController = property(lambda self: self._searchResultsCtrl)
 
   class Command:
-    '''Enumeration type that specifies what kind of action the user has selected.'''
-    newSearch, iterate, runSearch, resetSearch, savePosition, loadSearch, saveSearch, close, searchStats = range(9)
+    '''Enumeration type that specifies what kind of action the user has
+    selected.
+    '''
+    newSearch, iterate, runSearch, resetSearch, savePosition, loadSearch, \
+      saveSearch, close, searchStats = range(9)
 
 
   def __init__(self):
@@ -48,22 +56,43 @@ class MainWindow(Observable):
     self._imageManager = ImageManager()
 
     self._toolbar = ttk.Frame(self._window, padding=5)
-    self._newSearchBtn = ttk.Button(self._toolbar, text='New Initial Position',
-                                    command=lambda: self.notifyObservers(command=MainWindow.Command.newSearch))
-    self._runBtn = ttk.Button(self._toolbar, text='Run Search',
-                              command=lambda: self.notifyObservers(command=MainWindow.Command.runSearch))
-    self._resetBtn = ttk.Button(self._toolbar, text='Reset Search',
-                                command=lambda: self.notifyObservers(command=MainWindow.Command.resetSearch))
-    self._loadSearchBtn = ttk.Button(self._toolbar, text='Load Search',
-                                     command=lambda: self.notifyObservers(command=MainWindow.Command.loadSearch))
-    self._saveSearchBtn = ttk.Button(self._toolbar, text='Save Search',
-                                     command=lambda: self.notifyObservers(command=MainWindow.Command.saveSearch))
-    self._saveBtn = ttk.Button(self._toolbar, text='Save Position',
-                               command=lambda: self.notifyObservers(command=MainWindow.Command.savePosition))
-    self._statsBtn = ttk.Button(self._toolbar, text='Search Stats',
-                                command=lambda: self.notifyObservers(command=MainWindow.Command.searchStats))
+    self._newSearchBtn = ttk.Button(
+      self._toolbar, text='New Initial Position',
+      command=lambda: self.notifyObservers(
+        command=MainWindow.Command.newSearch))
 
-    self._window.protocol('WM_DELETE_WINDOW', lambda: self.notifyObservers(command=MainWindow.Command.close))
+    self._runBtn = ttk.Button(
+      self._toolbar, text='Run Search',
+      command=lambda: self.notifyObservers(
+        command=MainWindow.Command.runSearch))
+
+    self._resetBtn = ttk.Button(
+      self._toolbar, text='Reset Search',
+      command=lambda: self.notifyObservers(
+        command=MainWindow.Command.resetSearch))
+
+    self._loadSearchBtn = ttk.Button(
+      self._toolbar, text='Load Search',
+      command=lambda: self.notifyObservers(
+        command=MainWindow.Command.loadSearch))
+
+    self._saveSearchBtn = ttk.Button(
+      self._toolbar, text='Save Search',
+      command=lambda: self.notifyObservers(
+        command=MainWindow.Command.saveSearch))
+
+    self._saveBtn = ttk.Button(
+      self._toolbar, text='Save Position',
+      command=lambda: self.notifyObservers(
+        command=MainWindow.Command.savePosition))
+
+    self._statsBtn = ttk.Button(
+      self._toolbar, text='Search Stats',
+      command=lambda: self.notifyObservers(
+        command=MainWindow.Command.searchStats))
+
+    self._window.protocol('WM_DELETE_WINDOW',
+        lambda: self.notifyObservers(command=MainWindow.Command.close))
 
     self.disableSearch()
     self.disableStats()
@@ -124,7 +153,9 @@ class MainWindow(Observable):
 
 
 class MainWindowController(object):
-  '''Control logic of the main window. This class creates the actual search object.'''
+  '''Control logic of the main window. This class creates the actual search 
+  object.
+  '''
 
   def __init__(self, mainWindowDsply):
     object.__init__(self)
@@ -151,12 +182,16 @@ class MainWindowController(object):
     '''React to user's commands.'''
 
     if command == MainWindow.Command.newSearch:
-      positionEditorDlg = PositionEditorDialog(self._mainWindowDsply.window,
-                                                 'Create or load initial position',
-                                                 'Specify an initial search position or load one from disk:',
-                                                 self._mainWindowDsply.imageManager)
+      positionEditorDlg = PositionEditorDialog(
+        self._mainWindowDsply.window,
+        'Create or load initial position',
+        'Specify an initial search position or load one from disk:',
+        self._mainWindowDsply.imageManager
+      )
+
       if positionEditorDlg.board is not None:
-        self._controller.newGame(positionEditorDlg.board, positionEditorDlg.player)
+        self._controller.newGame(positionEditorDlg.board,
+                                 positionEditorDlg.player)
         self._resultsCtrl.updateTree(self._controller)
         gc.collect()
         self._mainWindowDsply.disableStats()
@@ -177,23 +212,31 @@ class MainWindowController(object):
 
         pars = self._controller.searchParameters
         pars.algo = newPrefs.algo
-        pars.timeLimit = newPrefs.timeLimit if newPrefs.timeLimitCheck else None
-        pars.positionLimit = newPrefs.positionLimit if newPrefs.positionLimitCheck else None
-        pars.memoryLimit = newPrefs.memLimit if newPrefs.memLimitCheck else None
+        pars.timeLimit = newPrefs.timeLimit if newPrefs.timeLimitCheck \
+                                            else None
+        pars.positionLimit = \
+            newPrefs.positionLimit if newPrefs.positionLimitCheck else None
+        pars.memoryLimit = \
+            newPrefs.memLimit if newPrefs.memLimitCheck else None
         pars.transTblSize = newPrefs.transTblSize
         pars.proofTblSize = newPrefs.proofTblSize
         pars.moveCacheSize = newPrefs.moveCacheSize
 
         try:
-          dlg = SearchProgressDialog(self._mainWindowDsply.window, runSearchCtrl.showTimeLeft, running=True)
-          searchProgressCtrl = SearchProgressController(dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit,
-                                                        runSearchCtrl.memLimit)
+          dlg = SearchProgressDialog(self._mainWindowDsply.window,
+                                     runSearchCtrl.showTimeLeft, running=True)
+          searchProgressCtrl = SearchProgressController(
+            dlg, runSearchCtrl.timeLimit, runSearchCtrl.posLimit,
+            runSearchCtrl.memLimit
+          )
           self._runStats = searchProgressCtrl.run(self._controller)
           self._mainWindowDsply.enableStats()
 
         except MemoryError:
-          tkMessageBox.showerror('Out of memory', 'This program ran out of memory while trying to expand the tree.\n'
-                                                  +'The partial tree has been discarded.')
+          tkMessageBox.showerror('Out of memory',
+            'This program ran out of memory while trying to expand the tree.\n'
+            +'The partial tree has been discarded.'
+          )
           self._mainWindowDsply.disableSearch()
           self._mainWindowDsply.disableStats()
 
@@ -219,7 +262,12 @@ class MainWindowController(object):
         self._controller.dropGame()
         gc.collect()
 
-        dlg = SaveLoadProgressDialog(self._mainWindowDsply.window, 'Loading search tree', 'Loading the search tree.\nThis might take a while')
+        dlg = SaveLoadProgressDialog(
+          self._mainWindowDsply.window,
+          'Loading search tree',
+          'Loading the search tree.\nThis might take a while'
+        )
+
         LoadProgressController(self._controller, dlg, str(filename))
         self._resultsCtrl.updateTree(self._controller)
 
@@ -230,11 +278,17 @@ class MainWindowController(object):
     elif command == MainWindow.Command.saveSearch:
       filename = tkFileDialog.asksaveasfilename()
       if len(filename) > 0:
-        dlg = SaveLoadProgressDialog(self._mainWindowDsply.window, 'Saving search tree', 'Saving the search tree.\nThis might take a while')
+        dlg = SaveLoadProgressDialog(
+          self._mainWindowDsply.window,
+          'Saving search tree',
+          'Saving the search tree.\nThis might take a while'
+        )
         SaveProgressController(self._controller, dlg, str(filename))
 
     elif command == MainWindow.Command.searchStats:
-      dlg = SearchProgressDialog(self._mainWindowDsply.window, showTimeLeft=False, running=False)
+      dlg = SearchProgressDialog(
+        self._mainWindowDsply.window, showTimeLeft=False, running=False
+      )
       SearchStatsController(dlg, self._controller.stats)
 
     elif command == MainWindow.Command.close:
@@ -242,9 +296,9 @@ class MainWindowController(object):
 
 
 class ResultsDisplay(Observable):
-  '''A widget that displays the search results. It displays the search tree and for each selected node in the tree, it
-  displays the corresponding board position.
-  '''
+  '''A widget that displays the search results. It displays the search tree and
+  for each selected node in the tree, it displays the corresponding board
+  position. '''
 
   widget = property(lambda self: self._content)
   boardController = property(lambda self: self._boardCtrl)
@@ -271,8 +325,10 @@ class ResultsDisplay(Observable):
     self._tree.heading(2, text='PN')
     self._tree.heading(3, text='DN')
 
-    verticalScrollBar = ttk.Scrollbar(self._content, orient=Tkinter.VERTICAL, command=self._tree.yview)
-    horizontalScrollBar = ttk.Scrollbar(self._content, orient=Tkinter.HORIZONTAL, command=self._tree.xview)
+    verticalScrollBar = ttk.Scrollbar(
+        self._content, orient=Tkinter.VERTICAL, command=self._tree.yview)
+    horizontalScrollBar = ttk.Scrollbar(
+        self._content, orient=Tkinter.HORIZONTAL, command=self._tree.xview)
     self._tree['yscrollcommand'] = verticalScrollBar.set
     self._tree['xscrollcommand'] = horizontalScrollBar.set
 
@@ -292,8 +348,8 @@ class ResultsDisplay(Observable):
 
 
   def addNode(self, parent, name, type_, pn, dn, best=False, principal=False):
-    '''Add a node to the tree. Return a handle of the node, which can later be used to remove the node, or attach a child
-    to it.
+    '''Add a node to the tree. Return a handle of the node, which can later be
+    used to remove the node, or attach a child to it.
 
     parent is the handle of the parent node, or None if it is a top-level node.
     '''
@@ -308,12 +364,15 @@ class ResultsDisplay(Observable):
     else:
       mark = ''
 
-    handle = self._tree.insert(parent, 'end', text=name, values=(mark, type_, pn, dn))
+    handle = self._tree.insert(parent, 'end', text=name,
+                               values=(mark, type_, pn, dn))
     return handle
 
 
   def removeNode(self, handle):
-    '''Remove a node from the tree. handle is the value returned from the corresponding addNode call.'''
+    '''Remove a node from the tree. handle is the value returned from the
+    corresponding addNode call.
+    '''
 
     self._tree.delete(handle)
 
@@ -401,8 +460,10 @@ class ResultsController(object):
   # XXX: This thing *badly* needs refactoring. Seriously.
 
   class _DisplayNode(object):
-    '''A node in the display. This represents the tree that is actually displayed. It contains a list of its
-    _DisplayNode children, its _DisplayNode parent and a reference to the actual node in the real search tree.
+    '''A node in the display. This represents the tree that is actually
+    displayed. It contains a list of its _DisplayNode children, its
+    _DisplayNode parent and a reference to the actual node in the real search
+    tree.
     '''
 
     _handleToNode = {}  # A dictionary handle -> _DisplayNode.
@@ -425,7 +486,8 @@ class ResultsController(object):
       self._best = best
       self.principal = principal
 
-      name = 'root' if self.vertex.step is None else self.vertex.step.toString()
+      name = 'root' if self.vertex.step is None \
+                    else self.vertex.step.toString()
       parent = self.parent.handle if self.parent is not None else None
       self.handle = display.addNode(parent, name, self._getType(),
                                     strFromNum(self.vertex.proofNumber),
@@ -481,11 +543,17 @@ class ResultsController(object):
 
       assert len(self.children) == 0
 
-      sameTypeChildren  = (c for c in self.vertex.children if c.type_ == self.vertex.type_)
-      otherTypeChildren = (c for c in self.vertex.children if c.type_ != self.vertex.type_)
+      sameTypeChildren  = (
+        c for c in self.vertex.children if c.type_ == self.vertex.type_
+      )
+      otherTypeChildren = (
+        c for c in self.vertex.children if c.type_ != self.vertex.type_
+      )
 
       for child in itertools.chain(sameTypeChildren, otherTypeChildren):
-        self.children.append(ResultsController._DisplayNode(self, child, display, False, False))
+        self.children.append(
+          ResultsController._DisplayNode(self, child, display, False, False)
+        )
 
 
     def _getType(self):
@@ -521,8 +589,9 @@ class ResultsController(object):
 
 
   def update(self, source, handle, command):
-    '''React to user's commands from the results display. Namely, display board for the selected node of the search tree and
-    handle the expansion of a vertex.
+    '''React to user's commands from the results display. Namely, display board
+    for the selected node of the search tree and handle the expansion of a
+      vertex.
     '''
 
     if self._tree is None: return
@@ -538,8 +607,9 @@ class ResultsController(object):
 
 
   def updateTree(self, controller):
-    '''Update the display of the search tree. This will first update the PN and DN values of all nodes already displayed,
-    then it will attach new nodes -- that are not displayed yet -- to the display.
+    '''Update the display of the search tree. This will first update the PN and
+    DN values of all nodes already displayed, then it will attach new nodes --
+    that are not displayed yet -- to the display.
     '''
 
     if self._tree:
@@ -548,7 +618,9 @@ class ResultsController(object):
       self._tree = None
 
     if controller.root is not None:
-      self._tree = ResultsController._DisplayNode(None, controller.root, self._resultsDsply, True, True)
+      self._tree = ResultsController._DisplayNode(
+        None, controller.root, self._resultsDsply, True, True
+      )
       self._initialState = controller.initialState.copy()
       self._tree.expand(self._resultsDsply)
       self._updateBest(self._tree)
@@ -558,8 +630,9 @@ class ResultsController(object):
 
 
   def _expandVertex(self, handle):
-    '''Expand a vertex. This needs a check whether any of the children's vertices have any children which are not
-    in the tree yet, and if so add them to the tree.
+    '''Expand a vertex. This needs a check whether any of the children's
+    vertices have any children which are not in the tree yet, and if so add
+    them to the tree.
     '''
 
     self._resultsDsply.selectNode(handle)
@@ -591,7 +664,8 @@ class ResultsController(object):
       stack.append(self._resultsDsply.getNodeStep(vertex))
       vertex = self._resultsDsply.getParent(vertex)
 
-    # Now, having the path on the stack, go back down, transforming the initial board into the final result.
+    # Now, having the path on the stack, go back down, transforming the initial
+    # board into the final result.
     result = self._initialState.copy()
     while len(stack) > 0:
       step = apnsmod.Step.fromString(stack.pop())
@@ -616,17 +690,21 @@ class ResultsController(object):
     else:
       name = 'Initial Position'
 
-    h = self._resultsDsply.addNode(parentHandle,
-                                   name,
-                                   self._nodeType(child),
-                                   strFromNum(child.proofNumber), strFromNum(child.disproofNumber),
-                                   bold)
+    h = self._resultsDsply.addNode(
+      parentHandle,
+      name,
+      self._nodeType(child),
+      strFromNum(child.proofNumber), strFromNum(child.disproofNumber),
+      bold
+    )
     self._nodeToHandle[hash(child)] = h
     self._handleToNodeParent[h] = (child, parent)
 
 
   def _nodeType(self, node):
-    '''Return the string representation of a node's type. It's either 'AND' or 'OR'.'''
+    '''Return the string representation of a node's type. It's either 'AND' or
+    'OR'.
+    '''
 
     if node.type_ == apnsmod.Vertex.Type.and_:
       return 'AND'
@@ -638,9 +716,12 @@ class DialogWindow(object):
   '''A generic dialog window.
 
   It has three properties:
-    -- window: an instance of Tkinter.Toplevel -- it is the window widget itself
-    -- content: a frame in the window where any meaningful content should be placed
-    -- buttonBox: a frame at the bottom of the window, where standard buttons such as 'Ok' or 'Cancel' are to be placed.
+    -- window: an instance of Tkinter.Toplevel -- it is the window widget 
+        itself
+    -- content: a frame in the window where any meaningful content should be 
+        placed
+    -- buttonBox: a frame at the bottom of the window, where standard buttons 
+        such as 'Ok' or 'Cancel' are to be placed.
   '''
 
   window = property(lambda self: self._window)
@@ -683,8 +764,9 @@ class DialogWindow(object):
 
 
   def run(self, wait=True):
-    '''Run the dialog modal loop. If wait is True, this function will return only after this dialog has been destroyed,
-    otherwise it returns immediately.
+    '''Run the dialog modal loop. If wait is True, this function will return
+    only after this dialog has been destroyed, otherwise it returns
+    immediately.
     '''
 
     self._window.update_idletasks()
@@ -710,7 +792,9 @@ class DialogWindow(object):
 
 
 class SaveLoadProgressDialog(Observable):
-  '''A simple dialog window showing the progress of the Save Tree or Load Tree actions.'''
+  '''A simple dialog window showing the progress of the Save Tree or Load Tree
+  actions.
+  '''
 
   window = property(lambda self: self._dialog.window)
 
@@ -721,7 +805,8 @@ class SaveLoadProgressDialog(Observable):
 
     self._lbl = ttk.Label(self._dialog.content, text=text + '   ')
 
-    cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel', command=lambda: self.notifyObservers())
+    cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel', 
+                           command=lambda: self.notifyObservers())
     self._dialog.setDeleteAction(lambda: cancelBtn.invoke())
 
     self._lbl.grid(row=0, column=0, sticky='W', padx=5, pady=5)
@@ -743,7 +828,8 @@ class SaveLoadProgressDialog(Observable):
       if text[i] == '.': dots += 1
 
     if dots < 3:
-      self._lbl['text'] = text[:len(text) - 3 + dots] + '.' + (3 - dots - 1) * ' '
+      self._lbl['text'] = text[:len(text) - 3 + dots] + '.' + \
+                          (3 - dots - 1) * ' '
     else:
       self._lbl['text'] = text[:len(text) - 3] + '   '
 
@@ -774,7 +860,9 @@ class Canceller:
       self.lastTick = now
 
   def update(self, source):
-    '''Update from the dialog -- this means the user wishes to cancel the operation.'''
+    '''Update from the dialog -- this means the user wishes to cancel the
+    operation.
+    '''
     self.controller.cancel()
 
 
@@ -790,7 +878,10 @@ class SaveProgressController(object):
     try:
       controller.saveGame(filename)
     except RuntimeError, e:
-      tkMessageBox.showerror('Could not savePosition search', 'Saving search to {0} failed:\n{1}'.format(filename, e))
+      tkMessageBox.showerror(
+        'Could not savePosition search',
+        'Saving search to {0} failed:\n{1}'.format(filename, e)
+      )
 
     controller.saveGameCallbacks.remove(canceller.callback)
     dialog.close()
@@ -810,15 +901,18 @@ class LoadProgressController(object):
     try:
       controller.loadGame(filename)
     except RuntimeError, e:
-      tkMessageBox.showerror('Could not load search',
-                             'Loading of the search tree from {0} failed:\n{1}'.format(filename, e))
+      tkMessageBox.showerror(
+        'Could not load search',
+        'Loading the search tree from {0} failed:\n{1}'.format(filename, e)
+      )
 
     controller.loadGameCallbacks.remove(canceller.callback)
     dlg.close()
 
 
 class RunSearchDialog(Observable):
-  '''A dialog window that lets the user choose search parameters and then execute a search.'''
+  '''A dialog window that lets the user choose search parameters and then
+  execute a search.'''
 
   parent = property(lambda self: self._dialog.parent)
   algo = property(lambda self: self._algoVar.get(),
@@ -829,8 +923,10 @@ class RunSearchDialog(Observable):
                             lambda self, val: self.enableTimeLimit(val))
   positionLimit = property(lambda self: self._positionLimitVar.get(),
                            lambda self, val: self.setPositionLimit(val))
-  positionLimitCheck = property(lambda self: self._positionLimitCheckVar.get() == '1',
-                                lambda self, val: self.enablePositionLimit(val))
+  positionLimitCheck = property(
+    lambda self: self._positionLimitCheckVar.get() == '1',
+    lambda self, val: self.enablePositionLimit(val)
+  )
   memLimit = property(lambda self: self._memLimitVar.get(),
                       lambda self, val: self.setMemLimit(val))
   memLimitCheck = property(lambda self: self._memLimitCheckVar.get() == '1',
@@ -843,7 +939,8 @@ class RunSearchDialog(Observable):
                            lambda self, val: self.setMoveCache(val))
 
   class Command:
-    timeLimitCheck, positionLimitCheck, memLimitCheck, gcCheck, start = range(5)
+    timeLimitCheck, positionLimitCheck, memLimitCheck, gcCheck, \
+      start = range(5)
 
   def __init__(self, parent, algos):
     '''Create the dialog.'''
@@ -852,49 +949,60 @@ class RunSearchDialog(Observable):
 
     self._dialog = DialogWindow(parent, 'Run Search')
 
-    infoLabel = ttk.Label(self._dialog.content, text='Enter parameters of the search:')
+    infoLabel = ttk.Label(self._dialog.content,
+                          text='Enter parameters of the search:')
 
-    algoFrame = ttk.Labelframe(self._dialog.content, text='Algorithm:', padding=5)
+    algoFrame = ttk.Labelframe(self._dialog.content, text='Algorithm:',
+                               padding=5)
     
     self._algoVar = Tkinter.StringVar(value=algos[0][0])
     algoRadios = []
     for row, (algo, description) in enumerate(algos):
-      radio = ttk.Radiobutton(algoFrame, text=description, variable=self._algoVar, value=algo)
+      radio = ttk.Radiobutton(algoFrame, text=description,
+                              variable=self._algoVar, value=algo)
       radio.grid(row=row, column=0, sticky='WE')
       algoRadios.append(radio)
     
-    limitsFrame = ttk.Labelframe(self._dialog.content, text='Search limits:', padding=5)
+    limitsFrame = ttk.Labelframe(self._dialog.content,
+                                 text='Search limits:', padding=5)
 
     self._timeLimitCheckVar = Tkinter.StringVar(value='0')
-    self._timeLimitCheck = ttk.Checkbutton(limitsFrame, text='Time limit:',
-                                           variable=self._timeLimitCheckVar,
-                                           command=lambda: self.notifyObservers(
-                                                                      command=RunSearchDialog.Command.timeLimitCheck))
+    self._timeLimitCheck = ttk.Checkbutton(
+      limitsFrame, text='Time limit:',
+      variable=self._timeLimitCheckVar,
+      command=lambda: self.notifyObservers(
+        command=RunSearchDialog.Command.timeLimitCheck))
 
     self._timeLimit = Tkinter.StringVar(value='0')
-    self._timeLimitSpin = Tkinter.Spinbox(limitsFrame, from_=1, to=9000, textvariable=self._timeLimit)
+    self._timeLimitSpin = Tkinter.Spinbox(limitsFrame, from_=1, to=9000,
+                                          textvariable=self._timeLimit)
     timeLimitUnits = ttk.Label(limitsFrame, text='seconds')
 
     self._positionLimitCheckVar = Tkinter.StringVar(value='0')
-    self._positionLimitCheck = ttk.Checkbutton(limitsFrame, text='Position limit:',
-                                               variable=self._positionLimitCheckVar,
-                                               command=lambda: self.notifyObservers(
-                                                                      command=RunSearchDialog.Command.positionLimitCheck))
+    self._positionLimitCheck = ttk.Checkbutton(
+      limitsFrame, text='Position limit:',
+      variable=self._positionLimitCheckVar,
+      command=lambda: self.notifyObservers(
+        command=RunSearchDialog.Command.positionLimitCheck))
     self._positionLimitVar = Tkinter.StringVar(value='0')
-    self._positionLimitSpin = Tkinter.Spinbox(limitsFrame, from_=1, to=99999999999,
-                                              textvariable=self._positionLimitVar)
+    self._positionLimitSpin = Tkinter.Spinbox(
+      limitsFrame, from_=1, to=99999999999,
+      textvariable=self._positionLimitVar)
     positionLimitUnits = ttk.Label(limitsFrame, text='positions')
 
     self._memLimitCheckVar = Tkinter.StringVar(value='0')
-    self._memLimitCheck = ttk.Checkbutton(limitsFrame, text='Memory limit:',
-                                          variable=self._memLimitCheckVar,
-                                          command=lambda: self.notifyObservers(command=RunSearchDialog.Command.memLimitCheck))
+    self._memLimitCheck = ttk.Checkbutton(
+      limitsFrame, text='Memory limit:',
+      variable=self._memLimitCheckVar,
+      command=lambda: self.notifyObservers(
+        command=RunSearchDialog.Command.memLimitCheck))
     self._memLimitVar = Tkinter.StringVar(value='0')
     self._memLimitSpin = Tkinter.Spinbox(limitsFrame, from_=1, to=999999999999,
                                          textvariable=self._memLimitVar)
     memLimitUnits = ttk.Label(limitsFrame, text='MB')
 
-    algoParamsFrame = ttk.Labelframe(self._dialog.content, text='Algorithm parameters:', padding=5)
+    algoParamsFrame = ttk.Labelframe(self._dialog.content,
+                                     text='Algorithm parameters:', padding=5)
     moveCacheLabel = ttk.Label(algoParamsFrame, text='Move cache size: ')
 
     sizeLabel = ttk.Label(algoParamsFrame, text='Transposition table size: ')
@@ -907,14 +1015,17 @@ class RunSearchDialog(Observable):
     self._proofSpinVar = Tkinter.StringVar(value='0')
     self._moveCacheSpinVar = Tkinter.StringVar(value='0')
 
-    self._moveCacheSpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=1024, textvariable=self._moveCacheSpinVar)
+    self._moveCacheSpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=1024,
+                                          textvariable=self._moveCacheSpinVar)
     self._memorySpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=99999999,
                                        textvariable=self._memorySpinVar)
     self._proofSpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=99999999,
                                       textvariable=self._proofSpinVar)
 
-    runBtn = ttk.Button(self._dialog.buttonBox, text='Run', command=self._execute)
-    cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel', command=self._dialog.close)
+    runBtn = ttk.Button(self._dialog.buttonBox, text='Run',
+                        command=self._execute)
+    cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel',
+                           command=self._dialog.close)
 
     self._timeLimitCheck.grid(row=0, column=0, sticky='W')
     self._timeLimitSpin.grid(row=0, column=1, sticky='WE', padx=5)
@@ -962,7 +1073,8 @@ class RunSearchDialog(Observable):
 
 
   def run(self):
-    '''Enter the modal dialog loop and wait for the user to close the dialog.'''
+    '''Enter the modal dialog loop and wait for the user to close the
+    dialog.'''
     self._dialog.run(wait=True)
 
 
@@ -1044,14 +1156,16 @@ class RunSearchDialog(Observable):
     self._moveCacheSpinVar.set(int(value))
 
   def _execute(self):
-    '''User has clicked the 'Run' button: Dispatch the command to the controller.'''
+    '''User has clicked the 'Run' button: Dispatch the command to the 
+    controller.
+    '''
 
     self.notifyObservers(command=RunSearchDialog.Command.start)
 
 
 class RunSearchController(object):
-  '''Controller of RunSearchDialog. If the user chooses to execute the search, it will start the computation and show a new
-  dialog showing the progress.
+  '''Controller of RunSearchDialog. If the user chooses to execute the search,
+  it will start the computation and show a new dialog showing the progress.
   '''
 
   algo = property(lambda self: self._algo)
@@ -1099,8 +1213,9 @@ class RunSearchController(object):
   def run(self):
     '''ctrl.run() -> (doRun, lastValues)
 
-    Execute the dialog. Return a boolean value indicating whether the search should be performed or not, and a
-    new dictionary of last set values of None if last set values should not be updated.
+    Execute the dialog. Return a boolean value indicating whether the search
+    should be performed or not, and a new dictionary of last set values of None
+    if last set values should not be updated.
     '''
 
     self._runSearchDlg.run()
@@ -1133,8 +1248,10 @@ class RunSearchController(object):
           memLimit = None
 
         self._algo = self._runSearchDlg.algo
-        self._transTblSize = (int(self._runSearchDlg.transTblSize) * MB) / apnsmod.TranspositionTable.sizeOfElement
-        self._proofTblSize = (int(self._runSearchDlg.proofTblSize) * MB) / apnsmod.ProofTable.sizeOfElement
+        self._transTblSize = (int(self._runSearchDlg.transTblSize) * MB) / \
+                             apnsmod.TranspositionTable.sizeOfElement
+        self._proofTblSize = (int(self._runSearchDlg.proofTblSize) * MB) / \
+                             apnsmod.ProofTable.sizeOfElement
         self._timeLimit = sTimeLimit
         self._posLimit = posLimit
         self._memLimit = memLimit
@@ -1162,19 +1279,22 @@ class RunSearchController(object):
       self._runSearchDlg.enableTimeLimit(self._runSearchDlg.timeLimitCheck)
 
     elif command == RunSearchDialog.Command.positionLimitCheck:
-      self._runSearchDlg.enablePositionLimit(self._runSearchDlg.positionLimitCheck)
+      self._runSearchDlg.enablePositionLimit(
+        self._runSearchDlg.positionLimitCheck
+      )
 
     elif command == RunSearchDialog.Command.memLimitCheck:
       self._runSearchDlg.enableMemLimit(self._runSearchDlg.memLimitCheck)
 
 
   def _validateInput(self):
-    '''Check whether the values set on the dialog are correct. If they are, return True; if they aren't, show an error
-    box and return False.
+    '''Check whether the values set on the dialog are correct. If they are,
+    return True; if they aren't, show an error box and return False.
     '''
 
     def showMustBeInteger(name):
-      tkMessageBox.showerror('Invalid value', '%s must be a positive integer' % name)
+      tkMessageBox.showerror('Invalid value',
+                             '%s must be a positive integer' % name)
 
     def checkVar(check, var, name):
       if check and not var.strip().isdigit():
@@ -1186,7 +1306,8 @@ class RunSearchController(object):
     dlg = self._runSearchDlg
 
     return (checkVar(dlg.timeLimitCheck, dlg.timeLimit, 'Time limit')
-            and checkVar(dlg.positionLimitCheck, dlg.positionLimit, 'Position limit')
+            and checkVar(dlg.positionLimitCheck, dlg.positionLimit,
+                         'Position limit')
             and checkVar(dlg.memLimitCheck, dlg.memLimit, 'Memory limit')
             and checkVar(True, dlg.transTblSize, 'Size of transposition table')
             and checkVar(True, dlg.proofTblSize, 'Size of proof table')
@@ -1194,13 +1315,16 @@ class RunSearchController(object):
 
 
 class SearchProgressDialog(Observable):
-  '''A dialog window showing the progress of a search along with a Cancel button.'''
+  '''A dialog window showing the progress of a search along with a Cancel
+  button.
+  '''
 
   def __init__(self, parent, showTimeLeft=True, running=True):
     '''Create the dialogue.
 
-    If running is True, the dialog should display strings informing the user that the computation is in progress. Otherwise,
-    it'll inform the user that it's displaying the statistics of a previous run.
+    If running is True, the dialog should display strings informing the user
+    that the computation is in progress. Otherwise, it'll inform the user that
+    it's displaying the statistics of a previous run.
     '''
 
     Observable.__init__(self)
@@ -1211,9 +1335,11 @@ class SearchProgressDialog(Observable):
       self._dialog = DialogWindow(parent, 'Statistics')
 
     if running:
-      infoLabel = ttk.Label(self._dialog.content, text='Computation is now in progress. Please wait.')
+      infoLabel = ttk.Label(self._dialog.content,
+                          text='Computation is now in progress. Please wait.')
     else:
-      infoLabel = ttk.Label(self._dialog.content, text='Last search statistics:')
+      infoLabel = ttk.Label(self._dialog.content,
+                            text='Last search statistics:')
 
     stats = ttk.Labelframe(self._dialog.content, text='Statistics:', padding=3)
 
@@ -1241,7 +1367,10 @@ class SearchProgressDialog(Observable):
     self._posCount        = ttk.Label(stats)
     self._posPerSec       = ttk.Label(stats)
 
-    self._cancelBtn = ttk.Button(self._dialog.buttonBox, text='Cancel' if running else 'OK', command=self._cancel)
+    self._cancelBtn = ttk.Button(
+      self._dialog.buttonBox,
+      text='Cancel' if running else 'OK', command=self._cancel
+    )
     self._dialog.setDeleteAction(lambda: self._cancelBtn.invoke())
 
     progress = ttk.Labelframe(self._dialog.content,
@@ -1339,7 +1468,9 @@ class SearchProgressDialog(Observable):
 
 
   def showTimeElapsed(self, sTime):
-    '''Show how much time has passed since the start of the calculation, in seconds.'''
+    '''Show how much time has passed since the start of the calculation, in
+    seconds.
+    '''
 
     self._timeElapsed['text'] = '%d seconds' % sTime
 
@@ -1405,9 +1536,11 @@ class SearchProgressController(object):
 
 
   def run(self, controller):
-    '''Run the search. This call will only return after the search is either finished or the user has decided to cancel it.
+    '''Run the search. This call will only return after the search is either
+    finished or the user has decided to cancel it.
 
-    Returns a dictionary with the statistics, that can later be fed into PositionStatsController.
+    Returns a dictionary with the statistics, that can later be fed into
+    PositionStatsController.
     '''
 
     MS_BURST_TIME = 250
@@ -1420,7 +1553,9 @@ class SearchProgressController(object):
         self.progCtrl = progCtrl
 
       def update(self, source):
-        '''This is an event from SearchProgressDialog -- the only event it ever fires up is the Cancel event.'''
+        '''This is an event from SearchProgressDialog -- the only event it ever
+        fires up is the Cancel event.
+        '''
         controller.cancel()
 
       def updateDlg(self, controller, progress):
@@ -1438,20 +1573,26 @@ class SearchProgressController(object):
         dlg.showMemoryAllocated(memUsed)
 
         if progress.transTblSize is not None:
-          ttSize = '{0:.2f} MB'.format(progress.transTblSize / float(1024 * 1024))
-          dlg.showTransTblStats(memUsed=ttSize, hits=progress.transTblHits, misses=progress.transTblMisses)
+          ttSize = '{0:.2f} MB'.format(progress.transTblSize /
+                                                           float(1024 * 1024))
+          dlg.showTransTblStats(memUsed=ttSize, hits=progress.transTblHits,
+                                misses=progress.transTblMisses)
         else:
           dlg.showTransTblStats(memUsed='0 B', hits='0', misses='0')
 
         if progress.proofTblSize is not None:
-          ptSize = '{0:.2f} MB'.format(progress.proofTblSize / float(1024 * 1024))
-          dlg.showProofTblStats(memUsed=ptSize, hits=progress.proofTblHits, misses=progress.proofTblMisses)
+          ptSize = '{0:.2f} MB'.format(progress.proofTblSize /
+                                                           float(1024 * 1024))
+          dlg.showProofTblStats(memUsed=ptSize, hits=progress.proofTblHits,
+                                misses=progress.proofTblMisses)
         else:
           dlg.showProofTblStats(memUsed='0 B', hits='0', misses='0')
 
-        dlg.showMoveCacheStats(hits=progress.moveCacheHits, misses=progress.moveCacheMisses)
+        dlg.showMoveCacheStats(hits=progress.moveCacheHits,
+                               misses=progress.moveCacheMisses)
 
-        dlg.showPosCount(posCount=progress.positionCount, posPerSec=progress.positionsPerSecond)
+        dlg.showPosCount(posCount=progress.positionCount,
+                         posPerSec=progress.positionsPerSecond)
         dlg.showRootPnDn(progress.rootPN, progress.rootDN)
         dlg.updateGui()
 
@@ -1462,50 +1603,64 @@ class SearchProgressController(object):
     try:
       controller.runSearch(MS_BURST_TIME)
     except RuntimeError, e:
-      tkMessageBox.showerror('Error', 'An internal error has happened. This is likely a bug.\n\n{0}'.format(e))
+      tkMessageBox.showerror(
+        'Error',
+        'An internal error has happened. This is likely a bug.\n\n' +
+        '{0}'.format(e)
+      )
     finally:
       controller.searchProgressCallbacks.remove(updater.updateDlg)
       self._searchProgressDlg.close()
 
 
 class SearchStatsController(object):
-  '''Another controller for SearchProgressDialog -- this one, however, doesn't run the search, but merely displays the stats.'''
+  '''Another controller for SearchProgressDialog -- this one, however, doesn't
+  run the search, but merely displays the stats.
+  '''
 
   def __init__(self, searchProgressDlg, stats):
     s = stats
     searchProgressDlg.showTimeElapsed(s.timeElapsed)
-    searchProgressDlg.showMemoryAllocated('{0:.2f} MB'.format(s.memUsed / float(1024 * 1024)))
-    searchProgressDlg.showPosCount(posCount=s.positionCount, posPerSec=s.positionsPerSecond)
+    searchProgressDlg.showMemoryAllocated('{0:.2f} MB'.format(s.memUsed /
+                                                          float(1024 * 1024)))
+    searchProgressDlg.showPosCount(posCount=s.positionCount, 
+                                   posPerSec=s.positionsPerSecond)
     searchProgressDlg.showRootPnDn(s.rootPN, s.rootDN)
 
     if s.transTblSize is not None:
       ttSize = '{0:.2f} MB'.format(s.transTblSize / float(1024 * 1024))
-      searchProgressDlg.showTransTblStats(ttSize, hits=s.transTblHits, misses=s.transTblMisses)
+      searchProgressDlg.showTransTblStats(ttSize, hits=s.transTblHits,
+                                          misses=s.transTblMisses)
     else:
       searchProgressDlg.showTransTblStats('0 B', '0', '0')
 
     if s.proofTblSize is not None:
       ptSize = '{0:.2f} MB'.format(s.proofTblSize / float(1024 * 1024))
-      searchProgressDlg.showProofTblStats(ptSize, hits=s.proofTblHits, misses=s.proofTblMisses)
+      searchProgressDlg.showProofTblStats(ptSize, hits=s.proofTblHits,
+                                          misses=s.proofTblMisses)
     else:
       searchProgressDlg.showProofTblStats('0 B', '0', '0')
       
-    searchProgressDlg.showMoveCacheStats(hits=s.moveCacheHits, misses=s.moveCacheMisses)
+    searchProgressDlg.showMoveCacheStats(hits=s.moveCacheHits,
+                                         misses=s.moveCacheMisses)
 
     searchProgressDlg.addObserver(self)
     searchProgressDlg.run()
 
 
   def update(self, source):
-    '''The dialog has fired up an event. The only event is the OK button, so dismiss the dialog.'''
+    '''The dialog has fired up an event. The only event is the OK button, so
+    dismiss the dialog.
+    '''
 
     source.close()
 
 
 class PositionEditorDialog(object):
-  '''A dialog window that lets the user modify a game position. It is a modal dialog, once created it will wait in its own
-  inner event loop until the user closes it. The caller may then check wheter the user has decided to confirm or cancel
-  their choice by testing if the .board property is None or not.
+  '''A dialog window that lets the user modify a game position. It is a modal
+  dialog, once created it will wait in its own inner event loop until the user
+  closes it. The caller may then check wheter the user has decided to confirm
+  or cancel their choice by testing if the .board property is None or not.
   '''
 
   board = property(lambda self: self._boardController.board)
@@ -1515,10 +1670,11 @@ class PositionEditorDialog(object):
     '''Create the dialog and wait for the user to close it.
 
     title -- title of the dialog window
-    description -- a short description text that will be displayed on the dialog,
+    description -- a short description text that will be displayed on the
+      dialog,
     imageManager -- an ImageManager instance
-    board -- either a Board instance that will be shown to the user or None, in which case the user will be initially
-            presented with an empty board.
+    board -- either a Board instance that will be shown to the user or None, in
+      which case the user will be initially presented with an empty board.
     '''
 
     object.__init__(self)
@@ -1529,13 +1685,23 @@ class PositionEditorDialog(object):
     self._parent = parent
     self._window = DialogWindow(parent, title)
 
-    descriptionLabel = ttk.Label(self._window.content, text=description, padding=(0, 0, 0, 5))
-    self._positionDisplay = PositionDisplay(self._window.content, board, imageManager)
-    okButton = ttk.Button(self._window.buttonBox, text='OK', command=self._window.close)
-    cancelButton = ttk.Button(self._window.buttonBox, text='Cancel', command=self._cancel)
+    descriptionLabel = ttk.Label(self._window.content, text=description,
+                                 padding=(0, 0, 0, 5))
+    self._positionDisplay = PositionDisplay(self._window.content, board,
+                                            imageManager)
+    okButton = ttk.Button(self._window.buttonBox, text='OK', 
+                          command=self._window.close)
+    cancelButton = ttk.Button(self._window.buttonBox, text='Cancel',
+                              command=self._cancel)
 
-    self._boardController = BoardController(board, self._positionDisplay.boardDisplay, self._positionDisplay.pieceChooser)
-    self._positionController = PositionController(self._window.window, self._positionDisplay, self._boardController)
+    self._boardController = BoardController(
+      board, self._positionDisplay.boardDisplay,
+      self._positionDisplay.pieceChooser
+    )
+
+    self._positionController = PositionController(
+      self._window.window, self._positionDisplay, self._boardController
+    )
 
     descriptionLabel.grid(row=0, column=0, sticky='W')
     self._positionDisplay.widget.grid(row=1, column=0, sticky='NSEW')
@@ -1569,10 +1735,13 @@ class PositionDisplay(Observable):
   boardDisplay = property(lambda self: self._boardDisplay)
   pieceChooser = property(lambda self: self._pieceChooser)
 
-  # color = property(...)  <-- Yes, it's here; it's just actually defined at the bottom.
+  # color = property(...)  <-- Yes, it's here; it's just actually defined at 
+  # the bottom.
 
   class Command:
-    '''Command invoked by the user. Either load position, savePosition position, clear position or switch player to move.'''
+    '''Command invoked by the user. Either load position, savePosition
+    position, clear position or switch player to move.
+    '''
     load, savePosition, clear, switch = range(4)
 
 
@@ -1590,12 +1759,17 @@ class PositionDisplay(Observable):
     goldSilverFrame = ttk.Frame(self._frame)
     self._color = Tkinter.StringVar(goldSilverFrame, 'g')
     playerLabel = ttk.Label(goldSilverFrame, text='Attacker:')
-    self._gold = ttk.Radiobutton(goldSilverFrame, text='Gold', value='g', variable=self._color)
-    self._silver = ttk.Radiobutton(goldSilverFrame, text='Silver', value='s', variable=self._color)
+    self._gold = ttk.Radiobutton(goldSilverFrame, text='Gold', value='g',
+                                 variable=self._color)
+    self._silver = ttk.Radiobutton(goldSilverFrame, text='Silver', value='s',
+                                   variable=self._color)
 
-    self._loadButton['command'] = lambda: self.notifyObservers(cmd=PositionDisplay.Command.load)
-    self._saveButton['command'] = lambda: self.notifyObservers(cmd=PositionDisplay.Command.savePosition)
-    self._clearButton['command'] = lambda: self.notifyObservers(cmd=PositionDisplay.Command.clear)
+    self._loadButton['command'] = lambda: self.notifyObservers(
+      cmd=PositionDisplay.Command.load)
+    self._saveButton['command'] = lambda: self.notifyObservers(
+      cmd=PositionDisplay.Command.savePosition)
+    self._clearButton['command'] = lambda: self.notifyObservers(
+      cmd=PositionDisplay.Command.clear)
 
     self._boardDisplay = BoardDisplay(self._frame, imageManager)
     self._pieceChooser = PieceChooser(self._frame, imageManager)
@@ -1617,7 +1791,9 @@ class PositionDisplay(Observable):
 
 
   def disable(self):
-    '''Disable this widget. Clicking any part of it won't result in any command.'''
+    '''Disable this widget. Clicking any part of it won't result in any
+    command.
+    '''
     self._gold.state(['disabled'])
     self._silver.state(['disabled'])
 
@@ -1673,7 +1849,12 @@ class PositionController(object):
 
       if len(filename) > 0:
         try:
-          saveBoard(self._boardController._board, 1, 'g' if self._positionDisplay.color == apnsmod.Piece.Color.gold else 's', filename)
+          saveBoard(
+            self._boardController._board, 1, 
+            'g' if self._positionDisplay.color == apnsmod.Piece.Color.gold \
+                else 's',
+            filename
+          )
         except RuntimeError, e:
           tkMessageBox.showerror('Could not write to file: %s' % e.what())
 
@@ -1694,39 +1875,49 @@ class PositionController(object):
 
 
 class ImageManager(object):
-  '''ImageManager merely loads and stores images. It is a class of its own to solve three problems:
+  '''ImageManager merely loads and stores images. It is a class of its own to
+  solve three problems:
+
   1) Images may only be loaded after an instance of Tk has been constructed;
   2) Images must be destroyed before Tk is destroyed;
-  3) Tkinter doesn't hold references to loaded images -- something else, then, needs to hold them.
+  3) Tkinter doesn't hold references to loaded images -- something else, then,
+    needs to hold them.
 
-  Therefore the purpose of this class is to load images upon creation, hold references to them so that they
-  stay alive, and ensure destruction at the "right time" -- that is, when individual parts of the interface
-  are destroyed.
+  Therefore the purpose of this class is to load images upon creation, hold
+  references to them so that they stay alive, and ensure destruction at the
+  "right time" -- that is, when individual parts of the interface are
+  destroyed.
 
-  The destruction part is implicit. The only important thing is that the last references to the loaded images are
-  dropped when objects are being destroyed. If the references were held on a module level, the destruction would
-  happen *after* the destruction of the Tk object.
+  The destruction part is implicit. The only important thing is that the last
+  references to the loaded images are dropped when objects are being destroyed.
+  If the references were held on a module level, the destruction would happen
+  *after* the destruction of the Tk object.
 
-  An instance of this class may only be created after an instance of Tk has been created.
+  An instance of this class may only be created after an instance of Tk has
+  been created.
   '''
 
   background = property(lambda self: self._background)
-  pieceImages = property(lambda self: self._pieceImages)  # Dictionary (color, type) -> Image
+  # Dictionary (color, type) -> Image
+  pieceImages = property(lambda self: self._pieceImages)  
   selection = property(lambda self: self._selection)
   removeImage = property(lambda self: self._removeImage)
 
   def __init__(self):
-    '''Load images from disk. If there is an error, display an error box and raise SystemExit. Tk needs to have been
-    constructed.
+    '''Load images from disk. If there is an error, display an error box and
+    raise SystemExit. Tk needs to have been constructed.
     '''
 
     object.__init__(self)
 
     try:
       from Tkinter import PhotoImage
-      self._background = PhotoImage(file='interface/arimaa-graphics/BoardMarbleSmall.gif')
-      self._selection = PhotoImage(file='interface/arimaa-graphics/selection.gif')
-      self._removeImage = PhotoImage(file='interface/arimaa-graphics/remove.gif')
+      self._background = PhotoImage(
+        file='interface/arimaa-graphics/BoardMarbleSmall.gif')
+      self._selection = PhotoImage(
+        file='interface/arimaa-graphics/selection.gif')
+      self._removeImage = PhotoImage(
+        file='interface/arimaa-graphics/remove.gif')
 
       self._pieceImages = dict()
       for color in _COLORS:
@@ -1742,15 +1933,27 @@ class ImageManager(object):
   def _imageName(self, color, type_):
     '''Get the filename of the image of the piece with given color and type.'''
 
-    colorName = { apnsmod.Piece.Color.gold: 'Gold', apnsmod.Piece.Color.silver: 'Silver' }[color]
-    typeName = { apnsmod.Piece.Type.elephant: 'Elephant', apnsmod.Piece.Type.camel: 'Camel', apnsmod.Piece.Type.horse: 'Horse',
-                 apnsmod.Piece.Type.dog: 'Dog', apnsmod.Piece.Type.cat: 'Cat', apnsmod.Piece.Type.rabbit: 'Rabbit' }[type_]
+    colorName = {
+      apnsmod.Piece.Color.gold: 'Gold',
+      apnsmod.Piece.Color.silver: 'Silver' 
+    }[color]
+
+    typeName = {
+      apnsmod.Piece.Type.elephant: 'Elephant',
+      apnsmod.Piece.Type.camel: 'Camel',
+      apnsmod.Piece.Type.horse: 'Horse',
+      apnsmod.Piece.Type.dog: 'Dog',
+      apnsmod.Piece.Type.cat: 'Cat',
+      apnsmod.Piece.Type.rabbit: 'Rabbit' 
+    }[type_]
+
     return 'interface/arimaa-graphics/' + colorName + typeName + '.gif'
 
 
 class PieceChooser(Observable):
-  '''Widget to let a user choose a piece. When a user clicks on a piece, this object fires an even through
-  the Observable interface with two keyword parameters: color and type.
+  '''Widget to let a user choose a piece. When a user clicks on a piece, this
+  object fires an even through the Observable interface with two keyword
+  parameters: color and type.
   '''
 
   widget = property(lambda self: self._frame)
@@ -1771,7 +1974,8 @@ class PieceChooser(Observable):
         color = _COLORS[column]
         type_ = _TYPES[row]
 
-        b = ttk.Label(self._frame, image=imageManager.pieceImages[color, type_])
+        b = ttk.Label(self._frame,
+                      image=imageManager.pieceImages[color, type_])
         b.color = color
         b.type = type_
         b.bind('<1>', self._pieceClicked)
@@ -1809,8 +2013,9 @@ class PieceChooser(Observable):
 
 
 class BoardDisplay(Observable):
-  '''Displays the game _board. On click, this widgets fires an event through the Observable interface. The event
-  contains two keyword arguments: row and column which specify which position on the _board was clicked on.
+  '''Displays the game _board. On click, this widgets fires an event through
+  the Observable interface. The event contains two keyword arguments: row and
+  column which specify which position on the _board was clicked on.
   '''
 
   widget = property(lambda self: self._canvas)
@@ -1819,31 +2024,38 @@ class BoardDisplay(Observable):
     Observable.__init__(self)
     self._imageManager = imageManager
 
-    self._canvas = Tkinter.Canvas(parent, width=_BOARD_WIDTH, height=_BOARD_HEIGHT)
+    self._canvas = Tkinter.Canvas(parent, width=_BOARD_WIDTH, 
+                                  height=_BOARD_HEIGHT)
     self._canvas.create_image(0, 0, image=imageManager.background, anchor='nw')
     self._canvas.bind('<1>', self._onClick)
 
 
   def select(self, row, column):
-    '''Draw a selection rectangle around the given row and column. Return the selection object.
+    '''Draw a selection rectangle around the given row and column. Return the
+    selection object.
 
-    The returned selection object is of an unspecified type except that the same object must be passed
-    to unselect to remove the selection.
+    The returned selection object is of an unspecified type except that the
+    same object must be passed to unselect to remove the selection.
     '''
 
     x, y = self._rowColumnToXY(row, column)
-    return self._canvas.create_image(x, y, image=self._imageManager.selection, anchor='nw')
+    return self._canvas.create_image(x, y, image=self._imageManager.selection,
+                                     anchor='nw')
 
 
   def unselect(self, selection):
-    '''Remove the given selection. 'selection' is the object returned from the select function.'''
+    '''Remove the given selection. 'selection' is the object returned from the
+    select function.
+    '''
+
     self._canvas.delete(selection)
 
 
   def putPiece(self, row, column, color, type_):
-    '''Put the specified piece on the given row and column. Return a handle to the piece. The returned handle
-    must then be passed to removePiece. It is of an unspecified type. This function doesn't check if the target
-    position is empty or not.
+    '''Put the specified piece on the given row and column. Return a handle to
+    the piece. The returned handle must then be passed to removePiece. It is of
+    an unspecified type. This function doesn't check if the target position is
+    empty or not.
     '''
 
     x, y = self._rowColumnToXY(row, column)
@@ -1853,7 +2065,9 @@ class BoardDisplay(Observable):
 
 
   def removePiece(self, handle):
-    '''Remove a previously added piece from the display. 'handle' is the value returned from the addPiece call.'''
+    '''Remove a previously added piece from the display. 'handle' is the value
+    returned from the addPiece call.
+    '''
 
     self._canvas.delete(handle)
 
@@ -1865,8 +2079,9 @@ class BoardDisplay(Observable):
 
 
   def _rowColumnToXY(self, row, column):
-    '''Convert (row, column) coordinates into (x, y) coordinates of the board background image. The resulting value represents
-    some point inside specified square.
+    '''Convert (row, column) coordinates into (x, y) coordinates of the board
+    background image. The resulting value represents some point inside
+    specified square.
     '''
 
     x = _OUTER_BORDER + column * (_INNER_BORDER + _TILE_WIDTH)
@@ -1875,8 +2090,8 @@ class BoardDisplay(Observable):
 
 
   def _xyToRowColumn(self, x, y):
-    '''Convert (x, y) coordinates of the board background image to the (row, column) coordinates of the square under that
-    pixel.
+    '''Convert (x, y) coordinates of the board background image to the (row,
+    column) coordinates of the square under that pixel.
     '''
 
     column = (x - _OUTER_BORDER) / (_INNER_BORDER + _TILE_WIDTH)
@@ -1885,18 +2100,22 @@ class BoardDisplay(Observable):
 
 
 class BoardController(object):
-  '''Control logic of the BoardDisplay and PieceChooser widgets. An instance of BoardDisplay must always
-  be specified; an instance of PieceDisplay may be omitted, in which case the controller assumes that there
-  is no corresponding PieceChooser object and so new pieces may not be added to the BoardDisplay.  
+  '''Control logic of the BoardDisplay and PieceChooser widgets. An instance of
+  BoardDisplay must always be specified; an instance of PieceDisplay may be
+  omitted, in which case the controller assumes that there is no corresponding
+  PieceChooser object and so new pieces may not be added to the BoardDisplay.  
   '''
 
   board = property(lambda self: self._board)
 
   def __init__(self, board, boardDisplay, piecesDisplay):
     '''Create an instance. Parameters:
-      _board: an instance of solver.Board to manipulate or None if it should be initially detached from any _board
-      boardDisplay: the display widget of the _board
-      piecesDisplay: an instance of PieceChooser widget or None
+    _board: an instance of solver.Board to manipulate or None if it should be
+    initially detached from any _board
+
+    boardDisplay: the display widget of the _board 
+    
+    piecesDisplay: an instance of PieceChooser widget or None
     '''
 
     self._board = board
@@ -1959,8 +2178,8 @@ class BoardController(object):
 
 
   def detachFromBoard(self):
-    '''Discard the reference to the Board object. The display will show an empty _board and will not react to any
-    user input.'''
+    '''Discard the reference to the Board object. The display will show an
+    empty _board and will not react to any user input.'''
 
     for displayedPiece in self._displayedPieces.values():
       self._boardDisplay.removePiece(displayedPiece)
@@ -1985,7 +2204,8 @@ class BoardController(object):
   def _updatePieceSelection(self, color, type_):
     '''Update selection on the PieceChooser.'''
 
-    if self._selectedPiece is not None and self._selectedPiece == (color, type_):
+    if self._selectedPiece is not None and \
+        self._selectedPiece == (color, type_):
       self._removePieceSelection()
 
     else:
@@ -1999,8 +2219,8 @@ class BoardController(object):
   def _updateBoardSelection(self, row, column):
     '''Update piece selection on the _board.'''
 
-    # If there is a piece selected in the chooser and then the user clicks on a position on the _board,
-    # it's an "add piece" command.
+    # If there is a piece selected in the chooser and then the user clicks on a
+    # position on the _board, it's an "add piece" command.
 
     empty = apnsmod.empty
     Position = apnsmod.Position
@@ -2015,15 +2235,16 @@ class BoardController(object):
         self._updateBoard(Position(r, c))
         self._removePieceSelection()
 
-      elif self._selectedPiece == (None, None) and not empty(Position(r, c), self._board):
+      elif self._selectedPiece == (None, None) and \
+          not empty(Position(r, c), self._board):
         self._board.remove(Position(r, c))
         self._updateBoard(Position(r, c))
         self._removePieceSelection()
 
     else:
       if self._boardSelection is not None:
-        # If there already is a piece selected on the _board, then move it to the new position, if the new position
-        # is empty.
+        # If there already is a piece selected on the _board, then move it to
+        # the new position, if the new position is empty.
         (r, c) = self._boardSelectionRowColumn
 
         (oldRow, oldColumn) = self._boardCoordsFromDisplay(r, c)
@@ -2046,7 +2267,8 @@ class BoardController(object):
           self._removeBoardSelection()
 
       else:
-        # If there is no selection, create a new one if there is a piece on the selected place.
+        # If there is no selection, create a new one if there is a piece on the
+        # selected place.
         (r, c) = self._boardCoordsFromDisplay(row, column)
 
         if not empty(Position(r, c), self._board):
@@ -2067,7 +2289,8 @@ class BoardController(object):
   def _removePieceSelection(self):
     '''Deselect the currently selected piece (if any) in the PieceChooser.'''
     if self._selectedPiece is not None:
-      self._piecesDisplay.unselect(self._selectedPiece[0], self._selectedPiece[1])
+      self._piecesDisplay.unselect(self._selectedPiece[0],
+                                   self._selectedPiece[1])
       self._selectedPiece = None
 
 
@@ -2081,14 +2304,17 @@ class BoardController(object):
 
   def _displayPiece(self, position, piece):
     '''Add the specified piece to the _board display.'''
-    displayRow, displayColumn = self._displayCoordsFromBoard(position.row, position.column)
-    handle = self._boardDisplay.putPiece(displayRow, displayColumn, piece.color, piece.type)
+    displayRow, displayColumn = self._displayCoordsFromBoard(position.row,
+                                                             position.column)
+    handle = self._boardDisplay.putPiece(displayRow, displayColumn, 
+                                         piece.color, piece.type)
     self._displayedPieces[position] = handle
 
 
   def _boardCoordsFromDisplay(self, row, column):
-    '''Convert to _board coordinates from display coordinates. Display coordinates use numbers 1 to 8 for columns;
-    _board coordinates use letters 'a' to 'h'.
+    '''Convert to _board coordinates from display coordinates. Display
+    coordinates use numbers 1 to 8 for columns; _board coordinates use letters
+    'a' to 'h'.
     '''
 
     c = chr(ord('a') + column)

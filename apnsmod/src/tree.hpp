@@ -23,21 +23,28 @@
 
 namespace apns {
 
-//! A vertex of the game tree.
-//!
-//! Vertices are non-copyable to prevent costly copies of large subtrees. Internally, they are implemented via resizeable
-//! array -- as such, their allocated size may be larger than the number of children. The pack() member function can be used
-//! to make the vertex only take up as much free-store space as required.
-//!
-//! \note This class behaves like a container of children. The children are always sorted in the order in which they were
-//! inserted.
-//!
-//! \note Operations such as add_child, remove_child, reserve, resize and pack may and will invalidate all iterators, pointers
-//! and references to any children of this vertex.
+/** A vertex of the game tree.
+ *
+ * Vertices are non-copyable to prevent costly copies of large subtrees.
+ * Internally, they are implemented via resizeable array -- as such, their
+ * allocated size may be larger than the number of children. The pack() member
+ * function can be used to make the vertex only take up as much free-store
+ * space as required.
+ *
+ * \note This class behaves like a container of children. The children are
+ * always sorted in the order in which they were inserted.
+ *
+ * \note Operations such as add_child, remove_child, reserve, resize and pack
+ * may and will invalidate all iterators, pointers and references to any
+ * children of this vertex.
+ *
+ * \note This could probably have been designed better. Oh well...
+ */
 class vertex : boost::noncopyable {
   typedef boost::ptr_vector<vertex> children_container;
 
-  //! This is to provide the op ->* that is for some reason missing in ptr_vector's iterator...
+  //! This is to provide the op ->* that is for some reason missing in 
+  //! ptr_vector's iterator...
   template <typename Iter>
   struct children_iterator_base : boost::iterator_adaptor<
     children_iterator_base<Iter>,
@@ -46,22 +53,31 @@ class vertex : boost::noncopyable {
     children_iterator_base() { }
 
     // Intentionally implicit.
-    children_iterator_base(Iter i) : children_iterator_base::iterator_adaptor_(i) { }
+    children_iterator_base(Iter i) 
+      : children_iterator_base::iterator_adaptor_(i) 
+    { }
 
     template <typename T>
     T& operator ->* (T vertex::*mptr) { return (*(this->base())).*mptr; }
   };
 
 public:
-  typedef boost::uint32_t number_t;  //!< Type of the proof and disproof numbers.
+  //! Type of the proof and disproof numbers.
+  typedef boost::uint32_t number_t;  
   
-  typedef children_iterator_base<children_container::iterator>        children_iterator;
-  typedef children_iterator_base<children_container::const_iterator>  const_children_iterator;
-  typedef boost::reverse_iterator<children_iterator>                  reverse_children_iterator;
-  typedef boost::reverse_iterator<const_children_iterator>            const_reverse_children_iterator;
+  typedef children_iterator_base<children_container::iterator> 
+    children_iterator;
+  typedef children_iterator_base<children_container::const_iterator> 
+    const_children_iterator;
+  typedef boost::reverse_iterator<children_iterator> 
+    reverse_children_iterator;
+  typedef boost::reverse_iterator<const_children_iterator>
+    const_reverse_children_iterator;
 
-  static number_t const max_num;  //!< Maximum value of a proof- or disproof number.
-  static number_t const infty;    //!< Infinity value used in the algorithm.
+  //! Maximum value of a proof- or disproof number.
+  static number_t const max_num;  
+  //! Infinity value used in the algorithm.
+  static number_t const infty;    
   
   //! Type of this node.
   enum e_type {
@@ -78,11 +94,12 @@ public:
   vertex();
   ~vertex();
 
-  //! Add a child at the end of the children list and return an iterator to it. May invalidate all existing iterators to
-  //! children of this vertex.
+  //! Add a child at the end of the children list and return an iterator to it.
+  //! May invalidate all existing iterators to children of this vertex.
   children_iterator add_child();
 
-  //! Remove child specified by an iterator into this vertex. May invalidate all existing iterators to children of this vertex.
+  //! Remove child specified by an iterator into this vertex. May invalidate 
+  //! all existing iterators to children of this vertex.
   //! \returns Iterator to the child following the removed one.
   children_iterator remove_child(children_iterator child);
   
@@ -110,8 +127,12 @@ public:
   std::size_t children_count() const { return children_.size(); }
   bool leaf() const { return children_.empty(); }
 
-  //! Construct an iterator to a child from a pointer to a child of this vertex. The behaviour is undefined if child does not
-  //! point to a child of this vertex.
+  //! Construct an iterator to a child from a pointer to a child of this 
+  //! vertex. The behaviour is undefined if child does not point to a child of 
+  //! this vertex.
+  //!
+  //! \note This is surprisingly ineffective (O(n) instead of O(1)) -- could
+  //!   it be improved or removed?
   children_iterator iter_from_ptr(vertex* child) {
     using namespace boost::lambda;
     return std::find_if(children_.begin(), children_.end(),
@@ -134,11 +155,14 @@ public:
     std::swap(*first.base().base(), *second.base().base());
   }
 
-  //! Transfer a child from another vertex to this one. The child is removed from the source vertex. Insertion into this one
-  //! is done at the end by default, but that may be changed by specifying the before parameter.
+  //! Transfer a child from another vertex to this one. The child is removed 
+  //! from the source vertex. Insertion into this one is done at the end by 
+  //! default, but that may be changed by specifying the before parameter.
   //!
-  //! \note As the source vertex's size is reduced, it may be advantageous to .pack() it after this operation.
-  void transfer_child(vertex& other, vertex::children_iterator child, vertex::children_iterator before) {
+  //! \note As the source vertex's size is reduced, it may be advantageous to 
+  //!   .pack() it after this operation.
+  void transfer_child(vertex& other, vertex::children_iterator child,
+                      vertex::children_iterator before) {
     children_.transfer(before.base(), child.base(), other.children_);
   }
 
@@ -146,25 +170,27 @@ public:
     transfer_child(other, child, children_end());
   }
 
-  //! Make this vertex allocate enough memory to hold new_size children, but don't really create the children yet. This may
-  //! invalidate all existing iterators to children of this vertex.
+  //! Make this vertex allocate enough memory to hold new_size children, but 
+  //! don't really create the children yet. This may invalidate all existing 
+  //! iterators to children of this vertex.
   void reserve(std::size_t new_size);
 
-  //! Make this vertex have new_size children. If new_size is more than the current size, new children will be 
-  //! default-constructed at the end of the children sequence. If new_size is less than the current size, this is equivalent
-  //! to removing children from the end until this vertex has exactly new_size children.
+  //! Make this vertex have new_size children. If new_size is more than the 
+  //! current size, new children will be  default-constructed at the end of the 
+  //! children sequence. If new_size is less than the current size, this is 
+  //! equivalent to removing children from the end until this vertex has 
+  //! exactly new_size children.
   //!
-  //! This function may invalidate all existing iterators to children of this vertex.
+  //! This function may invalidate all existing iterators to children of this 
+  //! vertex.
   //!
   //! \note This doesn't necessarily free up any memory if the size is reduced.
   void resize(std::size_t new_size);
 
-  //! Make this vertex use only as much memory as required to hold all its children. This may invalidate all existing iterator
+  //! Make this vertex use only as much memory as required to hold all its 
+  //! children. This may invalidate all existing iterator
   //! to children of this vertex.
   void pack();
-
-  //! Swap the subtree rooted in this vertex with a subtree rooted in the other vertex.
-  //void swap(vertex& other);
 
   //! Get an aproximate total memory usage by all vertices of all trees.
   static std::size_t alloc_size() { return alloc_; }
@@ -214,13 +240,18 @@ void sort_children(vertex& parent, Compare comp = Compare()) {
   parent.sort_children(comp);
 }
 
-//! Update the order of children of a vertex assuming it was sorted previously but child is now out of order.
+//! Update the order of children of a vertex assuming it was sorted previously 
+//! but child is now out of order.
 //!
 //! \returns Iterator to the given child in its new position.
 template <typename Compare>
-vertex::children_iterator resort_children(vertex& parent, vertex::children_iterator child, Compare comp = Compare()) {
-  // So long as the child is greater than its sibling to the right, bubble it right.
-  while (boost::next(child) != parent.children_end() && comp(*boost::next(child), *child)) {
+vertex::children_iterator
+resort_children(vertex& parent, vertex::children_iterator child, 
+                Compare comp = Compare()) {
+  // So long as the child is greater than its sibling to the right, bubble it 
+  // right.
+  while (boost::next(child) != parent.children_end() && 
+         comp(*boost::next(child), *child)) {
     vertex::children_iterator equal_range_end = boost::next(child);
     while (equal_range_end != parent.children_end() &&
            boost::next(equal_range_end) != parent.children_end() &&
@@ -231,9 +262,11 @@ vertex::children_iterator resort_children(vertex& parent, vertex::children_itera
     child = equal_range_end;
   }
 
-  // And conversly, so long as the sibling to the left is greater or equal than the child, bubble left. Note that this won't do
-  // anything if the previous loop already re-sorted the children.
-  while (child != parent.children_begin() && !comp(*boost::prior(child), *child)) {
+  // And conversly, so long as the sibling to the left is greater or equal than 
+  // the child, bubble left. Note that this won't do anything if the previous 
+  // loop already re-sorted the children.
+  while (child != parent.children_begin() && 
+         !comp(*boost::prior(child), *child)) {
     vertex::children_iterator equal_range_begin = boost::prior(child);
     while (equal_range_begin != parent.children_begin() &&
            boost::prior(equal_range_begin) != parent.children_begin() &&
@@ -251,12 +284,15 @@ vertex::children_iterator resort_children(vertex& parent, vertex::children_itera
 //! \param source The source vertex.
 //! \param child An iterator into source specifying the child to transfer.
 //! \param dest Destination vertex.
-//! \param before Iterator into dest specifying before which position is the insertion to take place.
-inline void transfer_child(vertex& source, vertex::children_iterator child, vertex& dest, vertex::children_iterator before) {
+//! \param before Iterator into dest specifying before which position is the 
+//!   insertion to take place.
+inline void transfer_child(vertex& source, vertex::children_iterator child,
+                           vertex& dest, vertex::children_iterator before) {
   dest.transfer_child(source, child, before);
 }
 
-inline void transfer_child(vertex& source, vertex::children_iterator child, vertex& dest) {
+inline void transfer_child(vertex& source, vertex::children_iterator child,
+                           vertex& dest) {
   dest.transfer_child(source, child);
 }
 
@@ -281,12 +317,17 @@ public:
 //! Save a game object to a file.
 //!
 //! \param game The game object to be saved.
-//! \param filename Name of the file to save to. This will be opened by an ofstream.
-//! \param op_ctrl OperationController for this operation. This algorithm does not provide information about its progress.
+//! \param filename Name of the file to save to. This will be opened by an 
+//!   ofstream.
+//! \param op_ctrl OperationController for this operation. This algorithm does 
+//!   not provide information about its progress.
 //!
-//! \throws std::runtime_error Thrown if the file could not be written successfully.
-void save_game(boost::shared_ptr<game> const& game, std::string const& filename, operation_controller& op_ctrl);
-inline void save_game(boost::shared_ptr<game> const& game, std::string const& filename) {
+//! \throws std::runtime_error Thrown if the file could not be written 
+//!   successfully.
+void save_game(boost::shared_ptr<game> const& game,
+               std::string const& filename, operation_controller& op_ctrl);
+inline void save_game(boost::shared_ptr<game> const& game,
+                      std::string const& filename) {
   null_operation_controller op_ctrl;
   save_game(game, filename, op_ctrl);
 }
@@ -294,13 +335,18 @@ inline void save_game(boost::shared_ptr<game> const& game, std::string const& fi
 //! Load a game from a file.
 //!
 //! \param filename File to be read. This will be opened by an ifstream.
-//! \param op_ctrl OperationController for this operation. This algorithm does not provide information about its progress.
+//! \param op_ctrl OperationController for this operation. This algorithm does 
+//!   not provide information about its progress.
 //!
 //! \returns A new Game instance and total number of vertices in the tree.
 //!
-//! \throws std::runtime_error Thrown if the file could not be read successfully, or if its format is not valid.
-std::pair<boost::shared_ptr<game>, std::size_t> load_game(std::string const& filename, operation_controller& op_ctrl);
-inline std::pair<boost::shared_ptr<game>, std::size_t> load_game(std::string const& filename) {
+//! \throws std::runtime_error Thrown if the file could not be read 
+//!   successfully, or if its format is not valid.
+std::pair<boost::shared_ptr<game>, std::size_t>
+load_game(std::string const& filename, operation_controller& op_ctrl);
+
+inline std::pair<boost::shared_ptr<game>, std::size_t> 
+load_game(std::string const& filename) {
   null_operation_controller op_ctrl;
   return load_game(filename, op_ctrl);
 }
@@ -315,20 +361,25 @@ struct null_stop_condition {
   bool operator () (vertex const&) { return false; }
 };
 
-//! Convenience typedef so that users don't have to type out the function signature each time they want to use a traverser
-//! with an ordinary function.
+//! Convenience typedef so that users don't have to type out the function 
+//! signature each time they want to use a traverser with an ordinary function.
 typedef vertex* (*fun_tp)(vertex&);
 
-//! Generic tree traverser. This traverser doesn't have to visit every node in the tree; instead, the path it will take is
-//! dictated by the specified TraversalPolicy.
-//!
-//! \tparam TraversalPolicy Specifies how the tree will be traversed. It is a functor taking a vertex& and returning a pointer
-//!   to the desired successor, or null if the traversal is to be stopped.
-//! \tparam Visitor Will be called on each node that is traversed.
-//! \tparam StopCondition Will be called on each node that is traversed (after Visitor) and if it returns true, the traversal
-//! will be stopped and the last visited vertex returned.
+/** Generic tree traverser. This traverser doesn't have to visit every node in
+ * the tree; instead, the path it will take is dictated by the specified
+ * TraversalPolicy.
+ *
+ * \tparam TraversalPolicy Specifies how the tree will be traversed. It is a
+ *   functor taking a vertex& and returning a pointer to the desired successor,
+ *   or null if the traversal is to be stopped.
+ * \tparam Visitor Will be called on each node that is traversed.
+ * \tparam StopCondition Will be called on each node that is traversed (after
+ *   Visitor) and if it returns true, the traversal
+ *   will be stopped and the last visited vertex returned.
+ */
 template <typename TraversalPolicy, typename Visitor, typename StopCondition>
-vertex* traverse(vertex& root, TraversalPolicy traversal_policy, Visitor visitor, StopCondition stop_condition) {
+vertex* traverse(vertex& root, TraversalPolicy traversal_policy,
+                 Visitor visitor, StopCondition stop_condition) {
   vertex* previous = 0;
   vertex* current = &root;
 
@@ -345,19 +396,23 @@ vertex* traverse(vertex& root, TraversalPolicy traversal_policy, Visitor visitor
 }
 
 template <typename TraversalPolicy, typename Visitor>
-vertex* traverse(vertex& root, TraversalPolicy traversal_policy, Visitor visitor) {
+vertex* traverse(vertex& root, TraversalPolicy traversal_policy,
+                 Visitor visitor) {
   return traverse(root, traversal_policy, visitor, null_stop_condition());
 }
 
 template <typename TraversalPolicy>
 vertex* traverse(vertex& root, TraversalPolicy traversal_policy) {
-  return traverse(root, traversal_policy, null_visitor(), null_stop_condition());
+  return traverse(root, traversal_policy, null_visitor(),
+                  null_stop_condition());
 }
 
-//! Generic tree traverser like traverse, except that this one applies TraversalPolicy first and Visitor and StopCondition after
-//! that. Useful for post-order traversals.
+//! Generic tree traverser like traverse, except that this one applies 
+//! TraversalPolicy first and Visitor and StopCondition after that. Useful for 
+//! post-order traversals.
 template <typename TraversalPolicy, typename Visitor, typename StopCondition>
-vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy, Visitor visitor, StopCondition stop_condition) {
+vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy,
+                           Visitor visitor, StopCondition stop_condition) {
   vertex* previous = &root;
   vertex* current = &*boost::unwrap_ref(traversal_policy)(root);
 
@@ -374,24 +429,32 @@ vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy, Visit
 }
 
 template <typename TraversalPolicy, typename Visitor>
-vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy, Visitor visitor) {
-  return traverse_postorder(root, traversal_policy, visitor, null_stop_condition());
+vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy,
+                           Visitor visitor) {
+  return traverse_postorder(root, traversal_policy, visitor,
+                            null_stop_condition());
 }
 
 template <typename TraversalPolicy>
 vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy) {
-  return traverse_postorder(root, traversal_policy, null_visitor(), null_stop_condition());
+  return traverse_postorder(root, traversal_policy, null_visitor(),
+                            null_stop_condition());
 }
 
 class backtrack {
   // A stack of (current vertex on a level, end iterator for that level).
-  typedef std::stack<std::pair<vertex::children_iterator, vertex::children_iterator> > stack_t;
+  typedef std::stack<
+    std::pair<vertex::children_iterator, vertex::children_iterator>
+  > stack_t;
 
 public:
   vertex* operator () (vertex& current) {
     if (current.children_count() > 0) {
-      // This vertex has any children? Good, go to the first one. Also push this level onto the stack.
-      stack_.push(std::make_pair(current.children_begin(), current.children_end()));
+      // This vertex has any children? Good, go to the first one. Also push 
+      // this level onto the stack.
+      stack_.push(
+        std::make_pair(current.children_begin(), current.children_end())
+      );
       return &*current.children_begin();
 
     } else while (!stack_.empty()) {
@@ -414,9 +477,12 @@ private:
   stack_t stack_;
 };
 
-//! Postorder traveral policy for traverse_postorder. Do note that this never traverses the root vertex.
+//! Postorder traveral policy for traverse_postorder. Do note that this never 
+//! traverses the root vertex.
 class postorder {
-  typedef std::stack<std::pair<apns::vertex::children_iterator, apns::vertex::children_iterator> > stack_t;
+  typedef std::stack<
+    std::pair<apns::vertex::children_iterator, apns::vertex::children_iterator>
+  > stack_t;
 
 public:
   vertex* operator () (apns::vertex& v) {
@@ -447,7 +513,8 @@ public:
 private:
   stack_t stack_;
 
-  //! If an iterator is given, increments it and returns pointer to the originally pointed-to vertex. Otherwise, it returns 0.
+  //! If an iterator is given, increments it and returns pointer to the 
+  //! originally pointed-to vertex. Otherwise, it returns 0.
   vertex* inc(boost::optional<vertex::children_iterator&> i) {
     if (i)
       return &*((*i)++);
@@ -455,12 +522,15 @@ private:
       return 0;
   }
 
-  boost::optional<vertex::children_iterator&> recurse(vertex::children_iterator from) {
+  boost::optional<vertex::children_iterator&> 
+  recurse(vertex::children_iterator from) {
     using namespace apns;
 
     vertex::children_iterator current = from;
     while (current->children_count() > 0) {
-      stack_.push(std::make_pair(current->children_begin(), current->children_end()));
+      stack_.push(
+        std::make_pair(current->children_begin(), current->children_end())
+      );
       current = current->children_begin();
     }
 
@@ -482,7 +552,8 @@ struct vertex_counter {
   std::size_t count;
 };
 
-//! Holds an instance of a concrete traversal policy object and delegates the traversal to it.
+//! Holds an instance of a concrete traversal policy object and delegates the 
+//! traversal to it.
 struct virtual_traversal_policy {
   //! Virtual traversal policy interface.
   struct base {
@@ -523,14 +594,16 @@ struct composite_visitor {
   }
 };
 
-//! Helper to make a composite_visitor without having to type out the full template parameter list.
+//! Helper to make a composite_visitor without having to type out the full 
+//! template parameter list.
 template <typename First, typename Second>
 composite_visitor<First, Second> make_composite_visitor(First f, Second s) {
   return composite_visitor<First, Second>(f, s);
 }
 
-//! Holds an instance of a concrete visitor (derived from virtual_visitor::base) and delegates all visiting to it.
-//! Useful e.g. for use from Python.
+//! Holds an instance of a concrete visitor (derived from 
+//! virtual_visitor::base) and delegates all visiting to it. Useful e.g. for 
+//! use from Python.
 struct virtual_visitor {
   //! Virtual visitor interface.
   struct base {
@@ -550,8 +623,8 @@ struct virtual_visitor {
   }
 };
 
-//! Holds an instance of a concrete StopCondition (derived from virtual_stop_condition::base) and delegates the stop decision
-//! to it.
+//! Holds an instance of a concrete StopCondition (derived from 
+//! virtual_stop_condition::base) and delegates the stop decision to it.
 struct virtual_stop_condition {
   //! Virtual stop condition interface.
   struct base {
@@ -572,9 +645,5 @@ struct virtual_stop_condition {
 };
 
 } // namespace apns
-
-namespace std {
-  //template <> inline void swap(apns::vertex& x, apns::vertex& y) { x.swap(y); }
-}
 
 #endif

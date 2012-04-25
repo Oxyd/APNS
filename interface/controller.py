@@ -24,18 +24,23 @@ class _Callbacks(object):
 def loadBoard(filename):
   '''loadBoard(filename) -> (Board, Color)
 
-  Load board position from file described by filename. Return the new board and color of the player to take the next turn.
+  Load board position from file described by filename. Return the new board and
+  color of the player to take the next turn.
 
-  The expected file format is the format described at http://arimaa.com/arimaa/learn/notation.html .
+  The expected file format is the format described at
+  http://arimaa.com/arimaa/learn/notation.html .
   '''
 
-  lines = filter(lambda line: len(line) > 0, file(filename, 'r').readlines())  # Only take nonempty lines.
+  # Only take nonempty lines.
+  lines = filter(lambda line: len(line) > 0, file(filename, 'r').readlines())
 
   if len(lines) >= 12:
     # First line needs to indicate turn number and player.
     match = re.match(r'\d([gs])', lines[0])
     if match is None:
-      raise RuntimeError('Bad input file format: Expected turn and player on first line')
+      raise RuntimeError(
+        'Bad input file format: Expected turn and player on first line'
+      )
 
     player = { 'g': apnsmod.Piece.Color.gold,
                's': apnsmod.Piece.Color.silver }[match.group(1)]
@@ -54,10 +59,14 @@ def loadBoard(filename):
       elif lastLine[charIndex] in (' ', '\n'):
         pass  # Space and newline are okay, just skip them.
       else:
-        raise RuntimeError('Bad input file format: Invalid column specification')
+        raise RuntimeError(
+          'Bad input file format: Invalid column specification'
+        )
 
     if len(columns) != 8:
-      raise RuntimeError('Bad input file format: Expected exactly eight columns')
+      raise RuntimeError(
+        'Bad input file format: Expected exactly eight columns'
+      )
 
     rows = dict()
     for lineIndex in xrange(1, len(lines) - 1):
@@ -91,10 +100,12 @@ def loadBoard(filename):
 def saveBoard(board, moveNumber, player, filename):
   '''saveBoard(Board, int, Color, str) -> None
 
-  Save the given board to a file with given name. The 'player' parameter specifies the player to move in next turn;
-  the 'stepNumber' parameter specifies which move it is.
+  Save the given board to a file with given name. The 'player' parameter
+  specifies the player to move in next turn; the 'stepNumber' parameter
+  specifies which move it is.
 
-  The output format is the one described at http://arimaa.com/arimaa/learn/notation.html .
+  The output format is the one described at
+  http://arimaa.com/arimaa/learn/notation.html .
 
   If filename is None, print to the standard output.
   '''
@@ -192,11 +203,15 @@ class Controller(object):
 
   gameLoaded = property(lambda self: self._game is not None)
   root = property(lambda self: self._game.root if self._game else None)
-  initialState = property(lambda self: self._game.initialState if self._game else None)
+  initialState = property(
+    lambda self: self._game.initialState if self._game else None
+  )
   attacker = property(lambda self: self._game.attacker if self._game else None)
 
   def newGame(self, *args):
-    '''Load a new game from an initial board file or from Board and Piece.Color (initial state and attacker).'''
+    '''Load a new game from an initial board file or from Board and Piece.Color 
+    (initial state and attacker).
+    '''
 
     self.dropGame()
 
@@ -214,14 +229,17 @@ class Controller(object):
     self.dropGame()
 
     self._cancel = False
-    (self._game, self._posCount) = apnsmod.loadGame(gamePath, Controller._OpCtrl(self, self.loadGameCallbacks))
+    (self._game, self._posCount) = apnsmod.loadGame(
+      gamePath, Controller._OpCtrl(self, self.loadGameCallbacks)
+    )
 
   def saveGame(self, gamePath):
     '''Save this game into a search file.'''
 
     self._cancel = False
     if self._game:
-      apnsmod.saveGame(self._game, gamePath, Controller._OpCtrl(self, self.saveGameCallbacks))
+      apnsmod.saveGame(self._game, gamePath,
+                       Controller._OpCtrl(self, self.saveGameCallbacks))
     else:
       raise RuntimeError('Create or load a game first')
 
@@ -243,7 +261,7 @@ class Controller(object):
     self._searchStart = None
     self.stats = None
     self._posCount = None
-    
+
   def runSearch(self, burst=_MS_BURST_TIME):
     '''Run the search until one of the terminating conditions is met.'''
 
@@ -252,20 +270,31 @@ class Controller(object):
     if self._game is None:
       raise RuntimeError('Create or load a game first')
 
-    if self._search is None or type(self._search) != self._algoType(self.searchParameters.algo):
-      self._search = self._algoType(self.searchParameters.algo)(self._game, self._posCount)
+    if self._search is None or \
+        type(self._search) != self._algoType(self.searchParameters.algo):
+      self._search = self._algoType(self.searchParameters.algo)(
+        self._game, self._posCount
+      )
 
     def numElementsFromMbSize(mbSize, tableType):
       bSize = mbSize * MB
       return bSize / (tableType.sizeOfElement)
 
     if self.searchParameters.transTblSize > 0 and (
-        self._search.transpositionTable is None or self._search.transpositionTable.size != self.searchParameters.transTblSize):
-      self._search.useTransTbl(numElementsFromMbSize(self.searchParameters.transTblSize, apnsmod.TranspositionTable))
+        self._search.transpositionTable is None or \
+            self._search.transpositionTable.size != \
+              self.searchParameters.transTblSize):
+      self._search.useTransTbl(
+        numElementsFromMbSize(self.searchParameters.transTblSize,
+                               apnsmod.TranspositionTable)
+      )
 
     if self.searchParameters.proofTblSize > 0 and (
-        self._search.proofTable is None or self._search.proofTable.size != self.searchParameters.proofTblSize):
-      self._search.useProofTbl(numElementsFromMbSize(self.searchParameters.proofTblSize, apnsmod.ProofTable))
+        self._search.proofTable is None or self._search.proofTable.size != \
+            self.searchParameters.proofTblSize):
+      self._search.useProofTbl(numElementsFromMbSize(
+        self.searchParameters.proofTblSize, apnsmod.ProofTable
+      ))
     
     self._search.moveCacheSize = self.searchParameters.moveCacheSize
 
@@ -275,7 +304,9 @@ class Controller(object):
     self._lastPosPerSec = 0
 
     try:
-      while not self._search.finished and not self._limitsExceeded() and not self._cancel:
+      while not self._search.finished and \
+          not self._limitsExceeded() and \
+          not self._cancel:
         self._search.run(burst)
         self._updateProgress()
     except MemoryError:
@@ -301,9 +332,13 @@ class Controller(object):
     self.searchProgressCallbacks.call(self, progress)
 
   def _limitsExceeded(self):
-    timeExceeded = self.searchParameters.timeLimit and time.clock() - self._searchStart >= self.searchParameters.timeLimit
-    posExceeded = self.searchParameters.positionLimit and self._search.positionCount >= self.searchParameters.positionLimit
-    memExceeded = self.searchParameters.memoryLimit and apnsmod.Vertex.allocSize / float(MB) >= self.searchParameters.memoryLimit
+    timeExceeded = self.searchParameters.timeLimit and \
+        time.clock() - self._searchStart >= self.searchParameters.timeLimit
+    posExceeded = self.searchParameters.positionLimit and \
+        self._search.positionCount >= self.searchParameters.positionLimit
+    memExceeded = self.searchParameters.memoryLimit and \
+        apnsmod.Vertex.allocSize / float(MB) >= \
+          self.searchParameters.memoryLimit
     return timeExceeded or memExceeded or posExceeded
 
   def _makeStats(self):
@@ -317,7 +352,8 @@ class Controller(object):
     progress.rootDN = self._game.root.disproofNumber
     self._posCount = progress.positionCount = self._search.positionCount
     if now - self._lastMeasurement >= 1.0:
-      self._lastPosPerSec = progress.positionsPerSecond = (self._posCount - self._lastPosCount) / (now - self._lastMeasurement)
+      self._lastPosPerSec = progress.positionsPerSecond = \
+          (self._posCount - self._lastPosCount) / (now - self._lastMeasurement)
       self._lastMeasurement = now
       self._lastPosCount = self._posCount
     else:

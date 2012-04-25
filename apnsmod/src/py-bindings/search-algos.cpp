@@ -33,10 +33,6 @@ struct virtual_algo_wrap : public apns::virtual_algo, boost::python::wrapper<apn
   apns::zobrist_hasher& hasher() { return hasher_; }
   apns::zobrist_hasher::hash_t initial_hash() { return initial_hash_; }
   apns::search_tree& tree() { return tree_; }
-  using apns::virtual_algo::game_;
-  using apns::virtual_algo::hasher_;
-  using apns::virtual_algo::initial_hash_;
-  using apns::virtual_algo::tree_;
 };
 
 template <typename Algo, typename Base>
@@ -116,8 +112,8 @@ void export_search_algos() {
          "the given vertex is not a child of the current one.")
     .def("selectParent", &apns::search_tree::select_parent,
          "t.selectParent() -> None\n\nSelect the parent of the current vertex. The current vertex must not be the root.")
-    .def("parent", &apns::search_tree::parent, return_internal_reference<>(),
-         "t.parent() -> Vertex\n\nGet the parent of the currently-selected vertex, which must not be the root.")
+    .add_property("parent", make_function(&apns::search_tree::parent, return_internal_reference<>()),
+                  "The parent of the currently-selected vertex, which must not be the root.")
     .def("selectRoot", &apns::search_tree::select_root,
          "t.selectRoot() -> None\n\nSelect the root of the tree.")
     .add_property("atRoot", &apns::search_tree::at_root, "Is the currently-selected vertex the root?")
@@ -128,8 +124,13 @@ void export_search_algos() {
          "t.evaluate() -> None\n\nEvaluate the current vertex")
     .def("evaluateChildren", &apns::search_tree::evaluate_children,
          "t.evaluateChildren() -> None\n\nEvaluate all children of the current selection.")
+    .def("evaluateCached", &apns::search_tree::evaluate_cached,
+         "t.evaluateCached() -> Bool\n\nAttempt to look up current vertex's numbers in the tables. Return True on success.")
     .def("cutChildren", &apns::search_tree::cut_children,
          "t.cutChildren() -> None\n\nRemove all children of the currently-selected vertex.")
+    .def("reduce", &apns::search_tree::reduce,
+         "t.reduce() -> None\n\nAssuming the current vertex only contains leaves, reduce the move by removing duplicate "
+         "paths for the same end position.")
     .def("updatePath", &apns::search_tree::update_path,
          "t.updatePath() -> None\n\nUpdate proof- and disproof number along the current path.")
     .def("useTransTbl", &apns::search_tree::use_trans_tbl,
@@ -149,15 +150,8 @@ void export_search_algos() {
   def("selectBest", &apns::select_best,
       "selectBest(SearchTree) -> None\n\nSelect the best successor of the current vertex in the tree");
 
-  export_algo<apns::proof_number_search>(
-    "ProofNumberSearch",
-    "The basic variant of the Proof-Number Search algorithm"
-  );
-
-  export_algo<apns::depth_first_pns>(
-    "DepthFirstPNS",
-    "Depth-First variant of the algorithm"
-  );
+  export_algo<apns::proof_number_search>("ProofNumberSearch", "The basic variant of the Proof-Number Search algorithm");
+  export_algo<apns::depth_first_pns>("DepthFirstPNS", "Depth-First variant of the algorithm");
 
   export_algo<virtual_algo_wrap, apns::search_algo<apns::virtual_algo> >("SearchAlgorithm", "Abstract base-class for search algorithms")
     .def("doIterate", pure_virtual(&virtual_algo_wrap::really_do_iterate))

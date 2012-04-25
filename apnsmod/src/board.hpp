@@ -1,7 +1,8 @@
 /**
  * \file board.hpp
  *
- * Types and functions related to the board itself and pieces standing on the board.
+ * Types and functions related to the board itself and pieces standing on the 
+ * board.
  */
 
 #ifndef BOARD_HPP
@@ -22,7 +23,8 @@ namespace apns {
 /**
  * One game piece.
  *
- * A piece is immutable. Once it has been created, its attributes cannot be changed. It can, however, be assigned.
+ * A piece is immutable. Once it has been created, its attributes cannot be 
+ * changed. It can, however, be assigned.
  */
 struct piece {
   //! Color of the piece.
@@ -63,8 +65,9 @@ private:
   char data_;
 
   explicit piece(char letter) : data_(letter) {
-    assert(data_ == 'e' || data_ == 'm' || data_ == 'h' || data_ == 'd' || data_ == 'c' || data_ == 'r' ||
-           data_ == 'E' || data_ == 'M' || data_ == 'H' || data_ == 'D' || data_ == 'C' || data_ == 'R');
+    assert(data_ == 'e' || data_ == 'm' || data_ == 'h' || data_ == 'd' ||
+           data_ == 'c' || data_ == 'r' || data_ == 'E' || data_ == 'M' || 
+           data_ == 'H' || data_ == 'D' || data_ == 'C' || data_ == 'R');
   }
 };
 
@@ -72,10 +75,15 @@ typedef boost::array<piece::color_t const, 2> colors_array_t;
 typedef boost::array<piece::type_t const, 6> types_array_t;
 
 extern colors_array_t const COLORS;  //!< Array of all colours.
-extern types_array_t const TYPES;    //!< Array of all types. This array is sorted from the strongest type to the weakest.
+extern types_array_t const TYPES;    //!< Array of all types. This array is 
+                                     //!< sorted from the strongest type to the 
+                                     //!< weakest.
 
-std::size_t index_from_color(piece::color_t color);  //!< Convert color to its index in COLORS.
-std::size_t index_from_type(piece::type_t type);     //!< Convert type to its index in TYPES.
+//! Convert color to its index in COLORS.
+std::size_t index_from_color(piece::color_t color);  
+
+//!< Convert type to its index in TYPES.
+std::size_t index_from_type(piece::type_t type);
 
 //! Equality comparison of pieces.
 bool operator == (piece lhs, piece rhs);
@@ -86,7 +94,8 @@ bool operator != (piece lhs, piece rhs);
 //! Return the opponent's color if the player's one is 'player'.
 piece::color_t opponent_color(piece::color_t player);
 
-//! Return the letter representing given piece according to the Arimaa notation rules.
+//! Return the letter representing given piece according to the Arimaa notation 
+//! rules.
 char letter_from_piece(piece p);
 
 //! Same as piece_from_letter but assumes that the input is valid.
@@ -94,10 +103,12 @@ inline piece piece_from_letter_unsafe(char letter) {
   return piece(letter);
 }
 
-//! Convert a piece letter into a piece, or nothing if the letter doesn't describe a valid piece.
+//! Convert a piece letter into a piece, or nothing if the letter doesn't 
+//! describe a valid piece.
 inline boost::optional<piece> piece_from_letter(char letter) {
-  if (letter == 'e' || letter == 'm' || letter == 'h' || letter == 'd' || letter == 'c' || letter == 'r'
-      || letter == 'E' || letter == 'M' || letter == 'H' || letter == 'D' || letter == 'C' || letter == 'R')
+  if (letter == 'e' || letter == 'm' || letter == 'h' || letter == 'd' || 
+      letter == 'c' || letter == 'r' || letter == 'E' || letter == 'M' || 
+      letter == 'H' || letter == 'D' || letter == 'C' || letter == 'R')
     return piece_from_letter_unsafe(letter);
   else
     return boost::none;
@@ -106,7 +117,8 @@ inline boost::optional<piece> piece_from_letter(char letter) {
 //! The four cardinal directions.
 enum direction { north, south, east, west };
 
-//! Return the letter representing the given direction according to the Arimaa notation rules.
+//! Return the letter representing the given direction according to the Arimaa 
+//! notation rules.
 char letter_from_direction(direction d);
 
 /**
@@ -128,11 +140,13 @@ public:
   /**
    * Construct a position.
    *
-   * Both parameters are checked for valid value ranges, (<tt>1 <= row <= 8, 'a' <= column <= 'h'</tt>). If one
-   * of the parameters is invalid, throw std::domain_error.
+   * Both parameters are checked for valid value ranges, 
+   * (<tt>1 <= row <= 8, 'a' <= column <= 'h'</tt>). If one of the parameters 
+   * is invalid, throw std::domain_error.
    *
    * \param row The row.
-   * \param column The column. This must be a lowercase letter, otherwise an exception will be thrown.
+   * \param column The column. This must be a lowercase letter, otherwise an 
+   *               exception will be thrown.
    * \throws std::domain_error Specified row or column was not valid.
    */
   position(row_t row, col_t column);
@@ -149,16 +163,18 @@ private:
   unsigned char column_;
 };
 
-bool operator == (position lhs, position rhs);  //!< Compare two positions for equality.
-bool operator != (position lhs, position rhs);  //!< Compare two positions for inequality.
+bool operator == (position lhs, position rhs);
+bool operator != (position lhs, position rhs);
 
 /**
  * Less-than compare two positions.
  *
- * This operator defines a linear order on all positions. This allows positions to be stored in an ordered container
- * such as std::set that requires that the type be linearly ordered.
+ * This operator defines a linear order on all positions. This allows positions 
+ * to be stored in an ordered container such as std::set that requires that the 
+ * type be linearly ordered.
  *
- * The exact ordering defined by this operator is further unspecified and should not be relied upon.
+ * The exact ordering defined by this operator is further unspecified and 
+ * should not be relied upon.
  */
 bool operator < (position lhs, position rhs);
 
@@ -189,7 +205,8 @@ inline position make_adjacent(position original, direction direction) {
 /**
  * Is a position adjacent to the given one valid?
  *
- * An adjacent position is valid if it is inside the board bounds. That is, if it is valid according to this function,
+ * An adjacent position is valid if it is inside the board bounds. That is, if 
+ * it is valid according to this function,
  * #make_adjacent is guaranteed not to throw while constructing it.
  *
  * \param original Where from?
@@ -214,13 +231,13 @@ piece::type_t type_from_int(int value);
 class board {
 public:
   // Dimensions of the board.
-  static position::row_t const ROWS    = 8;         //!< How many rows a board has.
-  static position::col_t const COLUMNS = 8;         //!< How many columns a board has.
+  static position::row_t const ROWS    = 8;
+  static position::col_t const COLUMNS = 8;
 
-  static position::row_t const MIN_ROW = 1;         //!< Coordinate of the first row.
-  static position::row_t const MAX_ROW = 8;         //!< Coordinate of the last row.
-  static position::col_t const MIN_COLUMN = 'a';    //!< Coordinate of the first column.
-  static position::col_t const MAX_COLUMN = 'h';    //!< Coordinate of the last column.
+  static position::row_t const MIN_ROW = 1;
+  static position::row_t const MAX_ROW = 8;
+  static position::col_t const MIN_COLUMN = 'a';
+  static position::col_t const MAX_COLUMN = 'h';
 
 private:
   //! Pieces are stored in a container of this type.
@@ -244,8 +261,9 @@ public:
     pieces_iterator();  //!< Construct a singular iterator.
 
   private:
-    //! Construct an iterator from an iterator into the underlying sequence given that the iterator into the
-    //! underlying sequence corresponds with an element with an index pos.
+    //! Construct an iterator from an iterator into the underlying sequence 
+    //! given that the iterator into the underlying sequence corresponds with 
+    //! an element with an index pos.
     explicit pieces_iterator(base_type original, std::size_t pos);
 
     friend class boost::iterator_core_access;
@@ -261,7 +279,8 @@ public:
     //! Iterate to the first non-empty position at or before the current one.
     void reverse_to_nonempty();
 
-    std::size_t pos_;  //!< Index into board::pieces that this iterator is currently pointing to.
+    std::size_t pos_;  //!< Index into board::pieces that this iterator is 
+                       //!< currently pointing to.
   };
 
   board();
@@ -281,10 +300,12 @@ public:
   /**
    * Get a piece from the given position.
    *
-   * \return The piece retreived from the position #from, or the empty value if there is no piece at that position.
+   * \return The piece retreived from the position #from, or the empty value if 
+   * there is no piece at that position.
    */
   boost::optional<piece> get(position from) const {
-    char const p = pieces_[(from.row() - board::MIN_ROW) * board::COLUMNS + (from.column() - board::MIN_COLUMN)];
+    char const p = pieces_[(from.row() - board::MIN_ROW) * board::COLUMNS +
+                   (from.column() - board::MIN_COLUMN)];
     if (p != ' ')
       return piece_from_letter_unsafe(p);
     else
@@ -296,8 +317,12 @@ public:
     std::fill(pieces_.begin(), pieces_.end(), ' ');
   }
 
-  pieces_iterator pieces_begin() const;  //!< Get the start iterator of the sequence of all pieces stored within board.
-  pieces_iterator pieces_end() const;    //!< Get the one-past-the-end iterator of the sequence.
+  pieces_iterator pieces_begin() const;  //!< Get the start iterator of the
+                                         //!< sequence of all pieces stored 
+                                         //!< within this board.
+
+  pieces_iterator pieces_end() const;    //!< Get the one-past-the-end iterator 
+                                         //!< of the sequence.
 
   //! Compare boards;
   bool equal(board const& other) const { return pieces_ == other.pieces_; }
@@ -307,22 +332,29 @@ private:
   pieces_cont pieces_;
 };
 
-bool operator == (board const& lhs, board const& rhs);  //<! Test whether two board contain exactly the same elements.
+//! Test whether two board contain exactly the same elements.
+bool operator == (board const& lhs, board const& rhs);
 bool operator != (board const& lhs, board const& rhs);
-inline bool operator <  (board const& lhs, board const& rhs) { return lhs.less(rhs); }
+inline bool operator <  (board const& lhs, board const& rhs) {
+  return lhs.less(rhs); 
+}
 
 //! Create a single-line string representation of a board.
 std::string string_from_board(board const& board);
 
-//! Re-create a board from a single-line string representation given by string_from_board.
+//! Re-create a board from a single-line string representation given by 
+//! string_from_board.
 //!
 //! The input board will be .clear()ed before being populated with pieces.
 //!
-//! \throws std::runtime_error Thrown if the string is not a valid representation of a board.
+//! \throws std::runtime_error Thrown if the string is not a valid 
+//! representation of a board.
 void board_from_string(std::string const& string, apns::board& board);
 
-//! Output a board object to an output string. This uses string_from_board to format the board.
-inline std::ostream& operator << (std::ostream& out, apns::board const& board) {
+//! Output a board object to an output string. This uses string_from_board to 
+//! format the board.
+inline std::ostream& 
+operator << (std::ostream& out, apns::board const& board) {
   return out << string_from_board(board);
 }
 
@@ -335,11 +367,12 @@ bool trap(position pos);
 //! Iterator type going through all four possible directions.
 typedef direction const* directions_iter;
 
-directions_iter directions_begin();  //!< Get the beginning of the sequence of directions.
-directions_iter directions_end();    //!< Get the end of the sequence of directions.
+directions_iter directions_begin();
+directions_iter directions_end();
 
 /**
- * This iterator goes over the neighbouring positions of a given central position.
+ * This iterator goes over the neighbouring positions of a given central 
+ * position.
  */
 class neighbourhood_iter : public boost::iterator_facade<
   neighbourhood_iter,
@@ -349,7 +382,8 @@ class neighbourhood_iter : public boost::iterator_facade<
 > {
 public:
   neighbourhood_iter();                 //!< Construct a singular iterator.
-  neighbourhood_iter(position center);  //! Construct an iterator going around in circle around center.
+  neighbourhood_iter(position center);  //!< Construct an iterator going around 
+                                        //!< in circle around center.
 
 private:
   friend class boost::iterator_core_access;
@@ -357,19 +391,21 @@ private:
   void increment();
   reference dereference() const;
   bool equal(neighbourhood_iter const& other) const;
-
-  void forward_to_valid();  //!< Forward direction to the first valid direction or keep it where it is, if it already
-                            //!< points to a valid direction.
+  
+  //! Forward direction to the first valid direction or keep it where it is, if 
+  //! it already points to a valid direction.
+  void forward_to_valid();
 
   directions_iter direction_;
   position        center_;
 };
 
-neighbourhood_iter neighbourhood_begin(position center);  //!< Get the beginning of a position's neighbourhood.
-neighbourhood_iter neighbourhood_end();                   //!< Get the end of a neighbourhood.
+neighbourhood_iter neighbourhood_begin(position center);
+neighbourhood_iter neighbourhood_end();
 
 /**
- * Iterator going through all pieces adjacent to a given one piece on a given board.
+ * Iterator going through all pieces adjacent to a given one piece on a given 
+ * board.
  */
 class adjacent_pieces_iter : public boost::iterator_adaptor<
   adjacent_pieces_iter,
@@ -381,7 +417,9 @@ class adjacent_pieces_iter : public boost::iterator_adaptor<
 {
 public:
   adjacent_pieces_iter();  //!< Construct a singular iterator.
-  adjacent_pieces_iter(position center, apns::board const& board);  //!< Construct an iterator going around center on board.
+  
+  //!< Construct an iterator going around center on board.
+  adjacent_pieces_iter(position center, apns::board const& board);  
 
 private:
   friend class boost::iterator_core_access;
@@ -390,19 +428,23 @@ private:
   reference dereference() const;
   bool equal(adjacent_pieces_iter const& other) const;
 
-  void forward_to_nonempty();  //!< Forward the underlying neighbourhood_iter to next nonempty position or keep it
-                               //!< where it is, if it already points to a nonempty position.
+  //! Forward the underlying neighbourhood_iter to next nonempty position or 
+  //! keep it where it is, if it already points to a nonempty position.
+  void forward_to_nonempty();  
 
   apns::board const* board_;
 };
 
-//! Return the start iterator of a sequence of pieces adjacent to the given center position on the given board.
-adjacent_pieces_iter adjacent_pieces_begin(board const& board, position center);
+//! Return the start iterator of a sequence of pieces adjacent to the given 
+//! center position on the given board.
+adjacent_pieces_iter
+adjacent_pieces_begin(board const& board, position center);
 
 //! Return the singular iterator of adjacent pieces sequence.
 adjacent_pieces_iter adjacent_pieces_end();
 
-// Why? Because I can. This is an often-used constructor, it might be advantageous to give the compiler a better chance at inlining
+// Why? Because I can. This is an often-used constructor, it might be 
+// advantageous to give the compiler a better chance at inlining
 // it.
 inline position::position(row_t row, col_t column)
   : row_(row)
@@ -410,7 +452,9 @@ inline position::position(row_t row, col_t column)
 {
   if (row < board::MIN_ROW || row > board::MAX_ROW
       || column < board::MIN_COLUMN || column > board::MAX_COLUMN) {
-    throw std::domain_error("position::position: attempted to create an invalid position");
+    throw std::domain_error(
+      "position::position: attempted to create an invalid position"
+    );
   }
 }
 

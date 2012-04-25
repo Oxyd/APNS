@@ -29,8 +29,10 @@ std::size_t bytes(Container const& c) {
 
 namespace apns {
 
-vertex::number_t const vertex::max_num = std::numeric_limits<vertex::number_t>::max();
-vertex::number_t const vertex::infty   = std::numeric_limits<vertex::number_t>::max() - 1;
+vertex::number_t const vertex::max_num =
+  std::numeric_limits<vertex::number_t>::max();
+vertex::number_t const vertex::infty =
+  std::numeric_limits<vertex::number_t>::max() - 1;
 std::size_t vertex::alloc_ = 0;
 
 vertex::vertex() :
@@ -80,7 +82,8 @@ void vertex::pack() {
 
 namespace {
 
-//! A stop condition that just keeps calling op_ctrl.update() to see whether the algorithm should stop.
+//! A stop condition that just keeps calling op_ctrl.update() to see whether 
+//! the algorithm should stop.
 struct op_ctrl_stop_cond {
   explicit op_ctrl_stop_cond(operation_controller& op_ctrl) :
     op_ctrl(op_ctrl)
@@ -109,8 +112,12 @@ struct printer {
     out << (v.step ? v.step->to_string() : "root")
         << " : " << (v.type == vertex::type_or ? "or" : "and")
         << ' '   << v.steps_remaining
-        << ' '   << (v.proof_number < vertex::infty ? boost::lexical_cast<std::string>(v.proof_number) : "infty")
-        << ' '   << (v.disproof_number < vertex::infty ? boost::lexical_cast<std::string>(v.disproof_number) : "infty")
+        << ' '   << (v.proof_number < vertex::infty ?
+                     boost::lexical_cast<std::string>(v.proof_number) : 
+                     "infty")
+        << ' '   << (v.disproof_number < vertex::infty ?
+                     boost::lexical_cast<std::string>(v.disproof_number) :
+                     "infty")
         << ' '   << v.children_count()
         << '\n'
         ;
@@ -148,11 +155,13 @@ struct reader {
       else bad_format();
 
       if (!(in >> token)) bad_format();
-      if (token != "infty") v.proof_number = boost::lexical_cast<vertex::number_t>(token);
+      if (token != "infty") 
+        v.proof_number = boost::lexical_cast<vertex::number_t>(token);
       else v.proof_number = vertex::infty;
 
       if (!(in >> token)) bad_format();
-      if (token != "infty") v.disproof_number = boost::lexical_cast<vertex::number_t>(token);
+      if (token != "infty")
+        v.disproof_number = boost::lexical_cast<vertex::number_t>(token);
       else v.disproof_number = vertex::infty;
 
       if (!(in >> num_token)) bad_format();
@@ -173,7 +182,8 @@ void delete_file(std::string const& filename) {
 
 } // anonymous namespace
 
-void save_game(boost::shared_ptr<game> const& game, std::string const& filename, operation_controller& op_ctrl) {
+void save_game(boost::shared_ptr<game> const& game, 
+               std::string const& filename, operation_controller& op_ctrl) {
   std::ios_base::sync_with_stdio(false);
 
   std::ofstream out(filename.c_str());
@@ -188,10 +198,13 @@ void save_game(boost::shared_ptr<game> const& game, std::string const& filename,
       out << "silver";
     out << '\n';
 
-    traverse(game->root, backtrack(), printer(out), op_ctrl_stop_cond(op_ctrl));
+    traverse(game->root, backtrack(), printer(out), 
+             op_ctrl_stop_cond(op_ctrl));
 
     if (op_ctrl.stop())
-      delete_file(filename);  // Cancelled -- the file has been only partially written.
+      // Cancelled -- the file has been only partially written -- so delete
+      // it.
+      delete_file(filename);  
 
   } catch (std::ios_base::failure& f) {
     delete_file(filename);  // The file has only been partially written.
@@ -199,7 +212,8 @@ void save_game(boost::shared_ptr<game> const& game, std::string const& filename,
   }
 }
 
-std::pair<boost::shared_ptr<game>, std::size_t> load_game(std::string const& filename, operation_controller& op_ctrl) {
+std::pair<boost::shared_ptr<game>, std::size_t>
+load_game(std::string const& filename, operation_controller& op_ctrl) {
   std::ios_base::sync_with_stdio(false);
 
   std::ifstream in(filename.c_str());

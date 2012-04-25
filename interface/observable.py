@@ -1,5 +1,6 @@
 class Observable(object):
-  '''Implements the observable pattern. To be used as a base class for Python classes.'''
+  '''Implements the observable pattern. To be used as a base class for Python
+  classes.'''
 
   def __init__(self):
     object.__init__(self)
@@ -12,6 +13,7 @@ class Observable(object):
 
 
   def notifyObservers(self, **kwargs):
-    '''Call the update() method of all observers, optionally passing any number of arguments.'''
+    '''Call the update() method of all observers, optionally passing any number
+    of arguments.'''
     for observer in self._observers:
       observer.update(self, **kwargs)

@@ -26,7 +26,8 @@ class SaveLoadProgress(apnsmod.OperationController):
 def strFromMem(mem):
   '''strFromMem(m) -> str
 
-  Convert an integer m representing an amount of memory to a string representing the amount with units attached.
+  Convert an integer m representing an amount of memory to a string
+  representing the amount with units attached.
   '''
 
   if mem < KB:
@@ -49,50 +50,77 @@ def strFromNum(num):
 def main():
   is64Bit = sys.maxsize > 2**32  # Trick straight from the docs.
 
-  parser = argparse.ArgumentParser(description='Execute the Proof-Number Search algorithm and save the result')
+  parser = argparse.ArgumentParser(
+    description='Execute the Proof-Number Search algorithm and save the result'
+  )
+
   parser.add_argument('-p', '--position', type=str, dest='position',
                       help='File containing the initial search position')
   parser.add_argument('-s', '--search', type=str, dest='searchFile',
-                      help='File containing the results of a previous search that should be resumed')
+                      help='File containing the results of a previous search '+
+                           'that should be resumed')
   parser.add_argument('-d', '--destination', type=str, required=True,
                       help='Name of the output file')
-  parser.add_argument('-a', '--algorithm', type=str, default='pns', metavar='algorithm', dest='algo',
+  parser.add_argument('-a', '--algorithm', type=str, default='pns',
+                      metavar='algorithm', dest='algo',
                       help='Algorithm to use. Valid values are {0}'.format(
-                          ', '.join(apnsmod.algos.keys()[:-1]) + ', and ' + apnsmod.algos.keys()[-1]))
-  parser.add_argument('-t', '--time', type=int, default=60, metavar='time limit', dest='timeLimit',
-                      help='Maximum running time of the algorithm, excluding any I/O operations, in seconds')
-  parser.add_argument('-n', '--positions', type=int, default=0, metavar='position limit', dest='posLimit',
+                          ', '.join(apnsmod.algos.keys()[:-1]) + 
+                          ', and ' + apnsmod.algos.keys()[-1]
+                      ))
+  parser.add_argument('-t', '--time', type=int, default=60,
+                      metavar='time limit', dest='timeLimit',
+                      help='Maximum running time of the algorithm, ' +
+                           'excluding any I/O operations, in seconds')
+  parser.add_argument('-n', '--positions', type=int, default=0,
+                      metavar='position limit', dest='posLimit',
                       help='Maximum number of unique positions examined')
-  parser.add_argument('-m', '--memory', type=int, default=0 if is64Bit else 1500, metavar='memory limit', dest='memLimit',
-                      help='Maximum amount of memory to be used by the computation, in megabytes')
-  parser.add_argument('-r', '--trans-tbl-size', type=int, default=32, metavar='trans tbl size', dest='transTblSize',
-                      help='Size of the transposition table to use, in megabytes. If set to 0, don\'t use transposition table'
+  parser.add_argument('-m', '--memory', type=int,
+                      default=0 if is64Bit else 1500, metavar='memory limit',
+                      dest='memLimit',
+                      help='Maximum amount of memory to be used by the ' +
+                           'computation, in megabytes')
+  parser.add_argument('-r', '--trans-tbl-size', type=int, default=32,
+                      metavar='trans tbl size', dest='transTblSize',
+                      help='Size of the transposition table to use, in ' +
+                           'megabytes. If set to 0, don\'t use ' +
+                           'transposition table'
                       'at all')
-  parser.add_argument('-o', '--proof-tbl-size', type=int, default=32, metavar='proof tbl size', dest='proofTblSize',
-                      help='Size of the proof table to use, in megabytes. If set to 0, don\'t use proof table')
-  parser.add_argument('-M', '--move-cache-size', type=int, default=32, metavar='move cache size', dest='moveCacheSize',
+  parser.add_argument('-o', '--proof-tbl-size', type=int, default=32, 
+                      metavar='proof tbl size', dest='proofTblSize',
+                      help='Size of the proof table to use, in megabytes. ' +
+                           'If set to 0, don\'t use proof table')
+  parser.add_argument('-M', '--move-cache-size', type=int, default=32,
+                      metavar='move cache size', dest='moveCacheSize',
                       help='Size of the move cache')
-  parser.add_argument('-q', '--quiet', const=True, default=False, action='store_const', dest='quiet',
+  parser.add_argument('-q', '--quiet', const=True, default=False,
+                      action='store_const', dest='quiet',
                       help='Don\'t print any messages to standard output.')
-  parser.add_argument('-Q', '--no-progress', const=True, default=False, action='store_const', dest='noProgress',
-                      help='Don\'t print any progress information, only the summary at the end.')
+  parser.add_argument('-Q', '--no-progress', const=True, default=False,
+                      action='store_const', dest='noProgress',
+                      help='Don\'t print any progress information, only ' +
+                           'the summary at the end.')
   args = parser.parse_args()
 
   if args.searchFile is None and args.position is None:
-    print >> sys.stderr, 'Error: Either initial position os previous search must be specified'
+    print >> sys.stderr, \
+        'Error: Either initial position os previous search must be specified'
     raise SystemExit(1)
 
   if args.searchFile is not None and args.position is not None:
-    print >> sys.stderr, 'Error: Initial position and previous search can\'t be specified at the same time.'
+    print >> sys.stderr, \
+        'Error: Initial position and previous search can\'t be specified ' + \
+        'at the same time.'
     raise SystemExit(1)
 
   if args.algo not in apnsmod.algos:
-    print >> sys.stderr, 'Error: Algorithm must be one of', ', '.join(apnsmod.algos)
+    print >> sys.stderr, \
+        'Error: Algorithm must be one of', ', '.join(apnsmod.algos)
     raise SystemExit(1)
 
   def checkNum(value, name):
     if value < 0:
-      print >> sys.stderr, 'Error: {0} must be a nonnegative integer'.format(name)
+      print >> sys.stderr, \
+          'Error: {0} must be a nonnegative integer'.format(name)
       raise SystemExit(1)
 
   checkNum(args.transTblSize, 'Size of transposition table')
@@ -144,7 +172,9 @@ def main():
     try:
       controller.newGame(args.position)
     except Exception, e:
-      print >> sys.stderr, 'Error loading specified initial position from specified file: {0}'.format(e)
+      print >> sys.stderr, \
+          'Error loading specified initial position from specified ' + \
+          'file: {0}'.format(e)
       raise SystemExit(1)
 
   else:
@@ -153,7 +183,9 @@ def main():
     try:
       controller.loadGame(args.searchFile)
     except Exception, e:
-      print >> sys.stderr, 'Error loading specified search tree from specified file: {0}'.format(e)
+      print >> sys.stderr, \
+        'Error loading specified search tree from specified ' + \
+        'file: {0}'.format(e)
       raise SystemExit(1)
 
     if not interruptHandler.interrupted:
@@ -175,42 +207,54 @@ def main():
     show('  -- Root vertex DN: {0}'.format(strFromNum(progress.rootDN)))
     show('  -- {0} tree memory used'.format(strFromMem(progress.memUsed)))
     show('  -- {0} unique positions total'.format(progress.positionCount))
-    show('  -- {0} new positions per second'.format(int(progress.positionsPerSecond)))
+    show('  -- {0} new positions per second'.format(
+      int(progress.positionsPerSecond))
+    )
 
     if progress.transTblSize:
       show('  -- Transposition table:')
-      show('    -- Size:   {0:.2f} MB'.format(float(progress.transTblSize) / MB))
+      show('    -- Size:   {0:.2f} MB'.format(
+        float(progress.transTblSize) / MB)
+      )
       show('    -- Hits:   {0}'.format(progress.transTblHits))
       show('    -- Misses: {0}'.format(progress.transTblMisses))
 
     if progress.proofTblSize:
       show('  -- Proof table:')
-      show('    -- Size:   {0:.2f} MB'.format(float(progress.proofTblSize) / MB))
+      show('    -- Size:   {0:.2f} MB'.format(
+        float(progress.proofTblSize) / MB)
+      )
       show('    -- Hits:   {0}'.format(progress.proofTblHits))
       show('    -- Misses: {0}'.format(progress.proofTblMisses))
-    
-    show('  -- Move cache:')
-    show('    -- Hits:   {0}'.format(progress.moveCacheHits))
-    show('    -- Misses: {0}'.format(progress.moveCacheMisses))
+#    
+#    show('  -- Move cache:')
+#    show('    -- Hits:   {0}'.format(progress.moveCacheHits))
+#    show('    -- Misses: {0}'.format(progress.moveCacheMisses))
 
   controller.searchProgressCallbacks.add(printProgress)
   show('Starting search. Pres Control-C to stop the search at any time.')
+  
+  start = time.time()
 
   try:
     controller.runSearch(burst=1000)
   except MemoryError:
-    print >> sys.stderr, 'Error: The program ran out of memory while trying to expand the tree.'
+    print >> sys.stderr, \
+      'Error: The program ran out of memory while trying to expand the tree.'
     raise SystemExit(1)
 
   if not args.quiet or args.noProgress:
     print 'Search finished:',
     if controller.root.proofNumber == 0:        print 'Root vertex is proved'
     elif controller.root.disproofNumber == 0:   print 'Root vertex is disproved'
-    elif params.timeLimit > 0 and controller.stats.timeElapsed >= params.timeLimit:
+    elif params.timeLimit > 0 and \
+        controller.stats.timeElapsed >= params.timeLimit:
       print 'Time limit exceeded'
-    elif params.positionLimit > 0 and controller.stats.positionCount >= params.positionLimit:
+    elif params.positionLimit > 0 and \
+        controller.stats.positionCount >= params.positionLimit:
       print 'Position limit exceeded'
-    elif params.memoryLimit > 0 and (apnsmod.Vertex.allocSize / (1024 ** 2)) >= params.memoryLimit:
+    elif params.memoryLimit > 0 and \
+        (apnsmod.Vertex.allocSize / (1024 ** 2)) >= params.memoryLimit:
       print 'Memory limit exceeded'
     elif interruptHandler.interrupted:
       print 'User interrupted'
@@ -220,6 +264,10 @@ def main():
       args.quiet = False
       printProgress(controller, controller.stats, summary=True)
       args.quiet = True
+  
+  end = time.time()
+  if not args.quiet or args.noProgress:
+    print 'Search took {0} seconds'.format(end - start)
 
   show('Saving result to {0}'.format(args.destination))
   controller.saveGame(args.destination)
