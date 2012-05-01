@@ -364,7 +364,7 @@ struct null_stop_condition {
 
 //! Convenience typedef so that users don't have to type out the function 
 //! signature each time they want to use a traverser with an ordinary function.
-typedef vertex* (*fun_tp)(vertex&);
+typedef vertex const* (*fun_tp)(vertex const&);
 
 /** Generic tree traverser. This traverser doesn't have to visit every node in
  * the tree; instead, the path it will take is dictated by the specified

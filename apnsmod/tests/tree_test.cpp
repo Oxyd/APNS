@@ -50,12 +50,13 @@ boost::shared_ptr<vertex> make_tree() {
 }
 
 struct bfs_traversal {
-  vertex* operator () (vertex& current) {
-    for (vertex::children_iterator child = current.children_begin(); child != current.children_end(); ++child)
+  vertex const* operator () (vertex const& current) {
+    for (vertex::const_children_iterator child = current.children_begin();
+         child != current.children_end(); ++child)
       queue.push(child);
 
     if (!queue.empty()) {
-      vertex::children_iterator n = queue.front();
+      vertex::const_children_iterator n = queue.front();
       queue.pop();
       return &*n;
     } else 
@@ -63,7 +64,7 @@ struct bfs_traversal {
   }
 
 private:
-  std::queue<vertex::children_iterator> queue;
+  std::queue<vertex::const_children_iterator> queue;
 };
 
 struct bfs_checker_visitor {
