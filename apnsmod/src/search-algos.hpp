@@ -19,8 +19,11 @@
 #include <stack>
 #include <cassert>
 #include <utility>
+#include <ostream>
 
 namespace apns {
+
+class log_sink;
 
 /**
  * Did any player win?
@@ -34,17 +37,30 @@ winner(board const& board, piece::color_t player);
 
 //! Compare children of a vertex according to the apropriate number.
 struct vertex_comparator {
-  explicit vertex_comparator(vertex const& parent) :
-    number_(parent.type == vertex::type_or ? 
-            &vertex::proof_number : &vertex::disproof_number),
-    parent_type_(parent.type)
-  { }
+  //! Make a comparator to compare children of parent.
+  //! \param best_first When true, children are sorted in best-first manner;
+  //!   when false, they are sorted in worst-first manner instead.
+  explicit vertex_comparator(vertex const& parent, bool best_first = true) { 
+    if (best_first) {
+      number_ = parent.type == vertex::type_or ?
+        &vertex::proof_number : &vertex::disproof_number;
+      parent_type_ = parent.type;
+    } else {
+      number_ = parent.type == vertex::type_and ?
+        &vertex::proof_number : &vertex::disproof_number;
+      parent_type_ = opposite_type(parent.type);
+    }
+  }
 
   bool operator () (vertex const& lhs, vertex const& rhs) {
+    // Performance note: It currently appears to be faster with this sort of
+    // lexicographial sorting that puts same-type children before other-type
+    // ones.
+    
     return lhs.*number_ < rhs.*number_ || 
-      (lhs.*number_ == rhs.*number_ &&
-       lhs.type == parent_type_ &&
-       rhs.type != parent_type_);
+            (lhs.*number_ == rhs.*number_ &&
+             lhs.type == parent_type_ &&
+             rhs.type != parent_type_);
   }
 
 private:
@@ -68,13 +84,16 @@ private:
 };
 
 //! Return the best successor of a vertex. Can be used as a traversal policy.
+//! If there are multiple "as good" children, this guarantees to select the
+//! first one of these. This is to preserve any relative heuristic order
+//! created on these chilren.
 vertex* best_successor(vertex& parent);
 vertex const* best_successor(vertex const& parent);
 
 //! Return the best successor of a vertex and, if any, the second-best
 //! successor.
-std::pair<vertex const*, vertex const*>
-two_best_successors(vertex const& parent);
+std::pair<vertex*, vertex*>
+two_best_successors(vertex& parent);
 
 //! Killer steps database.
 class killer_db {
@@ -144,7 +163,7 @@ private:
     case vertex::type_and:  return killers_and_;
     }
 
-    assert(!"Wont' get here");
+    assert(!"Won't get here");
     return killers_or_;
   }
 };
@@ -155,15 +174,24 @@ public:
   //! Advice the table that step caused a cut-off at depth.
   void insert(step const& step, std::size_t depth);
 
-  //! Sort the children of a vertex.
-  void sort(vertex& v);
+  //! Sort the children of a vertex according to this table.
+  void sort(vertex& v) const;
+
+  //! Count of unique steps that were inserted into the table.
+  std::size_t size() const { return table_.size(); }
 
 private:
   typedef boost::unordered_map<step, boost::uint64_t> table_t;
+
   struct compare {
-    table_t* table;
-    explicit compare(table_t& t) : table(&t) { }
+    explicit compare(table_t& t) 
+      : table_(&t) 
+    { }
+
     bool operator () (vertex const& lhs, vertex const& rhs);
+
+  private:
+    table_t* table_;
   };
 
   boost::unordered_map<step, boost::uint64_t> table_;
@@ -186,11 +214,15 @@ public:
     vertex* root, piece::color_t attacker, board const& initial_state
   );
 
-  //! Push a successor of the currently-last vertex.
-  void push(vertex* v); 
+  //! Push a successor of the currently top vertex. The behaviour is undefined
+  //! if v is not a child of the current top vertex.
+  void push(vertex* child); 
 
   //! Pop a vertex. The stack must not be at root before this call.
   void pop();           
+
+  //! Pop this stack until it is at_root.
+  void reset_to_root();
 
   //! Is the last vertex the root?
   bool at_root() const { return path_.size() == 1; }
@@ -222,6 +254,14 @@ private:
   zobrist_hasher const*             hasher_;
   piece::color_t                    attacker_;
 };
+
+//! Stream the current path into a stream.
+std::ostream& operator << (std::ostream& out, search_stack const& stack);
+
+//! Format a path into an ostream.
+std::ostream& format_path(std::ostream& out,
+                          search_stack::path_sequence::const_iterator begin,
+                          search_stack::path_sequence::const_iterator end);
 
 //! Allows temporary extensions to the search_stack. Whenever you create a
 //! checkpoint, you may push further vertices to the search_stack. When the
@@ -276,245 +316,72 @@ bool try_apply(move_path const& path, board& board);
 //! Unapply a move from a board.
 void unapply(move_path const& path, board& board);
 
-//! All possible moves from one position for one player. This serves as a kind
-//! of a cache.
-class player_moves {
-public:
-  explicit player_moves(board const& root_position) 
-    : root_position_(root_position) i
-  { }
+//! Get the parent of the top vertex. If the top is the root, returns 0.
+vertex* parent(search_stack const& stack);
 
-  //! Insert a move into the table.
-  //! \param hash Zobrist's hash value for the terminal vertex of the path.
-  void insert(zobrist_hasher::hash_t hash, move_path const& path) {
-    moves_.insert(std::make_pair(hash, path)); 
-  }
+//! Get the ply at which the top of the stack is.
+std::size_t ply(search_stack const& stack);
 
-  //! Remove a move from the table.
-  void remove(zobrist_hasher::hash_t hash) { moves_.erase(hash); }
+//! Sort the children of the current vertex according to their heuristic
+//! values.
+void order(history_table const& history, vertex& v);
 
-  //! Query for a pre-stored move in the table.
-  //! \param hash Key used for the query.
-  //! \param expected_position The expected target position for verification in
-  //!   the even of hash collisions.
-  boost::optional<move_path>
-  query(zobrist_hasher::hash_t hash, board const& expected_position);
+//! Expand the currently-selected leaf.
+//!
+//! \param leaf The leaf
+//! \param state State in the leaf.
+//! \param attacker Attacking player in the whole game.
+//! \returns Number of new children.
+//! \throws std::logic_error if the vertex is not a leaf.
+std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker);
 
-  //! The move-root position for this move.
-  board const& root_position() const { return root_position_; }
+//! Evaluate the top of the stack.
+void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log);
 
-  //! Number of moves stored in this table.
-  std::size_t size() const { return moves_.size(); }
+//! Attempt to find values for the top vertex in the proof table.
+//! \returns true if values were found; false otherwise.
+bool pt_lookup(proof_table& pt, search_stack& stack);
 
-private:
-  typedef boost::unordered_map<zobrist_hasher::hash_t, move_path> moves_map;
-  moves_map moves_;
-  board     root_position_;
+//! Store vertex's values in the proof table.
+void pt_store(proof_table& pt, vertex const& v,
+              zobrist_hasher::hash_t hash,
+              std::size_t ply,
+              search_stack::history_sequence::const_iterator history_begin,
+              search_stack::history_sequence::const_iterator history_end);
 
-  bool verify(move_path const& found_path, board const& expected);
-};
+//! Attempt to find values for given hash in the transposition table.
+//! \returns True if values were found; false otherwise.
+bool tt_lookup(transposition_table& tt, zobrist_hasher::hash_t hash,
+               vertex& child);
 
-//! Cache of moves in the tree.
-class moves {
-public:
-  explicit moves(std::size_t moves_cached) :
-    moves_cached_(moves_cached),
-    time_(0),
-    hits_(0),
-    misses_(0)
-  { }
+//! Store a vertex's values in the transposition table.
+void tt_store(transposition_table& tt, vertex const& v, 
+              zobrist_hasher::hash_t hash, std::size_t ply);
 
-  //! Get moves for the given move.
-  //! \param ply The ply.
-  //! \param root_hash Hash value of the move root vertex.
-  //! \param root_pos The board position in the move root vertex.
-  //! \param root The move-root vertex itself.
-  //! \param hasher Hasher used for making the hashes.
-  //! \param attacker Attacker for the whole search tree (that is, *not* the 
-  //!   player who moves from the given root).
-  boost::shared_ptr<player_moves>
-  get(zobrist_hasher::hash_t root_hash, board const& root_pos,
-      vertex* root, zobrist_hasher const& hasher, piece::color_t attacker);
+//! Cut vertices in worst-first manner until enough vertices have been cut.
+//! This also accepts a search_stack so that it knows which vertices to avoid
+//! collecting.
+//!
+//! \param how_many When to stop collecting.
+//! \param current_path Currently selected path -- vertices from it won't be
+//!        collected.
+//! \returns Number of vertices removed from the tree.
+std::size_t garbage_collect(std::size_t how_many, search_stack current_path);
 
-  //! Remove moves.
-  void remove(zobrist_hasher::hash_t root_hash);
+//! Cut all negative dis/proved children of a vertex -- that is, children
+//! that are dis/proved but don't constitute a dis/proof of their parent.
+//!
+//! \returns Number of vertices removed from the tree.
+std::size_t collect_proved(vertex& parent);
 
-  //! Set how many moves to cache.
-  void moves_cached(std::size_t new_moves_cached);
+//! Cut children of the given vertex.
+//! \returns Number of vertices removed from the tree.
+std::size_t cut(vertex& parent);
 
-  //! How many moves are currently cached?
-  std::size_t size() const { return records_.size(); }
-
-  //! Get how many moves at most are currently cached.
-  std::size_t moves_cached() const { return moves_cached_; }
-
-  std::size_t hits() const    { return hits_; }
-  std::size_t misses() const  { return misses_; }
-
-private:
-  struct move_record {
-    unsigned                        last_used;
-    boost::shared_ptr<player_moves> moves;
-
-    move_record() : last_used(0) { }
-    move_record(unsigned last_used,
-                boost::shared_ptr<player_moves> const& moves) 
-      : last_used(last_used)
-      , moves(moves)
-    { }
-  };
-
-  typedef boost::unordered_map<
-    zobrist_hasher::hash_t, move_record
-  > records_map;
-
-  records_map records_;
-  std::size_t moves_cached_;
-  std::size_t time_;
-  std::size_t hits_;
-  std::size_t misses_;
-
-  void gather(boost::shared_ptr<player_moves> const& moves,
-              search_stack& stack);
-  void resize_records(std::size_t new_size);
-  bool records_compare(records_map::value_type const& lhs,
-                       records_map::value_type const& rhs);
-};
-
-/** A search tree is more than just a wrapper around a pointer to the tree's
- * root: It cooperates with transposition and proof tables as well as killer
- * table. It takes care of the tree operations in a manner that is aware of
- * what's inside the tree and what heuristics are enabled. It assumes that
- * during its lifetime it is the only thing that modifies the tree. It,
- * however, does not take ownership of the tree.
- */
-class search_tree : boost::noncopyable {
-  static std::size_t const DEFAULT_MOVES_CACHED_ = 32;
-
-public:
-  search_tree(vertex* root, piece::color_t attacker, std::size_t size, 
-              zobrist_hasher const& hasher,
-              zobrist_hasher::hash_t initial_hash, board const& initial_state) 
-    : attacker_(attacker)
-    , size_(size)
-    , stack_(hasher, initial_hash, root, attacker, initial_state)
-    , hasher_(&hasher)
-    , history_(new history_table)
-    , moves_(DEFAULT_MOVES_CACHED_)
-  { }
-
-  vertex const& current() const { return *stack_.path_top(); }
-
-  //! Make a child of the current vertex the new current vertex. The behaviour 
-  //! is undefined if #child is not the current vertex's child.
-  void select_child(vertex::const_children_iterator child) {
-    select_child(&*child); 
-  }
-
-  void select_child(vertex const* child) {
-    stack_.push(const_cast<vertex*>(child)); 
-  }
-
-  //! Make the parent of the current vertex the new current vertex.
-  //! \throws std::logic_error if root is currently selected
-  void select_parent() { stack_.pop(); }
-
-  //! See the parent vertex without selecting it. The behaviour is undefined if 
-  //! this tree is currently .at_root().
-  vertex const& parent() const { return **(stack_.path().rbegin() + 1); }
-
-  //! Drop the current path and select root.
-  void select_root() { while (!at_root()) select_parent(); }
-
-  //! Is root currently selected?
-  bool at_root() const { return stack_.at_root(); }
-
-  //! How deep is the currently-selected vertex?
-  std::size_t selection_depth() const { return stack_.size(); }
-
-  //! Expand the currently-selected leaf.
-  //!
-  //! \throws std::logic_error if the currently selected vertex is not a leaf.
-  void expand();
-
-  //! Evaluate the currently-selected vertex.
-  void evaluate();
-
-  //! Evaluate every child of the currently-selected vertex.
-  void evaluate_children();
-
-  //! Attempt to find values for the currently-selected vertex in the tables, 
-  //! but not evaluate it if the look-up fails.
-  //! \returns true if values were found; false otherwise.
-  bool evaluate_cached();
-
-  //! Cut the current vertex's children. Children that constitute proof or 
-  //! disproof are not cut.
-  void cut_children();
-
-  //! Assuming the current vertex has just been expanded (contains only 
-  //! leaves), reduce the tree -- discard vertices that ultimately represent 
-  //! the same move.
-  void reduce();
-
-  //! Update vertices' numbers along the current path.
-  void update_path();
-
-  void use_trans_tbl(std::size_t size) {
-    trans_tbl_.reset(new transposition_table(size)); 
-  }
-
-  void use_proof_tbl(std::size_t size) {
-    proof_tbl_.reset(new proof_table(size)); 
-  }
-
-  void cache_moves(std::size_t how_many) {
-    moves_.moves_cached(how_many); 
-  }
-
-  transposition_table const* trans_tbl() const {
-    return trans_tbl_.get(); 
-  }
-
-  proof_table const* proof_tbl() const {
-    return proof_tbl_.get(); 
-  }
-
-  std::size_t cached_moves() const {
-    return moves_.moves_cached(); 
-  }
-
-  moves const& move_cache() const { return moves_; }
-
-  std::size_t size() const { return size_; }
-
-private:
-  piece::color_t        attacker_;
-  std::size_t           size_;
-  search_stack          stack_;
-  zobrist_hasher const* hasher_;
-
-  boost::shared_ptr<transposition_table>  trans_tbl_;
-  boost::shared_ptr<proof_table>          proof_tbl_;
-  boost::shared_ptr<history_table>        history_;
-  moves                                   moves_;
-
-  //! Get the move root of the currently-selected vertex.
-  //! \param root Will be set to the move-root vertex.
-  //! \param root_hash Will be set to move-root's hash.
-  //! \param position Will be set to the move-root's position.
-  //! \param move_len Will be set to the number of steps in the move.
-  void find_move_root(vertex*& root, zobrist_hasher::hash_t& root_hash, 
-                      board& position, std::size_t& move_len);
-
-  //! Store the current child to the moves table.
-  void store_move(boost::shared_ptr<player_moves> const& moves, 
-                  std::size_t current_depth);
-};
-
-inline void select_best(search_tree& tree) {
-  assert(!tree.current().leaf());
-  tree.select_child(best_successor(tree.current()));
+//! Push the best successor among the top vertex's successors.
+inline void push_best(search_stack& stack) {
+  assert(!stack.path_top()->leaf());
+  stack.push(best_successor(*stack.path_top()));
 }
 
 //! A CRTP base class for search algorithms.
@@ -530,23 +397,32 @@ public:
   }
 
   //! Make the algorithm use a transposition table.
-  void use_trans_tbl(std::size_t size) { tree_.use_trans_tbl(size); }
+  void use_trans_tbl(std::size_t size) {
+    trans_tbl_.reset(new transposition_table(size));
+  }
 
   //! Get the transposition table, if any, used by this algorithm.
   //! \returns Pointer to the transposition table or null if no table is 
   //!   associated with this algorithm.
   transposition_table const* get_trans_tbl() const {
-    return tree_.trans_tbl(); 
+    return trans_tbl_.get();
   }
 
   //! Make the algorithm use a proof table.
-  void use_proof_tbl(std::size_t size) { tree_.use_proof_tbl(size); }
+  void use_proof_tbl(std::size_t size) {
+    proof_tbl_.reset(new proof_table(size));
+  }
 
   //! Get the proof table, if any, used by this algorithm.
-  proof_table const* get_proof_tbl() const { return tree_.proof_tbl(); }
+  proof_table const* get_proof_tbl() const {
+    return proof_tbl_.get();
+  }
   
   //! Change the number of moves stored in the move cache.
-  void move_cache_size(std::size_t new_size) { tree_.cache_moves(new_size); }
+#if 0
+  void move_cache_size(std::size_t new_size) {
+    tree_.cache_moves(new_size);
+  }
 
   //! Get the number of moves stored in the move cache.
   std::size_t move_cache_size() const { return tree_.cached_moves(); }
@@ -556,11 +432,36 @@ public:
 
   //! Get the number of misses in the move cache.
   std::size_t move_cache_misses() const { return tree_.move_cache().misses(); }
+#endif
 
   //! Get the total number of vertices currently held by this algorithm.
   std::size_t get_position_count() const {
-    return tree_.size();
+    return size_;
   }
+
+  //! Number of steps remembered by the history table.
+  std::size_t history_tbl_size() const {
+    return history_tbl_.size();
+  }
+
+  std::size_t gc_low() const  { return gc_low_; }
+  std::size_t gc_high() const { return gc_high_; }
+
+  void gc_low(std::size_t new_low) {
+    gc_low_ = new_low;
+  }
+
+  void gc_high(std::size_t new_high) {
+    gc_high_ = new_high;
+  }
+
+  //! Make this algorithm log into a sink.
+  void log_into(boost::shared_ptr<log_sink> const& new_sink) {
+    log_ = new_sink;
+  }
+
+  //! Get the sink this algorithm logs to.
+  boost::shared_ptr<log_sink> log() const { return log_; }
 
   //! Run the algorithm for ms_how_long milliseconds.
   void run(unsigned ms_how_long) {
@@ -578,12 +479,19 @@ public:
   }
 
 protected:
-  boost::shared_ptr<apns::game> game_;
+  boost::shared_ptr<apns::game>           game_;
   //! Hasher to be used during the algorithm's execution.
-  zobrist_hasher                hasher_; 
+  zobrist_hasher                          hasher_; 
   //! Hash corresponding to initial_state.
-  zobrist_hasher::hash_t        initial_hash_;   
-  search_tree                   tree_;
+  zobrist_hasher::hash_t                  initial_hash_;   
+  search_stack                            stack_;
+  boost::shared_ptr<transposition_table>  trans_tbl_;
+  boost::shared_ptr<proof_table>          proof_tbl_;
+  history_table                           history_tbl_;
+  std::size_t                             size_;
+  std::size_t                             gc_low_;
+  std::size_t                             gc_high_;
+  boost::shared_ptr<log_sink>             log_;
 
   search_algo(boost::shared_ptr<apns::game> const& game,
               std::size_t position_count = 1) 
@@ -591,11 +499,100 @@ protected:
     , initial_hash_(
         hasher_.generate_initial(game->initial_state, game->attacker)
       )
-    , tree_(
-        &game->root, game->attacker, position_count, hasher_, initial_hash_, 
-        game->initial_state
-      )
+    , stack_(hasher_, initial_hash_, &game_->root, game_->attacker,
+             game_->initial_state)
+    , size_(position_count)
+    , gc_low_(0)
+    , gc_high_(0)
+    , log_(new null_sink)
   { }
+
+  void log_proof(search_stack::path_sequence::const_iterator path_begin,
+                 search_stack::path_sequence::const_iterator path_end) {
+    if (!log_->null()) {
+      std::ostringstream out;
+      format_path(out, path_begin, path_end);
+
+      out << " proved by children\n";
+      *log_ << out.str();
+    }
+  }
+
+  void store_in_ht(vertex const& v) {
+    vertex_counter counter;
+    traverse(v, backtrack(), boost::ref(counter));
+    history_tbl_.insert(*v.step, counter.count);
+
+    *log_ << v.step->to_string()
+          << " inserted into the history table with value "
+          << counter.count << '\n';
+  }
+
+  void store_in_pt(
+    search_stack::history_sequence::const_iterator history_begin,
+    search_stack::history_sequence::const_iterator history_end,
+    zobrist_hasher::hash_t hash, std::size_t ply,
+    vertex const& v
+  ) {
+    if (proof_tbl_)
+      pt_store(*proof_tbl_, v, hash, ply, history_begin, history_end);
+  }
+
+  void store_in_tt(zobrist_hasher::hash_t hash, std::size_t ply,
+                   vertex const& v) {
+    if (trans_tbl_)
+      tt_store(*trans_tbl_, v, hash, ply);
+  }
+
+  void update_and_store(
+    vertex& current, vertex* parent,
+    search_stack::path_sequence::const_iterator path_begin,
+    search_stack::path_sequence::const_iterator path_end,
+    search_stack::history_sequence::const_iterator history_begin,
+    search_stack::history_sequence::const_iterator history_end,
+    zobrist_hasher::hash_t hash, std::size_t ply
+   ) {
+    vertex::number_t const old_pn = current.proof_number;
+    vertex::number_t const old_dn = current.disproof_number;
+
+    update_numbers(current);
+
+    bool const numbers_changed = current.proof_number != old_pn ||
+                                 current.disproof_number != old_dn;
+    bool const proved = current.proof_number == 0 ||
+                        current.disproof_number == 0;
+    bool const cutoff = parent &&
+        ((parent->type == vertex::type_or && current.proof_number == 0) ||
+         (parent->type == vertex::type_and && current.disproof_number == 0));
+
+    if (proved && numbers_changed)
+      log_proof(path_begin, path_end);
+
+    if (cutoff)
+      store_in_ht(current);
+
+    if (proved)
+      store_in_pt(history_begin, history_end, ply, hash, current);
+    else
+      store_in_tt(hash, ply, current);
+  }
+
+  void evaluate_children() {
+    vertex& current = *stack_.path_top();
+    for (vertex::children_iterator child = current.children_begin();
+         child != current.children_end(); ++child) {
+      search_stack_checkpoint checkpoint(stack_);
+      stack_.push(&*child);
+
+      bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_);
+      bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_,
+                                                       stack_.hashes_top(),
+                                                       *child);
+
+      if (!found_in_pt && !found_in_tt)
+        evaluate(stack_, game_->attacker, *log_);
+    }
+  }
 };
 
 //! The basic variant of the Proof-Number Search algorithm.

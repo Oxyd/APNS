@@ -5,6 +5,10 @@
 #include <boost/timer.hpp>
 #include <boost/function.hpp>
 
+#include <iostream>
+#include <sstream>
+#include <fstream>
+
 void export_util();
 
 namespace apns {
@@ -132,6 +136,64 @@ struct transaction {
 private:
   boost::function<void ()>  rollback_;
   bool                      commited_;
+};
+
+//! Polymorphic abstract base-class defining the logging interface.
+class log_sink {
+public:
+  virtual ~log_sink() { }
+
+  //! Stream something into the sink.
+  template <typename T>
+  void put(T const& t) {
+    if (!null()) {
+      std::stringstream data;
+      data << t;
+      do_put(data);
+    }
+  }
+
+  //! Is the sink null?
+  virtual bool null() const { return false; }
+
+private:
+  //! Put some actual data into the sink.
+  virtual void do_put(std::stringstream const& data) = 0;
+};
+
+//! Log inserter operator.
+template <typename T>
+log_sink& operator << (log_sink& log, T const& t) {
+  log.put(t);
+  return log;
+}
+
+//! A log sink for printing to the standard output.
+class stdout_sink : public log_sink {
+  virtual void do_put(std::stringstream const& data) {
+    std::cout << data.rdbuf();
+  }
+};
+
+//! A long sink for printing into a file.
+class file_sink : public log_sink {
+public:
+  //! \throws std::ios_base::failure if the log file could not be opened.
+  explicit file_sink(std::string const& filename);
+
+private:
+  std::ofstream out_;
+
+  virtual void do_put(std::stringstream const& data);
+};
+
+//! A log sink that does nothing.
+class null_sink : public log_sink {
+public:
+  virtual bool null() const { return true; }
+
+private:
+  virtual void do_put(std::stringstream const&) { }
 };
 
 } // namespace apns

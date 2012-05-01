@@ -264,45 +264,59 @@ TEST(search_stack, checkpoint_test) {
   EXPECT_EQ(child, stack.path().back());
 }
 
-TEST(search_tree, expand_test) {
-  board b;
-  b.put(position(1, 'a'), piece(piece::gold, piece::dog));
-  b.put(position(8, 'h'), piece(piece::silver, piece::cat));
+class search_tree_test : public testing::Test {
+public:
+  search_tree_test() {
+    b.put(position(1, 'a'), piece(piece::gold, piece::dog));
+    b.put(position(8, 'h'), piece(piece::silver, piece::cat));
 
-  vertex root;
-  root.steps_remaining = MAX_STEPS;
+    root.steps_remaining = MAX_STEPS;
+    root.proof_number = root.disproof_number = 1;
 
-  zobrist_hasher hasher;
-  zobrist_hasher::hash_t initial_hash = hasher.generate_initial(b, piece::gold);
+    initial_hash = hasher.generate_initial(b, piece::gold);
 
-  search_tree tree(&root, piece::gold, 1, hasher, initial_hash, b);
-  tree.expand();
+    tree.reset(new search_tree(
+      &root, piece::gold, 1, hasher, initial_hash, b
+    ));
+  }
+
+  board                   b;
+  vertex                  root;
+  zobrist_hasher          hasher;
+  zobrist_hasher::hash_t  initial_hash;
+  boost::shared_ptr<search_tree> 
+                          tree;
+};
+
+TEST_F(search_tree_test, expand_test) {
+  tree->expand();
 
   EXPECT_EQ(4, root.children_count());
-  EXPECT_EQ(2, std::count_if(root.children_begin(), root.children_end(),
-                             boost::bind(&vertex::type, _1) == vertex::type_or));
+  EXPECT_EQ(
+    2, 
+    std::count_if(root.children_begin(), root.children_end(),
+                  boost::bind(&vertex::type, _1) == vertex::type_or)
+  );
 }
 
-TEST(search_tree, cut_test) {
-  board b;
-  b.put(position(1, 'a'), piece(piece::gold, piece::dog));
-  b.put(position(8, 'h'), piece(piece::silver, piece::cat));
+TEST_F(search_tree_test, cut_test) {
+  tree->expand();
 
-  vertex root;
-  root.steps_remaining = MAX_STEPS;
-  root.proof_number = 1;
-  root.disproof_number = 1;
-
-  zobrist_hasher hasher;
-  zobrist_hasher::hash_t initial_hash = hasher.generate_initial(b, piece::gold);
-
-  search_tree tree(&root, piece::gold, 1, hasher, initial_hash, b);
-  tree.expand();
-
-  tree.select_root();
-  tree.cut_children();
+  tree->select_root();
+  tree->cut_children();
 
   EXPECT_EQ(0, root.children_count());
+}
+
+TEST_F(search_tree_test, select_root_test) {
+  tree->expand();
+  tree->select_child(tree->current().children_begin());
+
+  EXPECT_TRUE(tree->current().leaf());
+
+  tree->select_root();
+
+  EXPECT_EQ(4, tree->current().children_count());
 }
 
 TEST(reducer, move_apply_test) {

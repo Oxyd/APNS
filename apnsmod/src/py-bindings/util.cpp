@@ -18,6 +18,22 @@ public:
   { }
 };
 
+struct log_sink_wrap : apns::log_sink, boost::python::wrapper<apns::log_sink> {
+  virtual bool null() const {
+    using namespace boost::python;
+
+    if (override f = this->get_override("null"))
+      return f();
+    return log_sink::null();
+  }
+
+  bool default_null() const { return log_sink::null(); }
+
+  virtual void do_put(std::stringstream const& data) {
+    this->get_override("doPut")(data.str());
+  }
+};
+
 } // anonymous namespace
 
 //! Export functions and types declared in util.hpp
@@ -39,5 +55,33 @@ void export_util() {
 
       .def("doUpdate", pure_virtual(&apns::operation_controller::do_update))
       ;
+
+  class_<log_sink_wrap, boost::noncopyable>(
+    "LogSink",
+    "An abstract base-class for defining own log sinks."
+  )
+    .def("put", &apns::log_sink::put<std::string>,
+         "s.put(str) -> None\n\n"
+         "Put something into the sink.")
+    .def("null", &apns::log_sink::null, &log_sink_wrap::default_null,
+         "s.null() -> Bool\n\n"
+         "Is this sink a null sink?")
+    .def("doPut", pure_virtual(&log_sink_wrap::do_put),
+         "s.doPut(str) -> None\n\n"
+         "Do the work of putting data into the sink.")
+    ;
+
+  class_<apns::stdout_sink, bases<apns::log_sink>, boost::noncopyable>(
+    "StdoutSink", "A sink that streams data into the standard output."
+  );
+
+  class_<apns::file_sink, bases<apns::log_sink>, boost::noncopyable>(
+    "FileSink", "Sink that streams data into a file",
+    init<std::string const&>()
+  );
+
+  class_<apns::null_sink, bases<apns::log_sink>, boost::noncopyable>(
+    "NullSink", "Sink that does nothing."
+  );
 }
 

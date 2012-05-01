@@ -188,7 +188,7 @@ public:
     record* r = find_record(hash, true);
     assert(r);
 
-    if (!r->is_set() || r->hash == hash || depth > r->depth) {
+    if (!r->is_set() || r->hash == hash || depth < r->depth) {
       if (!r->is_set())
         ++elements_;
       r->entry = entry;
@@ -200,8 +200,7 @@ public:
   /**
    * Try to retreive an element from the table.
    * \param hash The key.
-   * \returns Either the found element or an empty pointer if the element 
-   *   wasn't found.
+   * \returns Either the found element or nothing if the element wasn't found.
    */
   boost::optional<entry_t> query(hash_t hash) {
     record* r = find_record(hash, false);

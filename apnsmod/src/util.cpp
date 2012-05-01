@@ -46,5 +46,15 @@ unsigned operation_controller::get_work_total() const {
   return work_total_;
 }
 
+file_sink::file_sink(std::string const& filename)
+  : out_(filename.c_str())
+{
+  out_.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+}
+
+void file_sink::do_put(std::stringstream const& data) {
+  out_ << data.rdbuf();
+}
+
 } // namespace apns
 

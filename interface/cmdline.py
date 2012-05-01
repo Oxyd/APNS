@@ -7,7 +7,6 @@ from interface.controller import Controller, SearchParameters
 import apnsmod
 import argparse
 import sys
-import os
 import time
 import signal
 
@@ -59,8 +58,9 @@ def main():
   parser.add_argument('-s', '--search', type=str, dest='searchFile',
                       help='File containing the results of a previous search '+
                            'that should be resumed')
-  parser.add_argument('-d', '--destination', type=str, required=True,
-                      help='Name of the output file')
+  parser.add_argument('-d', '--destination', type=str, required=False,
+                      help='Name of the output file. If you don\'t specify ' +
+                      'this, the search tree won\'t be saved anywhere.')
   parser.add_argument('-a', '--algorithm', type=str, default='pns',
                       metavar='algorithm', dest='algo',
                       help='Algorithm to use. Valid values are {0}'.format(
@@ -92,6 +92,12 @@ def main():
   parser.add_argument('-M', '--move-cache-size', type=int, default=32,
                       metavar='move cache size', dest='moveCacheSize',
                       help='Size of the move cache')
+  parser.add_argument('-g', '--gc-low', type=int, default=0,
+                      metavar='gc low', dest='gcLow',
+                      help='Garbage collector low threshold.')
+  parser.add_argument('-G', '--gc-high', type=int, default=0,
+                      metavar='gc high', dest='gcHigh',
+                      help='Garbage collector high threshold.')
   parser.add_argument('-q', '--quiet', const=True, default=False,
                       action='store_const', dest='quiet',
                       help='Don\'t print any messages to standard output.')
@@ -99,11 +105,15 @@ def main():
                       action='store_const', dest='noProgress',
                       help='Don\'t print any progress information, only ' +
                            'the summary at the end.')
+  parser.add_argument('-l', '--log', dest='logFilename',
+                      nargs='?', const='',
+                      help='Save execution log into given file. Specify -l ' +
+                           'alone to print the log to standard output')
   args = parser.parse_args()
 
   if args.searchFile is None and args.position is None:
     print >> sys.stderr, \
-        'Error: Either initial position os previous search must be specified'
+        'Error: Either initial position or previous search must be specified'
     raise SystemExit(1)
 
   if args.searchFile is not None and args.position is not None:
@@ -129,6 +139,8 @@ def main():
   checkNum(args.timeLimit, 'Time limit')
   checkNum(args.posLimit, 'Position limit')
   checkNum(args.memLimit, 'Memory limit')
+  checkNum(args.gcLow, 'Garbage collector low threshold')
+  checkNum(args.gcHigh, 'Garbage collector high threshold')
 
   params = SearchParameters()
   params.algo = args.algo
@@ -138,6 +150,9 @@ def main():
   params.transTblSize = args.transTblSize
   params.proofTblSize = args.proofTblSize
   params.moveCacheSize = args.moveCacheSize
+  params.gcLow = args.gcLow
+  params.gcHigh = args.gcHigh
+  params.logFilename = args.logFilename
 
   controller = Controller()
   controller.searchParameters = params
@@ -226,27 +241,35 @@ def main():
       )
       show('    -- Hits:   {0}'.format(progress.proofTblHits))
       show('    -- Misses: {0}'.format(progress.proofTblMisses))
-#    
-#    show('  -- Move cache:')
-#    show('    -- Hits:   {0}'.format(progress.moveCacheHits))
-#    show('    -- Misses: {0}'.format(progress.moveCacheMisses))
+
+    show('  -- Move cache:')
+    show('    -- Hits:   {0}'.format(progress.moveCacheHits))
+    show('    -- Misses: {0}'.format(progress.moveCacheMisses))
+
+    show('  -- History table size: {0}'.format(progress.historyTblSize))
 
   controller.searchProgressCallbacks.add(printProgress)
   show('Starting search. Pres Control-C to stop the search at any time.')
-  
+
   start = time.time()
 
   try:
     controller.runSearch(burst=1000)
+  except RuntimeError, e:
+    print >> sys.stderr, \
+      'Internal error has occured; this is likely a bug.\n\n' + str(e)
+    raise SystemExit(1)
   except MemoryError:
     print >> sys.stderr, \
       'Error: The program ran out of memory while trying to expand the tree.'
     raise SystemExit(1)
 
+  end = time.time()
+
   if not args.quiet or args.noProgress:
     print 'Search finished:',
-    if controller.root.proofNumber == 0:        print 'Root vertex is proved'
-    elif controller.root.disproofNumber == 0:   print 'Root vertex is disproved'
+    if controller.root.proofNumber == 0:       print 'Root vertex is proved'
+    elif controller.root.disproofNumber == 0:  print 'Root vertex is disproved'
     elif params.timeLimit > 0 and \
         controller.stats.timeElapsed >= params.timeLimit:
       print 'Time limit exceeded'
@@ -257,24 +280,24 @@ def main():
         (apnsmod.Vertex.allocSize / (1024 ** 2)) >= params.memoryLimit:
       print 'Memory limit exceeded'
     elif interruptHandler.interrupted:
-      print 'User interrupted'
+      print 'Interrupted'
       interruptHandler.reset()
 
     if args.noProgress:
       args.quiet = False
       printProgress(controller, controller.stats, summary=True)
       args.quiet = True
-  
-  end = time.time()
+
   if not args.quiet or args.noProgress:
     print 'Search took {0} seconds'.format(end - start)
 
-  show('Saving result to {0}'.format(args.destination))
-  controller.saveGame(args.destination)
-  if not interruptHandler.interrupted:
-    show('Done')
-  else:
-    show('Cancelled')
+  if args.destination is not None:
+    show('Saving result to {0}'.format(args.destination))
+    controller.saveGame(args.destination)
+    if not interruptHandler.interrupted:
+      show('Done')
+    else:
+      show('Cancelled')
 
 if __name__ == '__main__':
   main()

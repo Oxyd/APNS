@@ -147,32 +147,36 @@ def saveBoard(board, moveNumber, player, filename):
 
 class SearchParameters:
   def __init__(self):
-    self.algo               = None
-    self.timeLimit          = None
-    self.positionLimit      = None
-    self.memoryLimit        = None
-    self.transTblSize       = None
-    self.proofTblSize       = None
-    self.moveCacheSize      = 32
+    self.algo           = None
+    self.timeLimit      = None
+    self.positionLimit  = None
+    self.memoryLimit    = None
+    self.transTblSize   = None
+    self.proofTblSize   = None
+    self.moveCacheSize  = 32
+    self.gcLow          = 0
+    self.gcHigh         = 0
+    self.logFilename    = None
 
 
 class SearchProgress:
   def __init__(self):
-    self.timeElapsed = None
-    self.timeLeft = None
-    self.memUsed = None
-    self.rootPN = None
-    self.rootDN = None
-    self.positionCount = None
+    self.timeElapsed        = None
+    self.timeLeft           = None
+    self.memUsed            = None
+    self.rootPN             = None
+    self.rootDN             = None
+    self.positionCount      = None
     self.positionsPerSecond = None
-    self.transTblSize = None
-    self.transTblHits = None
-    self.transTblMisses = None
-    self.proofTblSize = None
-    self.proofTblHits = None
-    self.proofTblMisses = None
-    self.moveCacheHits = None
-    self.moveCacheMisses = None
+    self.transTblSize       = None
+    self.transTblHits       = None
+    self.transTblMisses     = None
+    self.proofTblSize       = None
+    self.proofTblHits       = None
+    self.proofTblMisses     = None
+    self.moveCacheHits      = None
+    self.moveCacheMisses    = None
+    self.historyTblSize     = None
 
 MB = 1024 * 1024
 
@@ -284,6 +288,7 @@ class Controller(object):
         self._search.transpositionTable is None or \
             self._search.transpositionTable.size != \
               self.searchParameters.transTblSize):
+      print 'Resetting transposition table'
       self._search.useTransTbl(
         numElementsFromMbSize(self.searchParameters.transTblSize,
                                apnsmod.TranspositionTable)
@@ -292,11 +297,23 @@ class Controller(object):
     if self.searchParameters.proofTblSize > 0 and (
         self._search.proofTable is None or self._search.proofTable.size != \
             self.searchParameters.proofTblSize):
+      print 'Resetting proof table'
       self._search.useProofTbl(numElementsFromMbSize(
         self.searchParameters.proofTblSize, apnsmod.ProofTable
       ))
-    
+
     self._search.moveCacheSize = self.searchParameters.moveCacheSize
+    self._search.gcLow = self.searchParameters.gcLow
+    self._search.gcHigh = self.searchParameters.gcHigh
+
+    logFilename = self.searchParameters.logFilename
+    if logFilename is not None:
+      if logFilename != '':
+        self._search.logSink = apnsmod.FileSink(logFilename)
+      else:
+        self._search.logSink = apnsmod.StdoutSink()
+    else:
+      self._search.logSink = apnsmod.NullSink()
 
     self._searchStart = time.clock()
     self._lastMeasurement = time.clock()
@@ -371,8 +388,12 @@ class Controller(object):
       progress.proofTblHits = pt.hits
       progress.proofTblMisses = pt.misses
 
-    progress.moveCacheHits = self._search.moveCacheHits
-    progress.moveCacheMisses = self._search.moveCacheMisses
+#    progress.moveCacheHits = self._search.moveCacheHits
+#    progress.moveCacheMisses = self._search.moveCacheMisses
+    progress.moveCacheHits = 0
+    progress.moveCacheMisses = 0
+
+    progress.historyTblSize = self._search.historyTblSize
 
     return progress
 

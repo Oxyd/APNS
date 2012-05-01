@@ -167,6 +167,8 @@ class step_holder;
  * for repetition themselves via other means.
  */
 class step {
+  typedef std::vector<elementary_step> elementary_step_seq;
+
 public:
   //! Iterator over the sequence of elementary steps.
   struct el_steps_iterator : boost::iterator_facade<
@@ -280,6 +282,7 @@ private:
   representation_t representation_;
 
   friend class step_holder;
+
   // These two are to be used by step_holder.
   step() { }
   bool empty() const { return representation_.get().empty(); }

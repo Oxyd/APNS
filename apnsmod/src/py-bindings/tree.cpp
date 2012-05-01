@@ -20,11 +20,11 @@ void vertex_set_step(apns::vertex& vertex, boost::python::object step) {
 //! Wrapper around Traversal Policy to make it more Python-friendly.
 struct py_traversal_policy : apns::virtual_traversal_policy::base {
   explicit py_traversal_policy(boost::python::object policy) : policy(policy) { }
-  virtual apns::vertex* next(apns::vertex& v) {
+  virtual apns::vertex const* next(apns::vertex const& v) {
     using namespace boost::python;
 
     object n = policy(boost::ref(v));
-    return extract<apns::vertex*>(n);
+    return extract<apns::vertex const*>(n);
   }
 
 private:
