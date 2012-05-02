@@ -903,7 +903,7 @@ void depth_first_pns::do_iterate() {
   
   while (true) {
     vertex* parent = 0;
-    if (current_path != stack_.path().rend())
+    if (boost::next(current_path) != stack_.path().rend())
       parent = *boost::next(current_path);
 
     update_and_store(
