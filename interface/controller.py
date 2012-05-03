@@ -265,6 +265,8 @@ class Controller(object):
     self._searchStart = None
     self.stats = None
     self._posCount = None
+    self._transTbl = None
+    self._proofTbl = None
 
   def runSearch(self, burst=_MS_BURST_TIME):
     '''Run the search until one of the terminating conditions is met.'''
@@ -283,28 +285,36 @@ class Controller(object):
     def numElementsFromMbSize(mbSize, tableType):
       bSize = mbSize * MB
       return bSize / (tableType.sizeOfElement)
+    
+    if self.searchParameters.transTblSize is not None:
+      ttElems = numElementsFromMbSize(self.searchParameters.transTblSize, 
+                                      apnsmod.TranspositionTable)
+    else:
+      ttElems = 0
+    
+    if self.searchParameters.proofTblSize is not None:
+      ptElems = numElementsFromMbSize(self.searchParameters.proofTblSize, 
+                                      apnsmod.ProofTable)
+    else:
+      ptElems = 0
 
-    if self.searchParameters.transTblSize > 0 and (
-        self._search.transpositionTable is None or \
-            self._search.transpositionTable.size != \
-              self.searchParameters.transTblSize):
-      print 'Resetting transposition table'
-      self._search.useTransTbl(
-        numElementsFromMbSize(self.searchParameters.transTblSize,
-                               apnsmod.TranspositionTable)
-      )
+    if ttElems > 0 and (
+          self._transTbl is None or self._transTbl.size != ttElems):
+      self._transTbl = apnsmod.TranspositionTable(ttElems)
+    elif ttElems == 0:
+      self._transTbl = None
 
-    if self.searchParameters.proofTblSize > 0 and (
-        self._search.proofTable is None or self._search.proofTable.size != \
-            self.searchParameters.proofTblSize):
-      print 'Resetting proof table'
-      self._search.useProofTbl(numElementsFromMbSize(
-        self.searchParameters.proofTblSize, apnsmod.ProofTable
-      ))
+    if ptElems > 0 and (
+        self._proofTbl is None or self._proofTbl.size != ptElems):
+      self._proofTbl = apnsmod.ProofTable(ptElems)
+    elif ptElems == 0:
+      self._proofTbl = None
 
     self._search.moveCacheSize = self.searchParameters.moveCacheSize
     self._search.gcLow = self.searchParameters.gcLow
     self._search.gcHigh = self.searchParameters.gcHigh
+    self._search.transpositionTable = self._transTbl
+    self._search.proofTable = self._proofTbl
 
     logFilename = self.searchParameters.logFilename
     if logFilename is not None:

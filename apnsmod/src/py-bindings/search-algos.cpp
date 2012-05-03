@@ -75,13 +75,13 @@ export_algo(char const* name, char const* description) {
          "Make this algorithm use a proof table of given size.")
     
     .add_property("transpositionTable", 
-                  make_function(&Base::get_trans_tbl,
-                                return_internal_reference<>()),
+                  &Base::get_trans_tbl,
+                  &Base::use_trans_tbl,
                   "The TranspositionTable instance associated with this "
                   "algorithm or None.")
     .add_property("proofTable",
-                  make_function(&Base::get_proof_tbl,
-                                return_internal_reference<>()),
+                  &Base::get_proof_tbl,
+                  &Base::use_proof_tbl,
                   "The ProofTable instance associated with this algorithm or "
                   "None.")
     .add_property("positionCount",

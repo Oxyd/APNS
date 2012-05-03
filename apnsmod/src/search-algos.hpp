@@ -397,25 +397,25 @@ public:
   }
 
   //! Make the algorithm use a transposition table.
-  void use_trans_tbl(std::size_t size) {
-    trans_tbl_.reset(new transposition_table(size));
+  void use_trans_tbl(boost::shared_ptr<transposition_table> const& tt) {
+    trans_tbl_ = tt;
   }
 
   //! Get the transposition table, if any, used by this algorithm.
   //! \returns Pointer to the transposition table or null if no table is 
   //!   associated with this algorithm.
-  transposition_table const* get_trans_tbl() const {
-    return trans_tbl_.get();
+  boost::shared_ptr<transposition_table> get_trans_tbl() const {
+    return trans_tbl_;
   }
 
   //! Make the algorithm use a proof table.
-  void use_proof_tbl(std::size_t size) {
-    proof_tbl_.reset(new proof_table(size));
+  void use_proof_tbl(boost::shared_ptr<proof_table> const& pt) {
+    proof_tbl_ = pt;
   }
 
   //! Get the proof table, if any, used by this algorithm.
-  proof_table const* get_proof_tbl() const {
-    return proof_tbl_.get();
+  boost::shared_ptr<proof_table> get_proof_tbl() const {
+    return proof_tbl_;
   }
   
   //! Change the number of moves stored in the move cache.
