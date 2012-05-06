@@ -206,8 +206,12 @@ void killer_db::add(std::size_t ply, vertex::e_type type, step const& step) {
   if (ply >= p.size())
     p.resize(ply + 1, ply_killers_t(killer_count_));
 
-  if (std::find(p[ply].begin(), p[ply].end(), step) == p[ply].end())
+  if (std::find(p[ply].begin(), p[ply].end(), step) == p[ply].end()) {
+    if (!p[ply].full())
+      ++size_;  // Otherwise this replace an existing record.
+
     p[ply].push_back(step);
+  }
 }
 
 bool killer_db::is_killer(
@@ -490,8 +494,21 @@ std::size_t ply(search_stack const& stack) {
   return stack.history().size();
 }
 
-void order(history_table const& history, vertex& v) {
+void history_order(history_table const& history, vertex& v) {
   history.sort(v);
+}
+
+void killer_order(killer_db const& killers, std::size_t level, vertex& v) {
+  vertex::children_iterator killers_end = v.children_begin();
+
+  for (
+    vertex::children_iterator child = v.children_begin();
+    child != v.children_end();
+    ++child
+  ) {
+    if (child != killers_end && killers.is_killer(level, v.type, *child->step))
+      v.swap_children(child, killers_end++);
+  }
 }
 
 std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker) {
@@ -637,92 +654,6 @@ void tt_store(transposition_table& tt, vertex const& v,
             transposition_entry(v.proof_number, v.disproof_number));
 }
 
-#if 0
-void update_path(search_stack& stack, log_sink& log) {
-  search_stack::path_sequence::const_reverse_iterator path_current =
-    stack.path().rbegin();
-  search_stack::hashes_sequence::const_reverse_iterator hashes_current =
-    stack.hashes().rbegin();
-  search_stack::history_sequence::const_reverse_iterator  history_current =
-    stack.history().rbegin();
-  std::size_t ply = stack.history().size();
-
-  vertex* parent = 0;
-
-  while (true) {
-    vertex& current = **path_current;
-
-    if (boost::next(path_current) != stack.path().rend())
-      parent = *(boost::next(path_current));
-    else
-      parent = 0;
-
-    vertex::number_t const old_pn = current.proof_number;
-    vertex::number_t const old_dn = current.disproof_number;
-
-    update_numbers(current);
-
-    bool const numbers_changed = current.proof_number != old_pn ||
-                                 current.disproof_number != old_dn;
-    bool const proved = current.proof_number == 0 || 
-                        current.disproof_number == 0;
-    bool const cutoff = parent &&
-      ((parent->type == vertex::type_or && current.proof_number == 0) ||
-       (parent->type == vertex::type_and && current.disproof_number == 0));
-
-    if (proved && numbers_changed && !log.null()) {
-      std::ostringstream out;
-      format_path(
-        out, 
-        stack.path().begin(),
-        path_current.base()
-      );
-
-      out << " proved by children\n";
-      log << out.str();
-    }
-
-    if (history_ && cutoff) {
-      vertex_counter counter;
-      traverse(current, backtrack(), boost::ref(counter));
-      history_->insert(*current.step, counter.count);
-
-      log << stack_ << " inserted into the history table with value "
-          << counter.count << '\n';
-    }
-
-    if (proof_tbl_ && proved) {
-      proof_entry_t entry(
-        current.proof_number, current.disproof_number,
-        history_t(std::distance(history_current, stack_.history().rend()))
-      );
-      std::copy(history_current, stack_.history().rend(),
-                entry.history.rbegin());
-      proof_tbl_->insert(*hashes_current, ply, entry);
-    }
-
-    if (trans_tbl_ && !proved) {
-      trans_tbl_->insert(
-        *hashes_current, ply,
-        transposition_entry(current.proof_number, current.disproof_number)
-      );
-    }
-
-    if (parent) {
-      if (current.type != parent->type) {
-        ++history_current;
-        --ply;
-      }
-
-      ++hashes_current;
-      ++path_current;
-    } else {
-      break;
-    }
-  }
-}
-#endif
-
 std::size_t garbage_collect(std::size_t how_many, search_stack stack) {
   // NB: This function destroys the passed-in stack, so it's accepted by copy.
 
@@ -808,7 +739,12 @@ void proof_number_search::do_iterate() {
   assert(stack_.at_root());
 
   while (!stack_.path_top()->leaf()) {
-    order(history_tbl_, *stack_.path_top());
+    if (history_tbl_)
+      history_order(*history_tbl_, *stack_.path_top());
+
+    if (killer_db_)
+      killer_order(*killer_db_, stack_.size(), *stack_.path_top());
+
     push_best(stack_);
   }
 

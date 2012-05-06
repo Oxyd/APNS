@@ -67,22 +67,22 @@ export_algo(char const* name, char const* description) {
          "algo.run(msHowLong) -> None\n\n"
          "Run the algorithm for msHowLong milliseconds. If msHowLong is 0, "
          "the algorithm will run until it finishes.")
-    .def("useTransTbl", &Base::use_trans_tbl,
-         "algo.useTransTbl(size) -> None\n\n"
-         "Make this algorithm use a transposition table of given size.")
-    .def("useProofTbl", &Base::use_proof_tbl,
-         "algo.useProofTbl(size) -> None\n\n"
-         "Make this algorithm use a proof table of given size.")
     
     .add_property("transpositionTable", 
-                  &Base::get_trans_tbl,
-                  &Base::use_trans_tbl,
+                  &Base::get_trans_tbl, &Base::use_trans_tbl,
                   "The TranspositionTable instance associated with this "
                   "algorithm or None.")
     .add_property("proofTable",
-                  &Base::get_proof_tbl,
-                  &Base::use_proof_tbl,
+                  &Base::get_proof_tbl, &Base::use_proof_tbl,
                   "The ProofTable instance associated with this algorithm or "
+                  "None.")
+    .add_property("historyTable",
+                  &Base::get_history_tbl, &Base::use_history_tbl,
+                  "The HistoryTable instance associated with this algorithm or "
+                  "None.")
+    .add_property("killerDB",
+                  &Base::get_killer_db, &Base::use_killer_db,
+                  "The KillerDB instance associated with this algorithm or "
                   "None.")
     .add_property("positionCount",
                   &Base::get_position_count,
@@ -101,10 +101,6 @@ export_algo(char const* name, char const* description) {
                   &Base::move_cache_misses,
                   "Number of misses in the move cache.")
 #endif
-    .add_property("historyTblSize",
-                  &Base::history_tbl_size,
-                  "Number of steps remembered by the history table.")
-
     .add_property("gcLow",
                   get_gc_low, set_gc_low,
                   "The low threshold for garbage collector.")
@@ -136,6 +132,40 @@ export_algo(char const* name, char const* description) {
   return export_algo<Algo, apns::search_algo<Algo> >(name, description);
 }
 
+//! An iterator over the sequence of killers on a ply.
+struct killer_ply_iterator {
+  killer_ply_iterator(apns::killer_db::ply_iterator begin,
+                      apns::killer_db::ply_iterator end)
+    : current_(begin)
+    , end_(end)
+  { }
+
+  killer_ply_iterator iter() const { return *this; }
+
+  boost::python::object next() {
+    using namespace boost::python;
+
+    if (current_ != end_) {
+      return object(*current_++);
+    } else {
+      PyErr_SetNone(PyExc_StopIteration);
+      throw_error_already_set();
+      return object();
+    }
+  }
+
+private:
+  apns::killer_db::ply_iterator current_;
+  apns::killer_db::ply_iterator end_;
+};
+
+killer_ply_iterator killer_db_killers(apns::killer_db const& db,
+                                      std::size_t ply,
+                                      apns::vertex::e_type type) {
+  return killer_ply_iterator(db.ply_begin(ply, type),
+                             db.ply_end(ply, type));
+}
+
 } // anonymous namespace
 
 //! Export types and functions declared in search-algos.hpp.
@@ -148,6 +178,32 @@ void export_search_algos() {
       "bestSuccessor(Vertex) -> Vertex\n\n"
       "Returns the best of all vertex's successors, or None if the given "
       "vertex is a leaf.");
+
+  class_<killer_ply_iterator>("KillerPlyIterator", no_init)
+    .def("__iter__", &killer_ply_iterator::iter)
+    .def("__next__", &killer_ply_iterator::next)
+    ;
+
+  class_<apns::killer_db>("KillerDB",
+                          "Remembers each player's killer steps for a "
+                          "ply or level",
+                          init<std::size_t>())
+    .add_property("plysSize",
+                  &apns::killer_db::plys_size, &apns::killer_db::resize_plys,
+                  "How many killers are remembered for each ply")
+    .add_property("totalSize",
+                  &apns::killer_db::total_size,
+                  "Total number of elements in this DB.")
+    .def("add", &apns::killer_db::add,
+         "k.add(ply, type, step) -> None\n\n"
+         "Add a killer to the db.")
+    .def("isKiller", &apns::killer_db::is_killer,
+         "k.isKiller(ply, type, step) -> Bool\n\n"
+         "Check whether given step is a killer on given ply.")
+    .def("killers", &killer_db_killers,
+         "k.killers(ply, type) -> [Step]\n\n"
+         "Get the killers recorded for given ply and type.")
+    ;
 
   class_<apns::history_table>("HistoryTable",
                               "Remembers steps that caused cutoff and uses "

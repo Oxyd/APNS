@@ -153,7 +153,8 @@ class SearchParameters:
     self.memoryLimit    = None
     self.transTblSize   = None
     self.proofTblSize   = None
-    self.moveCacheSize  = 32
+    #self.moveCacheSize  = 32
+    self.killerCount    = 2
     self.gcLow          = 0
     self.gcHigh         = 0
     self.logFilename    = None
@@ -174,8 +175,8 @@ class SearchProgress:
     self.proofTblSize       = None
     self.proofTblHits       = None
     self.proofTblMisses     = None
-    self.moveCacheHits      = None
-    self.moveCacheMisses    = None
+    #self.moveCacheHits      = None
+    #self.moveCacheMisses    = None
     self.historyTblSize     = None
 
 MB = 1024 * 1024
@@ -267,6 +268,8 @@ class Controller(object):
     self._posCount = None
     self._transTbl = None
     self._proofTbl = None
+    self._historyTbl = None
+    self._killerDb = None
 
   def runSearch(self, burst=_MS_BURST_TIME):
     '''Run the search until one of the terminating conditions is met.'''
@@ -309,12 +312,24 @@ class Controller(object):
       self._proofTbl = apnsmod.ProofTable(ptElems)
     elif ptElems == 0:
       self._proofTbl = None
+    
+    if self._historyTbl is None:
+      self._historyTbl = apnsmod.HistoryTable()
 
-    self._search.moveCacheSize = self.searchParameters.moveCacheSize
+    kCount = int(self.searchParameters.killerCount)    
+    if kCount > 0 and (
+        self._killerDb is None or self._killerDb.plysSize != kCount):
+      self._killerDb = apnsmod.KillerDB(kCount)
+    elif kCount == 0:
+      self._killerDb = None
+
+    #self._search.moveCacheSize = self.searchParameters.moveCacheSize
     self._search.gcLow = self.searchParameters.gcLow
     self._search.gcHigh = self.searchParameters.gcHigh
     self._search.transpositionTable = self._transTbl
     self._search.proofTable = self._proofTbl
+    self._search.historyTable = self._historyTbl
+    self._search.killerDB = self._killerDb
 
     logFilename = self.searchParameters.logFilename
     if logFilename is not None:
@@ -403,7 +418,7 @@ class Controller(object):
     progress.moveCacheHits = 0
     progress.moveCacheMisses = 0
 
-    progress.historyTblSize = self._search.historyTblSize
+    progress.historyTblSize = self._search.historyTable.size
 
     return progress
 

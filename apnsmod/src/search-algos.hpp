@@ -104,7 +104,8 @@ public:
 
   //! Make a killer DB that holds at most killer_count killers for each ply.
   explicit killer_db(std::size_t killer_count) 
-    : killer_count_(killer_count) 
+    : killer_count_(killer_count)
+    , size_(0)
   { }
 
   //! Change the maximal number of killers per ply. This will drop all killers 
@@ -114,11 +115,15 @@ public:
       killers_or_.resize(0);
       killers_and_.resize(0);
       killer_count_ = new_killer_count;
+      size_ = 0;
     }
   }
 
   //! Get the maximal number of killers in each ply.
   std::size_t plys_size() const { return killer_count_; }
+
+  //! Number of records stored here in total for all levels and types.
+  std::size_t total_size() const { return size_; }
 
   //! Add a step to the list of killers for given ply and given parent type.
   void add(std::size_t ply, vertex::e_type type, step const& step);
@@ -144,6 +149,7 @@ private:
   typedef std::vector<ply_killers_t> plys;
 
   std::size_t killer_count_;       //!< How many killers at most per ply.
+  std::size_t size_;
   plys killers_or_;
   plys killers_and_;
 
@@ -322,9 +328,12 @@ vertex* parent(search_stack const& stack);
 //! Get the ply at which the top of the stack is.
 std::size_t ply(search_stack const& stack);
 
-//! Sort the children of the current vertex according to their heuristic
-//! values.
-void order(history_table const& history, vertex& v);
+//! Sort the children of the current vertex according to their history
+//! heuristic values.
+void history_order(history_table const& history, vertex& v);
+
+//! Move killers to the front of the successors list.
+void killer_order(killer_db const& killers, std::size_t level, vertex& v);
 
 //! Expand the currently-selected leaf.
 //!
@@ -384,6 +393,13 @@ inline void push_best(search_stack& stack) {
   stack.push(best_successor(*stack.path_top()));
 }
 
+//! Does the given child cause a cutoff for given parent?
+inline bool cutoff(vertex const& parent, vertex const& child) {
+  return
+    (parent.type == vertex::type_or && child.proof_number == 0) ||
+    (parent.type == vertex::type_and && child.disproof_number == 0);
+}
+
 //! A CRTP base class for search algorithms.
 template <typename Algo>
 class search_algo : private boost::noncopyable {
@@ -418,6 +434,26 @@ public:
     return proof_tbl_;
   }
   
+  //! Make the algorithm use a history table.
+  void use_history_tbl(boost::shared_ptr<history_table> const& ht) {
+    history_tbl_ = ht;
+  }
+
+  //! Get the history table, if any, used by this algorithm.
+  boost::shared_ptr<history_table> get_history_tbl() const {
+    return history_tbl_;
+  }
+
+  //! Make the algorithm use a killers DB.
+  void use_killer_db(boost::shared_ptr<killer_db> const& killers) {
+    killer_db_ = killers;
+  }
+
+  //! Get the killers db, if any, used by this algorithm.
+  boost::shared_ptr<killer_db> get_killer_db() const {
+    return killer_db_;
+  }
+
   //! Change the number of moves stored in the move cache.
 #if 0
   void move_cache_size(std::size_t new_size) {
@@ -437,11 +473,6 @@ public:
   //! Get the total number of vertices currently held by this algorithm.
   std::size_t get_position_count() const {
     return size_;
-  }
-
-  //! Number of steps remembered by the history table.
-  std::size_t history_tbl_size() const {
-    return history_tbl_.size();
   }
 
   std::size_t gc_low() const  { return gc_low_; }
@@ -487,7 +518,8 @@ protected:
   search_stack                            stack_;
   boost::shared_ptr<transposition_table>  trans_tbl_;
   boost::shared_ptr<proof_table>          proof_tbl_;
-  history_table                           history_tbl_;
+  boost::shared_ptr<history_table>        history_tbl_;
+  boost::shared_ptr<killer_db>            killer_db_;
   std::size_t                             size_;
   std::size_t                             gc_low_;
   std::size_t                             gc_high_;
@@ -518,14 +550,26 @@ protected:
     }
   }
 
-  void store_in_ht(vertex const& v) {
-    vertex_counter counter;
-    traverse(v, backtrack(), boost::ref(counter));
-    history_tbl_.insert(*v.step, counter.count);
+  void store_in_ht(vertex const& v, std::size_t level) {
+    if (history_tbl_) {
+      history_tbl_->insert(*v.step, level);
 
-    *log_ << v.step->to_string()
-          << " inserted into the history table with value "
-          << counter.count << '\n';
+      *log_ << v.step->to_string()
+            << " inserted into the history table with value "
+            << level << '\n';
+    }
+  }
+
+  void store_in_killer_db(std::size_t level, vertex::e_type parent_type,
+                          vertex const& v) {
+    if (killer_db_) {
+      killer_db_->add(level, parent_type, *v.step);
+
+      *log_ << v.step->to_string()
+            << " is a killer for type "
+            << (parent_type == vertex::type_or ? "OR" : "AND")
+            << " at level " << level << '\n';
+    }
   }
 
   void store_in_pt(
@@ -551,7 +595,7 @@ protected:
     search_stack::history_sequence::const_iterator history_begin,
     search_stack::history_sequence::const_iterator history_end,
     zobrist_hasher::hash_t hash, std::size_t ply
-   ) {
+  ) {
     vertex::number_t const old_pn = current.proof_number;
     vertex::number_t const old_dn = current.disproof_number;
 
@@ -561,15 +605,18 @@ protected:
                                  current.disproof_number != old_dn;
     bool const proved = current.proof_number == 0 ||
                         current.disproof_number == 0;
-    bool const cutoff = parent &&
-        ((parent->type == vertex::type_or && current.proof_number == 0) ||
-         (parent->type == vertex::type_and && current.disproof_number == 0));
+    bool const cutoff = parent && apns::cutoff(*parent, current);
 
     if (proved && numbers_changed)
       log_proof(path_begin, path_end);
 
-    if (cutoff)
-      store_in_ht(current);
+    if (cutoff) {
+      std::size_t const level = std::distance(path_begin, path_end);
+
+      store_in_ht(current, level);
+      if (parent)
+        store_in_killer_db(level, parent->type, current);
+    }
 
     if (proved)
       store_in_pt(history_begin, history_end, ply, hash, current);
@@ -585,12 +632,24 @@ protected:
       stack_.push(&*child);
 
       bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_);
-      bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_,
-                                                       stack_.hashes_top(),
-                                                       *child);
+      if (!found_in_pt) {
+        bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_,
+                                                         stack_.hashes_top(),
+                                                         *child);
 
-      if (!found_in_pt && !found_in_tt)
-        evaluate(stack_, game_->attacker, *log_);
+        if (!found_in_tt)
+          evaluate(stack_, game_->attacker, *log_);
+      } else {
+        // found_in_pt
+        *log_ << stack_ << " proved by proof table\n";
+      }
+
+      bool const cutoff = apns::cutoff(current, *child);
+
+      if (cutoff) {
+        store_in_ht(*child, stack_.size());
+        store_in_killer_db(stack_.size(), current.type, *child);
+      }
     }
   }
 };
