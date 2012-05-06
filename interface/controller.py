@@ -155,8 +155,8 @@ class SearchParameters:
     self.proofTblSize   = None
     #self.moveCacheSize  = 32
     self.killerCount    = 2
-    self.gcLow          = 0
-    self.gcHigh         = 0
+    self.gcHigh         = 5000000
+    self.gcLow          = 3000000
     self.logFilename    = None
 
 
@@ -324,8 +324,8 @@ class Controller(object):
       self._killerDb = None
 
     #self._search.moveCacheSize = self.searchParameters.moveCacheSize
-    self._search.gcLow = self.searchParameters.gcLow
-    self._search.gcHigh = self.searchParameters.gcHigh
+    self._search.gcLow = int(self.searchParameters.gcLow)
+    self._search.gcHigh = int(self.searchParameters.gcHigh)
     self._search.transpositionTable = self._transTbl
     self._search.proofTable = self._proofTbl
     self._search.historyTable = self._historyTbl

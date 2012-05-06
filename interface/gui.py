@@ -223,6 +223,13 @@ class MainWindowController(object):
         pars.transTblSize = newPrefs.transTblSize
         pars.proofTblSize = newPrefs.proofTblSize
         pars.killerCount = newPrefs.killerCount
+        
+        if newPrefs.gcCheck:
+          pars.gcHigh = newPrefs.gcHigh
+          pars.gcLow = newPrefs.gcLow
+        else:
+          pars.gcHigh = pars.gcLow = 0
+        
         #pars.logFilename = ''
         #pars.moveCacheSize = newPrefs.moveCacheSize
 
@@ -943,6 +950,18 @@ class RunSearchDialog(Observable):
                          lambda self, val: self.setKillerCount(val))
   #moveCacheSize = property(lambda self: self._moveCacheSpinVar.get(),
   #                         lambda self, val: self.setMoveCache(val))
+  gcCheck = property(
+    lambda self: self._gcCheckVar.get() == '1',
+    lambda self, val: self.enableGC(val)
+  )
+  gcHigh = property(
+    lambda self: self._gcHigh.get(),
+    lambda self, val: self.setGCHigh(val)
+  )
+  gcLow = property(
+    lambda self: self._gcLow.get(),
+    lambda self, val: self.setGCLow(val)
+  )
 
   class Command:
     timeLimitCheck, positionLimitCheck, memLimitCheck, gcCheck, \
@@ -966,8 +985,46 @@ class RunSearchDialog(Observable):
     for row, (algo, description) in enumerate(algos):
       radio = ttk.Radiobutton(algoFrame, text=description,
                               variable=self._algoVar, value=algo)
-      radio.grid(row=row, column=0, sticky='WE')
+      radio.grid(row=row, column=0, columnspan=3, sticky='WE')
       algoRadios.append(radio)
+    
+    nextRow = len(algos)
+    
+    self._gcCheckVar = Tkinter.StringVar(value='1')
+    gcCheck = ttk.Checkbutton(
+      algoFrame, text='Garbage Collector',
+      variable=self._gcCheckVar,
+      command=lambda: 
+        self.notifyObservers(command=RunSearchDialog.Command.gcCheck)
+    )
+    gcHighLabel = ttk.Label(algoFrame, text='High threshold:')
+    gcLowLabel = ttk.Label(algoFrame, text='Low threshold:')
+    gcHighUnits = ttk.Label(algoFrame, text='vertices')
+    gcLowUnits = ttk.Label(algoFrame, text='vertices')
+    
+    self._gcHigh = Tkinter.StringVar(value='5000000')
+    self._gcLow = Tkinter.StringVar(value='3000000')
+    
+    self._gcHighSpin = Tkinter.Spinbox(
+      algoFrame,
+      from_=1, to=999999999999999,
+      textvariable=self._gcHigh
+    )
+    self._gcLowSpin = Tkinter.Spinbox(
+      algoFrame,
+      from_=1, to=999999999999999,
+      textvariable=self._gcLow
+    )
+    
+    gcCheck.grid(row=nextRow, column=0, columnspan=3, sticky='WE', pady=(5, 0))
+    
+    gcHighLabel.grid(row=nextRow + 1, column=0, sticky='E', padx=(30, 0))
+    self._gcHighSpin.grid(row=nextRow + 1, column=1, sticky='WE', padx=5)
+    gcHighUnits.grid(row=nextRow + 1, column=2, sticky='W')
+    
+    gcLowLabel.grid(row=nextRow + 2, column=0, sticky='E', padx=(30, 0))
+    self._gcLowSpin.grid(row=nextRow + 2, column=1, sticky='WE', padx=5)
+    gcLowUnits.grid(row=nextRow + 2, column=2, sticky='W')
     
     limitsFrame = ttk.Labelframe(self._dialog.content,
                                  text='Search limits:', padding=5)
@@ -1174,6 +1231,27 @@ class RunSearchDialog(Observable):
     '''Set the move cache size.'''
     
     self._moveCacheSpinVar.set(int(value))
+  
+  
+  def enableGC(self, enable):
+    '''Enable or disable garbage collector.'''
+    
+    if enable:
+      self._gcHighSpin['state'] = ['normal']
+      self._gcLowSpin['state'] = ['normal']
+      self._gcCheckVar.set('1')
+    else:
+      self._gcHighSpin['state'] = ['disabled']
+      self._gcLowSpin['state'] = ['disabled']
+      self._gcCheckVar.set('0')
+  
+  
+  def setGCHigh(self, val):
+    self._gcHigh.set(val)
+  
+  def setGCLow(self, val):
+    self._gcLow.set(val)
+      
 
   def _execute(self):
     '''User has clicked the 'Run' button: Dispatch the command to the 
@@ -1225,6 +1303,9 @@ class RunSearchController(object):
     self._runSearchDlg.transTblSize = get('transTblSize', 32)
     self._runSearchDlg.proofTblSize = get('proofTblSize', 32)
     self._runSearchDlg.killerCount = get('killerCount', 2)
+    self._runSearchDlg.gcHigh = get('gcHigh', '5000000')
+    self._runSearchDlg.gcLow = get('gcLow', '3000000')
+    self._runSearchDlg.gcCheck = get('gcCheck', True)
     #self._runSearchDlg.moveCacheSize = get('moveCacheSize', 32)
 
     self._doRun = False
@@ -1278,6 +1359,9 @@ class RunSearchController(object):
         self._memLimit = memLimit
         self._showTimeLeft = showTimeLeft
         self._killerCount = self._runSearchDlg.killerCount
+        self._gcHigh = self._runSearchDlg.gcHigh
+        self._gcLow = self._runSearchDlg.gcLow
+        self._gcCheck = self._runSearchDlg.gcCheck
         #self._moveCachesize = self._runSearchDlg.moveCacheSize
 
         self._lastSetValues = SearchParameters()
@@ -1293,6 +1377,9 @@ class RunSearchController(object):
         last.transTblSize = int(self._runSearchDlg.transTblSize)
         last.proofTblSize = int(self._runSearchDlg.proofTblSize)
         last.killerCount = self._runSearchDlg.killerCount
+        last.gcHigh = self._runSearchDlg.gcHigh
+        last.gcLow = self._runSearchDlg.gcLow
+        last.gcCheck = self._runSearchDlg.gcCheck
         #last.moveCacheSize = int(self._runSearchDlg.moveCacheSize)
 
         self._doRun = True
@@ -1308,7 +1395,10 @@ class RunSearchController(object):
 
     elif command == RunSearchDialog.Command.memLimitCheck:
       self._runSearchDlg.enableMemLimit(self._runSearchDlg.memLimitCheck)
-
+    
+    elif command == RunSearchDialog.Command.gcCheck:
+      self._runSearchDlg.enableGC(self._runSearchDlg.gcCheck)
+      
 
   def _validateInput(self):
     '''Check whether the values set on the dialog are correct. If they are,
@@ -1334,7 +1424,9 @@ class RunSearchController(object):
             and checkVar(dlg.memLimitCheck, dlg.memLimit, 'Memory limit')
             and checkVar(True, dlg.transTblSize, 'Size of transposition table')
             and checkVar(True, dlg.proofTblSize, 'Size of proof table')
-            and checkVar(True, dlg.killerCount, 'Killer count'))
+            and checkVar(True, dlg.killerCount, 'Killer count')
+            and checkVar(dlg.gcCheck, dlg.gcHigh, 'GC high threshold')
+            and checkVar(dlg.gcCheck, dlg.gcLow, 'GC low threshold'))
             #and checkVar(True, dlg.moveCacheSize, 'Move cache size'))
 
 
