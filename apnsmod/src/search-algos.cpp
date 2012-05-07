@@ -771,7 +771,7 @@ void proof_number_search::do_iterate() {
       break;
   }
 
-  if (gc_high_ > 0 && size_ > gc_high_ && gc_low_ <= size_)
+  if (gc_enabled() && size_ > gc_high_ && gc_low_ <= size_)
     size_ -= garbage_collect(size_ - gc_low_, stack_);
 }
 
@@ -790,7 +790,7 @@ void depth_first_pns::do_iterate() {
           current->proof_number > limits_.back().pn_limit ||
           current->disproof_number == 0 || 
           current->disproof_number > limits_.back().dn_limit)) {
-    if (current->type != parent(stack_)->type)
+    if (!gc_enabled() && current->type != parent(stack_)->type)
       size_ -= cut(*current);
 
     stack_.pop();
@@ -862,6 +862,9 @@ void depth_first_pns::do_iterate() {
       break;
     }
   }
+
+  if (gc_enabled() && size_ > gc_high_ && gc_low_ <= size_)
+    size_ -= garbage_collect(size_ - gc_low_, stack_);
 }
 
 depth_first_pns::limits_t 

@@ -539,6 +539,10 @@ protected:
     , log_(new null_sink)
   { }
 
+  bool gc_enabled() const {
+    return gc_low_ > 0 || gc_high_ > 0;
+  }
+
   void log_proof(search_stack::path_sequence::const_iterator path_begin,
                  search_stack::path_sequence::const_iterator path_end) {
     if (!log_->null()) {
