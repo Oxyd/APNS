@@ -178,6 +178,7 @@ class SearchProgress:
     #self.moveCacheHits      = None
     #self.moveCacheMisses    = None
     self.historyTblSize     = None
+    self.killerCount        = None
 
 MB = 1024 * 1024
 
@@ -415,10 +416,20 @@ class Controller(object):
 
 #    progress.moveCacheHits = self._search.moveCacheHits
 #    progress.moveCacheMisses = self._search.moveCacheMisses
-    progress.moveCacheHits = 0
-    progress.moveCacheMisses = 0
+    #progress.moveCacheHits = 0
+    #progress.moveCacheMisses = 0
 
-    progress.historyTblSize = self._search.historyTable.size
+    ht = self._search.historyTable
+    if ht:
+      progress.historyTblSize = self._search.historyTable.size
+    else:
+      progress.historyTblSize = 0
+    
+    kDB = self._search.killerDB
+    if kDB:
+      progress.killerCount  = kDB.totalSize
+    else:
+      progress.killerCount = 0
 
     return progress
 

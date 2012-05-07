@@ -19,6 +19,8 @@
 #include <boost/optional.hpp>
 #include <boost/unordered_map.hpp>
 
+#include <limits>
+
 #ifdef BOOST_NO_INT64_T
 // Defined only if the underlying platform doesn't provide 64-bit integer 
 // types. This program can't work without
@@ -144,15 +146,18 @@ public:
 private:
   //! One record in the table.
   struct record {
-    entry_t entry;
-    int     depth;
-    hash_t  hash;
+    entry_t   entry;
+    unsigned  depth;
+    hash_t    hash;
 
-    record() : depth(-1), hash(0) { }
+    record() : depth(UNSET), hash(0) { }
 
     bool is_set() {
-      return depth != -1;
+      return depth != UNSET;
     }
+
+  private:
+    static unsigned const UNSET;
   };
 
 public:
@@ -184,7 +189,7 @@ public:
    * \param hash Key of the element.
    * \param vertex Value of the element.
    */
-  void insert(hash_t hash, int depth, entry_t entry) {
+  void insert(hash_t hash, unsigned depth, entry_t entry) {
     record* r = find_record(hash, true);
     assert(r);
 
@@ -288,6 +293,10 @@ private:
 
 template <typename Entry, typename Hash>
 std::size_t const table<Entry, Hash>::SIZE_OF_ELEMENT = sizeof(record);
+
+template <typename Entry, typename Hash>
+unsigned const table<Entry, Hash>::record::UNSET =
+  std::numeric_limits<unsigned>::max();
 
 } // namespace detail
 
