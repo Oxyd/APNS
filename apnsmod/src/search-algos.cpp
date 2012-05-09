@@ -750,6 +750,14 @@ bool simulate(search_stack& stack, piece::color_t attacker,
     if (killer->revalidate(position, player)) {
       assert(parent.leaf());
 
+      // First append the step as a new child of opposite type (so that it makes
+      // sense to evaluate it at all) and see if that causes a proof. If it
+      // doesn't, and it's got enough steps remaining, flip its type and try
+      // one level deeper.
+      //
+      // This uses built-in recursion. It should be okay, since the recursion
+      // is at most four calls deep.
+
       vertex::children_iterator child = parent.add_child();
       ++size;
 
@@ -769,6 +777,9 @@ bool simulate(search_stack& stack, piece::color_t attacker,
         log << stack << " proved by simulation\n";
         return true;
       } else {
+        // No proof -- flip the type, set the apropriate number of remaining
+        // steps and recurse.
+
         int const child_remains = parent.steps_remaining - killer->steps_used();
         if (child_remains >= 1) {
           child->type = parent.type;
