@@ -812,6 +812,7 @@ class SaveLoadProgressDialog(Observable):
     Observable.__init__(self)
 
     self._dialog = DialogWindow(parent, title)
+    self._dialog.window.minsize(width=150, height=1)
 
     self._lbl = ttk.Label(self._dialog.content, text=text + '   ')
 
@@ -819,7 +820,7 @@ class SaveLoadProgressDialog(Observable):
                            command=lambda: self.notifyObservers())
     self._dialog.setDeleteAction(lambda: cancelBtn.invoke())
 
-    self._lbl.grid(row=0, column=0, sticky='W', padx=5, pady=5)
+    self._lbl.grid(row=0, column=0, sticky='W', padx=10, pady=5)
     cancelBtn.grid(row=0, column=0, sticky='E')
 
     self._dialog.content.rowconfigure(1, weight=1)
@@ -1140,7 +1141,7 @@ class RunSearchDialog(Observable):
     positionLimitUnits.grid(row=1, column=2, sticky='W')
 
     self._memLimitCheck.grid(row=2, column=0, sticky='W')
-    self._memLimitSpin.grid(row=2, column=1, sticky='WE')
+    self._memLimitSpin.grid(row=2, column=1, sticky='WE', padx=5)
     memLimitUnits.grid(row=2, column=2, sticky='W')
 
     algoFrame.columnconfigure(1, weight=1)

@@ -201,10 +201,12 @@ void save_game(boost::shared_ptr<game> const& game,
     traverse(game->root, backtrack(), printer(out), 
              op_ctrl_stop_cond(op_ctrl));
 
-    if (op_ctrl.stop())
+    if (op_ctrl.stop()) {
       // Cancelled -- the file has been only partially written -- so delete
       // it.
-      delete_file(filename);  
+      out.close();
+      delete_file(filename);
+    }
 
   } catch (std::ios_base::failure& f) {
     delete_file(filename);  // The file has only been partially written.
