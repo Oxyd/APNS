@@ -755,15 +755,8 @@ bool simulate(search_stack& stack, piece::color_t attacker,
 
       child->step = *killer;
       child->proof_number = child->disproof_number = 1;
-
-      int const child_remains = parent.steps_remaining - killer->steps_used();
-      if (child_remains >= 1) {
-        child->type = parent.type;
-        child->steps_remaining = child_remains;
-      } else {
-        child->type = opposite_type(parent.type);
-        child->steps_remaining = MAX_STEPS;
-      }
+      child->steps_remaining = MAX_STEPS;
+      child->type = opposite_type(parent.type);
 
       search_stack_checkpoint checkpoint(stack);
       stack.push(&*child);
@@ -776,7 +769,11 @@ bool simulate(search_stack& stack, piece::color_t attacker,
         log << stack << " proved by simulation\n";
         return true;
       } else {
-        if (child->type == parent.type) {
+        int const child_remains = parent.steps_remaining - killer->steps_used();
+        if (child_remains >= 1) {
+          child->type = parent.type;
+          child->steps_remaining = child_remains;
+
           bool const success = simulate(stack, attacker, size,
                                         killers, proof_tbl, log);
           if (success)
