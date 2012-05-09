@@ -264,7 +264,7 @@ public:
 
   //! How many steps does this step use? For ordinary moves, it is 1; for push 
   //! and pull it's 2. Captures do not count as used steps.
-  std::size_t steps_used() const;
+  int steps_used() const;
 
   //! Does this step involve rabbits in any way?
   bool moves_rabbit() const;

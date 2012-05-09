@@ -217,8 +217,8 @@ void killer_db::add(std::size_t ply, vertex::e_type type, step const& step) {
 bool killer_db::is_killer(
   std::size_t ply, vertex::e_type type, step const& step
 ) const {
-  for (ply_iterator killer = ply_begin(ply, type);
-       killer != ply_end(ply, type); ++killer)
+  for (level_iterator killer = level_begin(ply, type);
+       killer != level_end(ply, type); ++killer)
     if (*killer == step)
       return true;
 
@@ -732,6 +732,66 @@ std::size_t cut(vertex& parent) {
   return cut_counter.count - 1;  // parent has been counted but not removed.
 }
 
+bool simulate(search_stack& stack, piece::color_t attacker,
+              std::size_t& size,
+              killer_db const& killers,
+              boost::shared_ptr<proof_table> const& proof_tbl,
+              log_sink& log) {
+  std::size_t const level     = stack.size();
+  vertex& parent              = *stack.path_top();
+  board const& position       = stack.state();
+  piece::color_t const player = vertex_player(parent, attacker);
+
+  for (
+    killer_db::level_iterator killer = killers.level_begin(level, parent.type);
+    killer != killers.level_end(level, parent.type);
+    ++killer
+  ) {
+    if (killer->revalidate(position, player)) {
+      assert(parent.leaf());
+
+      vertex::children_iterator child = parent.add_child();
+      ++size;
+
+      child->step = *killer;
+      child->proof_number = child->disproof_number = 1;
+
+      int const child_remains = parent.steps_remaining - killer->steps_used();
+      if (child_remains >= 1) {
+        child->type = parent.type;
+        child->steps_remaining = child_remains;
+      } else {
+        child->type = opposite_type(parent.type);
+        child->steps_remaining = MAX_STEPS;
+      }
+
+      search_stack_checkpoint checkpoint(stack);
+      stack.push(&*child);
+
+      bool const found_in_pt = proof_tbl && pt_lookup(*proof_tbl, stack);
+      if (!found_in_pt)
+        evaluate(stack, attacker, log);
+
+      if (cutoff(parent, *child)) {
+        log << stack << " proved by simulation\n";
+        return true;
+      } else {
+        if (child->type == parent.type) {
+          bool const success = simulate(stack, attacker, size,
+                                        killers, proof_tbl, log);
+          if (success)
+            return true;
+        }
+
+        size -= cut(parent);
+      }
+    }
+  }
+
+  assert(parent.leaf());
+  return false;
+}
+
 void proof_number_search::do_iterate() {
   assert(game_);
   assert(!game_->root.step);
@@ -748,8 +808,7 @@ void proof_number_search::do_iterate() {
     push_best(stack_);
   }
 
-  size_ += expand(*stack_.path_top(), stack_.state(), game_->attacker);
-  evaluate_children();
+  expand_and_eval();
 
   while (true) {
     vertex& current = *stack_.path_top();

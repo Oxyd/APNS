@@ -335,7 +335,7 @@ class Controller(object):
     logFilename = self.searchParameters.logFilename
     if logFilename is not None:
       if logFilename != '':
-        self._search.logSink = apnsmod.FileSink(logFilename)
+        self._search.logSink = apnsmod.FileSink(str(logFilename))
       else:
         self._search.logSink = apnsmod.StdoutSink()
     else:
@@ -356,6 +356,7 @@ class Controller(object):
       self.dropGame()
       raise
 
+    self._search.logSink.flush()
     self._posCount = self._search.positionCount
     self.stats = self._makeStats()
 

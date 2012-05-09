@@ -168,7 +168,6 @@ class MainWindowController(object):
     self._controller = Controller()
     self._searchPreferences = SearchParameters()
 
-
   def runApplication(self):
     '''Start the GUI of the application.'''
 
@@ -223,6 +222,7 @@ class MainWindowController(object):
         pars.transTblSize = newPrefs.transTblSize
         pars.proofTblSize = newPrefs.proofTblSize
         pars.killerCount = newPrefs.killerCount
+        pars.logFilename = newPrefs.logPath if newPrefs.logCheck else None
         
         if newPrefs.gcCheck:
           pars.gcHigh = newPrefs.gcHigh
@@ -230,7 +230,6 @@ class MainWindowController(object):
         else:
           pars.gcHigh = pars.gcLow = 0
         
-        #pars.logFilename = ''
         #pars.moveCacheSize = newPrefs.moveCacheSize
 
         try:
@@ -948,6 +947,14 @@ class RunSearchDialog(Observable):
                           lambda self, val: self.setProofTblSize(val))
   killerCount = property(lambda self: self._killerCountVar.get(),
                          lambda self, val: self.setKillerCount(val))
+  logCheck = property(
+    lambda self: self._logCheckVar.get() == '1',
+    lambda self, val: self.enableLog(val)
+  )
+  logPathName = property(
+    lambda self: self._logPathNameVar.get(),
+    lambda self, val: self.setLogPathName(val)
+  )
   #moveCacheSize = property(lambda self: self._moveCacheSpinVar.get(),
   #                         lambda self, val: self.setMoveCache(val))
   gcCheck = property(
@@ -965,7 +972,7 @@ class RunSearchDialog(Observable):
 
   class Command:
     timeLimitCheck, positionLimitCheck, memLimitCheck, gcCheck, \
-      start = range(5)
+      logCheck, logChoose, start = range(7)
 
   def __init__(self, parent, algos):
     '''Create the dialog.'''
@@ -1089,6 +1096,35 @@ class RunSearchDialog(Observable):
                                       textvariable=self._proofSpinVar)
     self._killersSpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=100,
                                         textvariable=self._killerCountVar)
+    
+    loggingFrame = ttk.Labelframe(self._dialog.content,
+                                  text='Logging:', padding=5)
+    
+    self._logCheckVar = Tkinter.StringVar(value='0')
+    self._loggingCheck = ttk.Checkbutton(
+      loggingFrame, text='Enabled', variable=self._logCheckVar,
+      command=lambda: self.notifyObservers(
+        command=RunSearchDialog.Command.logCheck
+      )
+    )
+    
+    self._logPathLabel = ttk.Label(loggingFrame, text='Log file:')
+    
+    self._logPathNameVar = Tkinter.StringVar(value='')
+    self._logPathName = ttk.Entry(loggingFrame, 
+                                  textvariable=self._logPathNameVar)
+    
+    self._logPathChooseBtn = ttk.Button(
+      loggingFrame, text='Choose…',
+      command=lambda: self.notifyObservers(
+        command=RunSearchDialog.Command.logChoose
+      )
+    )
+    
+    self._loggingCheck.grid(row=0, column=0, columnspan=3, sticky='WE')
+    self._logPathLabel.grid(row=1, column=0, sticky='E', padx=(30, 5), pady=3)
+    self._logPathName.grid(row=1, column=1, sticky='WE', pady=3)
+    self._logPathChooseBtn.grid(row=1, column=2, sticky='W', padx=5, pady=3)
 
     runBtn = ttk.Button(self._dialog.buttonBox, text='Run',
                         command=self._execute)
@@ -1104,7 +1140,7 @@ class RunSearchDialog(Observable):
     positionLimitUnits.grid(row=1, column=2, sticky='W')
 
     self._memLimitCheck.grid(row=2, column=0, sticky='W')
-    self._memLimitSpin.grid(row=2, column=1, sticky='WE', padx=5)
+    self._memLimitSpin.grid(row=2, column=1, sticky='WE')
     memLimitUnits.grid(row=2, column=2, sticky='W')
 
     algoFrame.columnconfigure(1, weight=1)
@@ -1130,7 +1166,10 @@ class RunSearchDialog(Observable):
     self._killersSpin.grid(row=3, column=1, sticky='WE', padx=5)
 
     algoParamsFrame.columnconfigure(1, weight=1)
-    algoParamsFrame.grid(row=4, column=0, sticky='EW', pady=(5, 0))
+    algoParamsFrame.grid(row=4, column=0, sticky='EW', pady=(5, 5))
+    
+    loggingFrame.columnconfigure(1, weight=1)
+    loggingFrame.grid(row=5, column=0, sticky='WE', pady=(5, 0))
 
     runBtn.grid(row=0, column=0, padx=5)
     cancelBtn.grid(row=0, column=1)
@@ -1251,7 +1290,22 @@ class RunSearchDialog(Observable):
   
   def setGCLow(self, val):
     self._gcLow.set(val)
-      
+  
+  
+  def enableLog(self, enable):
+    if enable:
+      self._logCheckVar.set('1')
+      state = ['normal']
+    else:
+      self._logCheckVar.set('0')
+      state = ['disabled']
+    
+    self._logPathName['state'] = state
+    self._logPathChooseBtn['state'] = state
+  
+  def setLogPathName(self, name):
+    self._logPathNameVar.set(name)
+    
 
   def _execute(self):
     '''User has clicked the 'Run' button: Dispatch the command to the 
@@ -1306,6 +1360,8 @@ class RunSearchController(object):
     self._runSearchDlg.gcHigh = get('gcHigh', '5000000')
     self._runSearchDlg.gcLow = get('gcLow', '3000000')
     self._runSearchDlg.gcCheck = get('gcCheck', True)
+    self._runSearchDlg.logCheck = get('logCheck', False)
+    self._runSearchDlg.logPathName = get('logPath', 'log.txt')
     #self._runSearchDlg.moveCacheSize = get('moveCacheSize', 32)
 
     self._doRun = False
@@ -1362,6 +1418,8 @@ class RunSearchController(object):
         self._gcHigh = self._runSearchDlg.gcHigh
         self._gcLow = self._runSearchDlg.gcLow
         self._gcCheck = self._runSearchDlg.gcCheck
+        self._logCheck = self._runSearchDlg.logCheck
+        self._logPath = self._runSearchDlg.logPathName
         #self._moveCachesize = self._runSearchDlg.moveCacheSize
 
         self._lastSetValues = SearchParameters()
@@ -1380,6 +1438,8 @@ class RunSearchController(object):
         last.gcHigh = self._runSearchDlg.gcHigh
         last.gcLow = self._runSearchDlg.gcLow
         last.gcCheck = self._runSearchDlg.gcCheck
+        last.logCheck = self._runSearchDlg.logCheck
+        last.logPath = self._runSearchDlg.logPathName
         #last.moveCacheSize = int(self._runSearchDlg.moveCacheSize)
 
         self._doRun = True
@@ -1398,6 +1458,14 @@ class RunSearchController(object):
     
     elif command == RunSearchDialog.Command.gcCheck:
       self._runSearchDlg.enableGC(self._runSearchDlg.gcCheck)
+    
+    elif command == RunSearchDialog.Command.logCheck:
+      self._runSearchDlg.enableLog(self._runSearchDlg.logCheck)
+    
+    elif command == RunSearchDialog.Command.logChoose:
+      pathname = tkFileDialog.asksaveasfilename()
+      if len(pathname) > 0:
+        self._runSearchDlg.setLogPathName(pathname)
       
 
   def _validateInput(self):

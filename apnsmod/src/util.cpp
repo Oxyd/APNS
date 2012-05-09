@@ -56,5 +56,9 @@ void file_sink::do_put(std::stringstream const& data) {
   out_ << data.rdbuf();
 }
 
+void file_sink::do_flush() {
+  out_ << std::flush;
+}
+
 } // namespace apns
 

@@ -505,9 +505,10 @@ step::reverse_el_steps_iterator step::step_sequence_rend() const {
   return reverse_el_steps_iterator(step_sequence_begin());
 }
 
-std::size_t step::steps_used() const {
-  return std::count_if(step_sequence_begin(), step_sequence_end(),
-      !boost::bind(&elementary_step::capture, _1));
+int step::steps_used() const {
+  return
+    std::count_if(step_sequence_begin(), step_sequence_end(),
+                  !boost::bind(&elementary_step::capture, _1));
 }
 
 bool step::moves_rabbit() const {

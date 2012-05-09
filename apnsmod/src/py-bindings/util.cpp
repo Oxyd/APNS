@@ -24,7 +24,8 @@ struct log_sink_wrap : apns::log_sink, boost::python::wrapper<apns::log_sink> {
 
     if (override f = this->get_override("null"))
       return f();
-    return log_sink::null();
+    else
+      return log_sink::null();
   }
 
   bool default_null() const { return log_sink::null(); }
@@ -32,6 +33,15 @@ struct log_sink_wrap : apns::log_sink, boost::python::wrapper<apns::log_sink> {
   virtual void do_put(std::stringstream const& data) {
     this->get_override("doPut")(data.str());
   }
+
+  virtual void do_flush() {
+    using namespace boost::python;
+
+    if (override f = this->get_override("doFlush"))
+      f();
+  }
+
+  void default_flush() { }
 };
 
 } // anonymous namespace
@@ -63,12 +73,18 @@ void export_util() {
     .def("put", &apns::log_sink::put<std::string>,
          "s.put(str) -> None\n\n"
          "Put something into the sink.")
+    .def("flush", &apns::log_sink::flush,
+         "s.flush() -> None\n\n"
+         "Flush this sink.")
     .def("null", &apns::log_sink::null, &log_sink_wrap::default_null,
          "s.null() -> Bool\n\n"
          "Is this sink a null sink?")
     .def("doPut", pure_virtual(&log_sink_wrap::do_put),
          "s.doPut(str) -> None\n\n"
          "Do the work of putting data into the sink.")
+    .def("doFlush", &log_sink_wrap::do_flush, &log_sink_wrap::default_flush,
+         "s.doFlush() -> None\n\n"
+         "Do the work of flushing the sink.")
     ;
 
   class_<apns::stdout_sink, bases<apns::log_sink>, boost::noncopyable>(

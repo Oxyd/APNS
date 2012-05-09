@@ -134,8 +134,8 @@ export_algo(char const* name, char const* description) {
 
 //! An iterator over the sequence of killers on a ply.
 struct killer_ply_iterator {
-  killer_ply_iterator(apns::killer_db::ply_iterator begin,
-                      apns::killer_db::ply_iterator end)
+  killer_ply_iterator(apns::killer_db::level_iterator begin,
+                      apns::killer_db::level_iterator end)
     : current_(begin)
     , end_(end)
   { }
@@ -155,15 +155,15 @@ struct killer_ply_iterator {
   }
 
 private:
-  apns::killer_db::ply_iterator current_;
-  apns::killer_db::ply_iterator end_;
+  apns::killer_db::level_iterator current_;
+  apns::killer_db::level_iterator end_;
 };
 
 killer_ply_iterator killer_db_killers(apns::killer_db const& db,
                                       std::size_t ply,
                                       apns::vertex::e_type type) {
-  return killer_ply_iterator(db.ply_begin(ply, type),
-                             db.ply_end(ply, type));
+  return killer_ply_iterator(db.level_begin(ply, type),
+                             db.level_end(ply, type));
 }
 
 } // anonymous namespace
@@ -189,7 +189,7 @@ void export_search_algos() {
                           "ply or level",
                           init<std::size_t>())
     .add_property("plysSize",
-                  &apns::killer_db::plys_size, &apns::killer_db::resize_plys,
+                  &apns::killer_db::levels_size, &apns::killer_db::resize_plys,
                   "How many killers are remembered for each ply")
     .add_property("totalSize",
                   &apns::killer_db::total_size,

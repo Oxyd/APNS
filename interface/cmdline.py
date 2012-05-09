@@ -241,10 +241,12 @@ def main():
       )
       show('    -- Hits:   {0}'.format(progress.proofTblHits))
       show('    -- Misses: {0}'.format(progress.proofTblMisses))
-
-    show('  -- Move cache:')
-    show('    -- Hits:   {0}'.format(progress.moveCacheHits))
-    show('    -- Misses: {0}'.format(progress.moveCacheMisses))
+    
+    if progress.historyTblSize:
+      show('  -- History table size: {0}'.format(progress.historyTblSize))
+    
+    if progress.killerCount:
+      show('  -- Total killer count: {0}'.format(progress.killerCount))
 
     show('  -- History table size: {0}'.format(progress.historyTblSize))
 

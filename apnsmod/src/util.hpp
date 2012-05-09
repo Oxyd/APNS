@@ -153,12 +153,18 @@ public:
     }
   }
 
+  //! Flush the stream.
+  void flush() { do_flush(); }
+
   //! Is the sink null?
   virtual bool null() const { return false; }
 
 private:
   //! Put some actual data into the sink.
   virtual void do_put(std::stringstream const& data) = 0;
+
+  //! Really flush the stream.
+  virtual void do_flush() { }
 };
 
 //! Log inserter operator.
@@ -185,6 +191,7 @@ private:
   std::ofstream out_;
 
   virtual void do_put(std::stringstream const& data);
+  virtual void do_flush();
 };
 
 //! A log sink that does nothing.

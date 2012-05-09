@@ -100,7 +100,7 @@ class killer_db {
   typedef boost::circular_buffer<step> ply_killers_t;
 
 public:
-  typedef ply_killers_t::const_iterator ply_iterator;
+  typedef ply_killers_t::const_iterator level_iterator;
 
   //! Make a killer DB that holds at most killer_count killers for each ply.
   explicit killer_db(std::size_t killer_count) 
@@ -120,29 +120,30 @@ public:
   }
 
   //! Get the maximal number of killers in each ply.
-  std::size_t plys_size() const { return killer_count_; }
+  std::size_t levels_size() const { return killer_count_; }
 
   //! Number of records stored here in total for all levels and types.
   std::size_t total_size() const { return size_; }
 
-  //! Add a step to the list of killers for given ply and given parent type.
-  void add(std::size_t ply, vertex::e_type type, step const& step);
+  //! Add a step to the list of killers for given level and given parent type.
+  void add(std::size_t level, vertex::e_type type, step const& step);
 
-  //! Is the given step a killer for the given ply?
-  bool is_killer(std::size_t ply, vertex::e_type type, step const& step) const;
+  //! Is the given step a killer for the given level?
+  bool is_killer(std::size_t level, vertex::e_type type,
+                 step const& step) const;
 
-  ply_iterator ply_begin(std::size_t ply, vertex::e_type type) const {
-    if (ply < get_plys(type).size()) 
-      return get_plys(type)[ply].begin();
+  level_iterator level_begin(std::size_t level, vertex::e_type type) const {
+    if (level < get_plys(type).size())
+      return get_plys(type)[level].begin();
     else
-      return ply_iterator();
+      return level_iterator();
   }
 
-  ply_iterator ply_end(std::size_t ply, vertex::e_type type) const {
-    if (ply < get_plys(type).size())
-      return get_plys(type)[ply].end();
+  level_iterator level_end(std::size_t level, vertex::e_type type) const {
+    if (level < get_plys(type).size())
+      return get_plys(type)[level].end();
     else
-      return ply_iterator();
+      return level_iterator();
   };
 
 private:
@@ -387,6 +388,21 @@ std::size_t collect_proved(vertex& parent);
 //! \returns Number of vertices removed from the tree.
 std::size_t cut(vertex& parent);
 
+//! Attempt to simulate the current top vertex.
+//! \param stack The search stack whose top vertex is to be simulated.
+//! \param attacker Game-wise attacker.
+//! \param size Reference to the size of the whole tree; it will be updated
+//!             accordingly.
+//! \param killers The killer DB itself.
+//! \param proof_tbl If non-null, it will be used in attempt to find a proof.
+//! \param log Program-wise algorithm log sink.
+//! \returns True if the top vertex has been proved; false otherwise.
+bool simulate(search_stack& stack, piece::color_t attacker,
+              std::size_t& size,
+              killer_db const& killers,
+              boost::shared_ptr<proof_table> const& proof_tbl,
+              log_sink& log);
+
 //! Push the best successor among the top vertex's successors.
 inline void push_best(search_stack& stack) {
   assert(!stack.path_top()->leaf());
@@ -626,6 +642,23 @@ protected:
       store_in_pt(history_begin, history_end, ply, hash, current);
     else
       store_in_tt(hash, ply, current);
+  }
+
+  void expand_and_eval() {
+    bool const simulated =
+      killer_db_ && simulate(stack_, game_->attacker, size_, *killer_db_,
+                             proof_tbl_, *log_);
+
+    if (!simulated) {
+      size_ += expand(*stack_.path_top(), stack_.state(), game_->attacker);
+      evaluate_children();
+    }
+
+#ifndef NDEBUG
+    vertex_counter counter;
+    traverse(game_->root, backtrack(), boost::ref(counter));
+    assert(counter.count == size_);
+#endif
   }
 
   void evaluate_children() {
