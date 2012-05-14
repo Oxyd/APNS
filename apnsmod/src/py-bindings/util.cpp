@@ -82,7 +82,7 @@ void export_util() {
     .def("doPut", pure_virtual(&log_sink_wrap::do_put),
          "s.doPut(str) -> None\n\n"
          "Do the work of putting data into the sink.")
-    .def("doFlush", &log_sink_wrap::do_flush, &log_sink_wrap::default_flush,
+    .def("doFlush", &log_sink_wrap::do_flush,
          "s.doFlush() -> None\n\n"
          "Do the work of flushing the sink.")
     ;
