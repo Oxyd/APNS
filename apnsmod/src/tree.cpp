@@ -29,8 +29,11 @@ std::size_t bytes(Container const& c) {
 
 namespace apns {
 
+#ifndef _MSC_VER
 vertex::number_t const vertex::max_num;
 vertex::number_t const vertex::infty;
+#endif
+
 std::size_t vertex::alloc_ = 0;
 
 vertex::vertex() :
