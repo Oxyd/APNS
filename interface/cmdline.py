@@ -89,9 +89,9 @@ def main():
                       metavar='proof tbl size', dest='proofTblSize',
                       help='Size of the proof table to use, in megabytes. ' +
                            'If set to 0, don\'t use proof table')
-  parser.add_argument('-M', '--move-cache-size', type=int, default=32,
-                      metavar='move cache size', dest='moveCacheSize',
-                      help='Size of the move cache')
+  #parser.add_argument('-M', '--move-cache-size', type=int, default=32,
+  #                    metavar='move cache size', dest='moveCacheSize',
+  #                    help='Size of the move cache')
   parser.add_argument('-g', '--gc-low', type=int, default=0,
                       metavar='gc low', dest='gcLow',
                       help='Garbage collector low threshold.')
@@ -114,6 +114,7 @@ def main():
   if args.searchFile is None and args.position is None:
     print >> sys.stderr, \
         'Error: Either initial position or previous search must be specified'
+    parser.print_usage()
     raise SystemExit(1)
 
   if args.searchFile is not None and args.position is not None:
@@ -135,7 +136,7 @@ def main():
 
   checkNum(args.transTblSize, 'Size of transposition table')
   checkNum(args.proofTblSize, 'Size of proof table')
-  checkNum(args.moveCacheSize, 'Size of move cache')
+  #checkNum(args.moveCacheSize, 'Size of move cache')
   checkNum(args.timeLimit, 'Time limit')
   checkNum(args.posLimit, 'Position limit')
   checkNum(args.memLimit, 'Memory limit')
@@ -149,7 +150,7 @@ def main():
   params.memoryLimit = args.memLimit
   params.transTblSize = args.transTblSize
   params.proofTblSize = args.proofTblSize
-  params.moveCacheSize = args.moveCacheSize
+  #params.moveCacheSize = args.moveCacheSize
   params.gcLow = args.gcLow
   params.gcHigh = args.gcHigh
   params.logFilename = args.logFilename

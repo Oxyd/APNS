@@ -29,10 +29,8 @@ std::size_t bytes(Container const& c) {
 
 namespace apns {
 
-vertex::number_t const vertex::max_num =
-  std::numeric_limits<vertex::number_t>::max();
-vertex::number_t const vertex::infty =
-  std::numeric_limits<vertex::number_t>::max() - 1;
+vertex::number_t const vertex::max_num;
+vertex::number_t const vertex::infty;
 std::size_t vertex::alloc_ = 0;
 
 vertex::vertex() :

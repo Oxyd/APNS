@@ -292,9 +292,7 @@ void update_numbers(vertex& v) {
 
   // A number type that can hold values as large as 2 * vertex::max. This will
   // be used to detect overflows.
-  //
-  // This magic constant sucks. But C++03 lacks constexpr...
-  typedef boost::uint_value_t<8589934590>::fast sum_num_t; 
+  typedef boost::uint_value_t<2 * vertex::max_num>::fast sum_num_t;
 
   vertex::number_t  min = vertex::infty;
   sum_num_t         sum = 0;
@@ -857,13 +855,15 @@ void depth_first_pns::do_iterate() {
           current->proof_number > limits_.back().pn_limit ||
           current->disproof_number == 0 || 
           current->disproof_number > limits_.back().dn_limit)) {
-    if (!gc_enabled() && current->type != parent(stack_)->type)
-      size_ -= cut(*current);
+    bool const cut = !gc_enabled() && current->type != parent(stack_)->type;
 
     stack_.pop();
     limits_.pop_back();
 
     current = stack_.path_top();
+
+    if (cut)
+      size_ -= apns::cut(*current);
 
     assert(!limits_.empty());
   }

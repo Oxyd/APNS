@@ -9,6 +9,7 @@
 #include <boost/utility.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/integer_traits.hpp>
 #include <boost/ref.hpp>
 #include <boost/iterator/iterator_adaptor.hpp>
 #include <boost/iterator/reverse_iterator.hpp>
@@ -75,9 +76,10 @@ public:
     const_reverse_children_iterator;
 
   //! Maximum value of a proof- or disproof number.
-  static number_t const max_num;  
+  static number_t const max_num = boost::integer_traits<number_t>::const_max;
+
   //! Infinity value used in the algorithm.
-  static number_t const infty;    
+  static number_t const infty = max_num - 1;
   
   //! Type of this node.
   enum e_type {

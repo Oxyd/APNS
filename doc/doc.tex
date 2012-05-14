@@ -18,352 +18,329 @@
 \end{center}
 
 \section{Účel}
-Program je primárně experimentální implementací algoritmu \emph{Proof-Number Search} v adaptaci pro hru \emph{Arimaa}.
-Má ukázat vhodnost zmíněného algoritmu při řešení koncových částí hry. Program má spíše teoretický význam, protože jeho
-hlavním výstupem je částečně prohledaný stavový prostor hry -- tento výstup je ale možné použít jako vstup jiného
+Program je primárně experimentální implementací algoritmu \emph{Proof-Number
+Search} v adaptaci pro hru \emph{Arimaa}.
+Má ukázat vhodnost zmíněného algoritmu při řešení koncových částí hry. Program
+má spíše teoretický význam, protože jeho
+hlavním výstupem je částečně prohledaný stavový prostor hry -- tento výstup je
+ale možné použít jako vstup jiného
 programu.
 
 \section{Podporované systémy}
-Program je určený pro systémy Microsoft Windows a FreeBSD. K běhu je na obou systémech potřeba mít instalovaný
+Program je určený pro systémy Microsoft Windows a GNU/Linux. K běhu je na obou
+systémech potřeba mít instalovaný
 Python verze 2.7 (pro Windows ke stažení na \url{http://python.org/download/}). 
 
-Pro Windows je připraven zip soubor obsahující vše potřebné pro spuštění programu -- ten lze získat na adrese
-\url{https://github.com/Oxyd/APNS} kliknutím na tlačítko \emph{Download} a následně stažením souboru
-\texttt{apns-windows-32bit-\textit{verze}.zip} pro 32bitové Windows či \texttt{apns-windows-64bit-\textit{verze}.zip} pro 
+Pro Windows je připraven zip soubor obsahující vše potřebné pro spuštění
+programu -- ten lze získat na adrese
+\url{https://github.com/Oxyd/APNS} kliknutím na tlačítko \emph{Download} a
+následně stažením souboru
+\texttt{apns-windows-32bit-\textit{verze}.zip} pro 32bitové Windows či
+\texttt{apns-windows-64bit-\textit{verze}.zip} pro 
 64bitový systém.
 
-Na platformě FreeBSD je potřeba prvně program přeložit -- o tom více v části \ref{sec:compiling}.
+Na platformě GNU/Linux je potřeba prvně program přeložit -- o tom více v části
+\ref{sec:compiling}.
 
 \section{Běh programu}
 \label{sec:running}
-Program je možné spustit buďto s grafickým rozhraním či v dávkovém režimu. Grafické rozhraní zobrazuje spočtený strom a
-v každém jeho vrcholu zobrazuje příslušnou situaci na hrací ploše. 
+Program je možné spustit buďto s grafickým rozhraním či v dávkovém režimu.
+Grafické rozhraní zobrazuje spočtený strom a v každém jeho vrcholu zobrazuje 
+příslušnou situaci na hrací ploše. 
 
 \subsection{Grafické rozhraní}
-Grafické rozhraní lze ve Windows spustit poklepáním na ikonu souboru \texttt{gui.pyw}. Ve Windows i FreeBSD lze grafické
-rozhraní spustit příkazem \texttt{python gui.pyw} z příkazové řádky v adresáři s programem.
+Grafické rozhraní lze ve Windows spustit poklepáním na ikonu souboru
+\texttt{gui.pyw}. Ve Windows i GNU/Linuxu lze grafické rozhraní spustit příkazem 
+\texttt{python gui.pyw} z příkazové řádky v adresáři s programem.
 
-Grafické rozhraní v levé části zobrazuje výsledný strom, pravá část ukazuje příslušnou herní pozici po vybrání některého
-z vrcholů stromu. Tlačítka v horní části rozhraní umožňují výběr nové počáteční pozice, zahájení výpočtu, načtení
-předchozího výpočtu z disku, uložení výpočtu na disk a uložení vybrané pozice na disk.
+Grafické rozhraní v levé části zobrazuje výsledný strom, pravá část ukazuje
+příslušnou herní pozici po vybrání některého z vrcholů stromu. Tlačítka v horní 
+části rozhraní umožňují výběr nové počáteční pozice, zahájení výpočtu, zahození
+dosavadního výpočtu, načtení předem provedeného výpočtu z disku, uložení výpočtu 
+na disk, uložení vybrané pozice na disk či zobrazení statistik o posledním 
+provedeném výpočtu.
 
-Po skončení výpočtu je možné procházet výsledný strom, který je zobrazený v levé části okna programu. Sloupec
-\emph{Step} určuje krok vedoucí do příslušného vrcholu; \emph{Type} říká, jakého typu je příslušný vrchol -- buď
-\emph{OR} pro vrchol, ze kterého táhne útočník, či \emph{AND}, což je stav, ze kterého táhne obránce.
+Po skončení či přerušení výpočtu je možné procházet výsledný strom, který je 
+zobrazený v levé části okna programu. Sloupec \emph{Step} určuje krok vedoucí do 
+příslušného vrcholu; \emph{Type} říká, jakého typu je příslušný vrchol -- buď
+\emph{OR} pro vrchol, ze kterého táhne útočník, či \emph{AND}, což je stav, ze
+kterého táhne obránce.
 
-Vybráním některého vrcholu se v pravé části zobrazí pozice odpovídající stavu hry po provedení kroku v sloupci
-\emph{Step}.
+Vybráním některého vrcholu se v pravé části zobrazí pozice odpovídající stavu
+hry po provedení kroku v sloupci \emph{Step}.
 
-Nulová hodnota \emph{PN} znamená, že příslušný uzel stromu je \emph{dokázaný} -- tedy pokud se hra dostane do stavu
-představovaného tímto vrcholem, pak útočník může zaručeně vyhrát. Podobně, je-li hodnota \emph{DN} nulová,
-znamená to, že dostane-li se hra do tohoto stavu, nemůže útočník vyhrát, protože tato pozice zaručuje vítězství
-obránci. Takový vrchol se nazývá \emph{vyvrácený}.
+Nulová hodnota \emph{PN} znamená, že příslušný uzel stromu je \emph{dokázaný} --
+tedy pokud se hra dostane do stavu představovaného tímto vrcholem, pak útočník 
+může zaručeně vyhrát. Podobně, je-li hodnota \emph{DN} nulová, znamená to, že 
+dostane-li se hra do tohoto stavu, nemůže útočník vyhrát, protože tato pozice 
+zaručuje vítězství obránci. Takový vrchol se nazývá \emph{vyvrácený}.
 
-V každé úrovni stromu -- tedy v možných krocích z jedné pozice -- je vždy jeden krok označen hvězdičkou -- ta označuje nejlepší
-možný tah (vzhledem k číslům \emph{PN} a \emph{DN}) na této úrovni.
+V každé úrovni stromu -- tedy v možných krocích z jedné pozice -- je vždy jeden
+krok označen hvězdičkou -- ta označuje nejlepší možný tah (vzhledem k číslům 
+\emph{PN} a \emph{DN}) na této úrovni. Dvěma hvězdičkami je pak označena 
+principiální varianta.
 
-\subsubsection{Příklad 1: Prozkoumání stavového prostoru vedoucího z jednoduché pozice}
+\subsubsection{Příklad 1: Prozkoumání stavového prostoru vedoucího z jednoduché
+pozice}
 \paragraph{Spuštění výpočtu}
-V souboru \texttt{puzzle1-one-move.txt} v adresáři \texttt{example-positions} je připravena jednoduchá startovní pozice.
-Řekněme, že chceme prozkoumat všechny možnosti, abychom zjistili, zda a jak může zlatý hráč zvítězit.
+V souboru \texttt{puzzle1-one-move.txt} v adresáři \texttt{example-positions} je
+připravena jednoduchá startovní pozice.
+Řekněme, že chceme prozkoumat všechny možnosti, abychom zjistili, zda a jak může
+zlatý hráč zvítězit.
 
-Klepnutím na \emph{New Initial Position} se zobrazí dialogové okno umožňující zadání nové pozice či její načtení z
-disku. Jelikož zmíněná pozice je již připravena v souboru, stačí z adreséře \texttt{example-positions} vybrat soubor
-\texttt{puzzle1-{}one-{}move.txt}. Načtená pozice se pak zobrazí na obrazovce a je možné ji dále upravovat. Stiskem
-\texttt{Ok} se pozice načte jako kořenová pozice stromu.
+Klepnutím na \emph{New Initial Position} se zobrazí dialogové okno umožňující
+zadání nové pozice či její načtení z disku. Jelikož zmíněná pozice je již 
+připravena v souboru, stačí z adreséře \texttt{example-positions} vybrat soubor
+\texttt{puzzle1-{}one-{}move.txt}. Načtená pozice se pak zobrazí na obrazovce a
+je možné ji dále upravovat. Stiskem \texttt{Ok} se pozice načte jako kořenová 
+pozice stromu.
 
-Nyní je možné spustit výpočet. Po stisku \emph{Run Search} se zobrazí dialog umožňující nastavit dobu trvání výpočtu, maximální
-využití paměti a velikost použité transpoziční tabulky. Pro zmíněnou pozici, která je velmi jednoduchá, jsou výchozí parametry 
-naprosto postačující. Stiskem \emph{Run} se zahájí výpočet.
+Nyní je možné spustit výpočet. Po stisku \emph{Run Search} se zobrazí dialog
+umožňující nastavit různé parametry pro výpočet. Pro zmíněnou pozici, která je 
+velmi jednoduchá, jsou výchozí parametry naprosto postačující. Stiskem 
+\emph{Run} se zahájí výpočet.
 
 \paragraph{Výsledky}
-V tomto příkladě se velmi rychle povede dokázat kořen stromu -- hodnota \emph{PN} kořene je nulová. To znamená, že se
-programu povedlo dokázat, že zlatý hráč má zaručené vítězství. To je zaručené krokem \emph{Dc7n} -- tedy přesunem psa z
-C7 směrem vzhůru -- protože stav vzniklý tímto krokem je opět dokázaný. Po kliknutí na \emph{Dc7n} se pravá část okna
-programu aktualizuje a zobrazí pozici vzniklou provedením tohoto kroku.
+V tomto příkladě se velmi rychle povede dokázat kořen stromu -- hodnota 
+\emph{PN} kořene je nulová. To znamená, že se programu povedlo dokázat, že zlatý 
+hráč má zaručené vítězství. To je zaručené krokem \emph{Dc7n} -- tedy přesunem 
+psa z C7 směrem vzhůru -- protože stav vzniklý tímto krokem je opět dokázaný. Po
+kliknutí na \emph{Dc7n} se pravá část okna programu aktualizuje a zobrazí pozici 
+vzniklou provedením tohoto kroku.
 
-Z této pozice je možné pokračovat krokem \emph{Dc8s rd8w} -- odtažení stříbrného zajíce psem doleva. Opět je to dokázaná
-pozice. Pod ní konečně je pozice \emph{Rd7n} -- posun zlatého zajíce do cílové řady, neboli vítězství zlatého hráče.
+Z této pozice je možné pokračovat krokem \emph{Dc8s rd8w} -- odtažení stříbrného
+zajíce psem doleva. Opět je to dokázaná pozice. Pod ní konečně je pozice 
+\emph{Rd7n} -- posun zlatého zajíce do cílové řady, neboli vítězství zlatého 
+hráče.
 
-Celkově je tedy vidět, že ze startovní pozice může zlatý hráč zvítězit volbou kroků \emph{Dc7n Dc8s rd8w Rd7n}.
+Celkově je tedy vidět, že ze startovní pozice může zlatý hráč zvítězit volbou
+kroků \emph{Dc7n Dc8s rd8w Rd7n}.
 
-První tři kroky v této posloupnosti jsou typu \emph{OR} -- jsou to kroky, ze kterých dál táhne zlatý hráč. Poslední krok
-je typu \emph{AND}, protože by z něj táhl hráč stříbrný (pokud by neprohrál). Většina pozic se ve stromě vyskytuje
-dvakrát -- pokaždé s jiným typem. Pozice typu \emph{OR} představuje situaci, kdy zlatý hráč udělá krok a pokračuje ve
-svém tahu; \emph{AND} se stejným krokem znamená, že po provedení kroku zlatý hráč svůj tah skončí a nechá hrát soupeře.
+První tři kroky v této posloupnosti jsou typu \emph{OR} -- jsou to kroky, ze
+kterých dál táhne zlatý hráč. Poslední krok je typu \emph{AND}, protože by z něj 
+táhl hráč stříbrný (pokud by neprohrál). Většina pozic se ve stromě vyskytuje
+dvakrát -- pokaždé s jiným typem. Pozice typu \emph{OR} představuje situaci, kdy
+zlatý hráč udělá krok a pokračuje ve svém tahu; \emph{AND} se stejným krokem 
+znamená, že po provedení kroku zlatý hráč svůj tah skončí a nechá hrát soupeře.
 
 \subsubsection{Příklad 2: Načítání a ukládání stavového prostoru}
 \label{sec:gui-example-2}
-Pro tento příklad zvolme jako počáteční pozici soubor \texttt{gold-to-play-and-win-in-2-moves.txt}. Opět jako v příkladu
-1 stačí zvolit \emph{New Initial Position}, \emph{Load} a zvolit příslušný soubor v adresáři s příklady. Tato pozice je
-však na výpočet daleko složitější než ta z prvního příkladu.
+Pro tento příklad zvolme jako počáteční pozici soubor
+\texttt{puzzle6-two-moves.txt}. Opět jako v příkladu 1 stačí zvolit 
+\emph{New Initial Position}, \emph{Load} a zvolit příslušný soubor v adresáři s 
+příklady. Tato pozice je však na výpočet daleko složitější než ta z prvního 
+příkladu.
 
-Volbou \emph{Run Search} opět spustíme výpočet -- díky složitosti této pozice se dá očekávat, že na běžném PC program
-nevydá definitivní výsledek ani po přednastaveném šedesátisekundovém limitu.
+Volbou \emph{Run Search} opět spustíme výpočet -- díky složitosti této pozice se
+dá očekávat, že na běžném PC program nevydá definitivní výsledek ani po 
+přednastaveném šedesátisekundovém limitu.
 
-Je-li tedy již strom (čátečně) spočítán, můžeme zvolit \emph{Save Search}, vybrat jméno souboru, kam se strom uloží --
-například \texttt{search-1.txt} -- a potvrdit tlačítkem \emph{Ok}. Pro demonstrační účely je nyní možné program ukončit
-a poté opět spustit. Pak stiskem \emph{Load Search} znovu vybrat soubor \texttt{search-1.txt}. Program by nyní měl
-zobrazovat stejný strom jako před ukončením.
+Je-li tedy již strom (čátečně) spočítán, můžeme zvolit \emph{Save Search},
+vybrat jméno souboru, kam se strom uloží -- například \texttt{search-1.txt} -- 
+a potvrdit tlačítkem \emph{Ok}. Pro demonstrační účely je nyní možné program 
+ukončit a poté opět spustit. Pak stiskem \emph{Load Search} znovu vybrat soubor
+\texttt{search-1.txt}. Program by nyní měl zobrazovat stejný strom jako před 
+ukončením.
 
 Dále je možné třeba znovu stisknout \emph{Run Search} a pokračovat ve výpočtu.
 
 \subsection{Dávkové rozhraní}
-Dávkové rozhraní umožňuje provádění výpočtu z příkazové řádky či dávkového souboru bez nutnosti použití grafického
-rozhraní. Všechny parametry výpočtu musí být zadány jako parametry na příkazové řádce. Výpočet je kdykoliv možné ukončit
+Dávkové rozhraní umožňuje provádění výpočtu z příkazové řádky či dávkového
+souboru bez nutnosti použití grafického rozhraní. Všechny parametry výpočtu musí 
+být zadány jako parametry na příkazové řádce. Výpočet je kdykoliv možné ukončit
 stiskem kláves \texttt{Ctrl-C}.
 
 \subsubsection{Spouštění a parametry příkazové řádky}
-Z příkazové řádky je možné dávkové rozhraní programu spustit příkazem \texttt{python batch.py \textit{parametry}}.
-Nejsou-li zadány žádné parametry, vypíše program stručný soupis všech parametrů a skončí. Stručnou nápovědu je možné
-vyvolat parametrem \texttt{--help}, tedy příkazem \texttt{python batch.py --help}.
+Z příkazové řádky je možné dávkové rozhraní programu spustit příkazem
+\texttt{python batch.py \textit{parametry}}.
+Nejsou-li zadány žádné parametry, vypíše program stručný soupis všech parametrů
+a skončí. Stručnou nápovědu je možné
+vyvolat parametrem \texttt{--help}, tedy příkazem \texttt{python batch.py
+--help}.
 
 Důležité parametry jsou:\begin{description}
-  \item[\texttt{-p} \textit{pozice}] Udává cestu k souboru s počáteční pozicí. Jeho funkce je analogická funkci
-    \emph{New Initial Position} z grafického rozhraní.
-  \item[\texttt{-d} \textit{výstup}] Udává cestu k souboru, do kterého se uloží spočtený strom. Tato funkce je analogem
-    tlačítka \emph{Save Search} z grafického rozhraní.
-  \item[\texttt{-s} \textit{strom}] Udává cestu k souboru, ve kterém je částečně spočtený vyhledávací strom, ve kterém
-    se má pokračovat ve výpočtu. Tedy stejná funkce, kterou v grafickém rozhraní zastává tlačítko \emph{Load Search}.
-  \item[\texttt{-t} \textit{sekundy}] Umožňuje nastavit časový limit (v sekundách) pro vyhledávání (výchozí hodnota je
-    60 sekund)
-  \item[\texttt{-r} \textit{velikost v MB}] Nastavuje velikost použité transpoziční tabulky. Nastavením na hodnotu 0 se zabrání
-    jakémukoliv použití transpoziční tabulky. Výchozí hodnota je 32 MB.
-  \item[\texttt{-m} \textit{velikost v MB}] Omezení maximální použité paměti při výpočtu. Hodnota 0 znamená, že výpočet nemá
-    být omezen velikostí použité paměti. Výchozí hodnota je na 64bitových systémech 0, na 32bitových systémech 1500 MB.
+\item[\texttt{-p} \textit{pozice}] Udává cestu k souboru s počáteční pozicí.
+  Jeho funkce je analogická funkci \emph{New Initial Position} z grafického 
+  rozhraní.
+\item[\texttt{-d} \textit{výstup}] Udává cestu k souboru, do kterého se uloží
+  spočtený strom. Tato funkce je analogem tlačítka \emph{Save Search} z 
+  grafického rozhraní.
+\item[\texttt{-s} \textit{strom}] Udává cestu k souboru, ve kterém je částečně
+  spočtený vyhledávací strom, ve kterém se má pokračovat ve výpočtu. Tedy stejná
+  funkce, kterou v grafickém rozhraní zastává tlačítko \emph{Load Search}.
+\item[\texttt{-t} \textit{sekundy}] Umožňuje nastavit časový limit (v sekundách) 
+  pro vyhledávání (výchozí hodnota je 60 sekund)
+\item[\texttt{-r} \textit{velikost v MB}] Nastavuje velikost použité transpoziční 
+  tabulky. Nastavením na hodnotu 0 se zabrání jakémukoliv použití transpoziční 
+  tabulky. Výchozí hodnota je 32 MB. 
+\item[\texttt{-o} \textit{velikost v MB}] Podobně jako parametr \texttt{-r},
+  akorát tento ovlivňuje důkazovou tabulku.
+\item[\texttt{-m} \textit{velikost v MB}] Omezení maximální použité paměti při 
+  výpočtu. Hodnota 0 znamená, že výpočet nemá být omezen velikostí použité
+  paměti. Výchozí hodnota je na 64bitových systémech 0, na 32bitových systémech
+  1500 MB.
 \end{description}
 
-Parametr \texttt{-d} je povinný. Dále uživatel musí zadat buď parametr \texttt{-p} nebo parametr \texttt{-s}.
+Uživatel musí zadat parametr \texttt{-p} nebo \texttt{-s} (ne však oba zároveň).
+Parametr \texttt{-d} je nepovinný, ale bez jeho určení se v dávkovém rozhraní
+spočtený strom po dokončení práce zahodí.
 
 \subsubsection{Příklad 1: Prozkoumávání stavového stromu z dané pozice}
-Opět jako v prvním příkladu u grafického rozhraní budeme chtít spočítat příslušný strom, máme-li v souboru uloženou
-počáteční pozici. Pro tento příklad zvolme třeba pozici \texttt{puzzle3-one-move.txt}, pro kterou program dokáže vydat
-kladný výsledek (zlatý hráč vítězí) na mém PC\footnote{Procesor: AMD Athlon 64 X2 5400+ na 2,8 GHz, paměť: 3 GB DDR2 533,
-systém: FreeBSD 8.2 64-bit}  po přibližně 3 sekundách. Řekněme, že výsledek chceme uložit do souboru
+Opět jako v prvním příkladu u grafického rozhraní budeme chtít spočítat 
+příslušný strom, máme-li v souboru uloženou počáteční pozici. Pro tento příklad 
+zvolme třeba pozici \texttt{puzzle3-one-move.txt}, pro kterou program dokáže 
+vydat kladný výsledek (zlatý hráč vítězí) na mém PC\footnote{Procesor: AMD 
+Athlon 64 X2 5400+ na 2,8 GHz, paměť: 3 GB DDR2 533, systém: Linux 3.3}  po 
+přibližně jedné sekundě. Řekněme, že výsledek chceme uložit do souboru
 \texttt{search-2.txt}.
 
 Příslušný příkaz včetně parametrů tedy bude vypadat takto:
-\begin{center}\verb+python batch.py -p example-positions/puzzle3-one-move.txt -d search-2.txt+\end{center}
+\begin{center}\texttt{python batch.py -p example-positions/puzzle3-one-move.txt 
+-d search-2.txt}\end{center}
 
-Pokud je výpočet přerušen ještě před jeho dokončením, program stejně vypíše částečně spočtený strom do specifikovaného
+Pokud je výpočet přerušen ještě před jeho dokončením, program stejně vypíše
+částečně spočtený strom do specifikovaného
 souboru.
 
-Výstup, tedy soubor \texttt{search-2.txt}, je pak možné otevřít v grafickém rozhraní a procházet jak bylo uvedeno v
-předchozích částech.
+Výstup, tedy soubor \texttt{search-2.txt}, je pak možné otevřít v grafickém
+rozhraní a procházet jak bylo uvedeno v předchozích částech.
 
 \subsubsection{Příklad 2: Pokračování v předešlém výpočtu}
-Řekněme, že chceme pokračovat ve výpočtu, který jsme začali v části \ref{sec:gui-example-2} -- tedy máme soubor
-\texttt{search-1.txt}, který je částečným výsledekm prohledávání z pozice \texttt{gold-to-play-and-win-in-2-moves.txt}.
+Řekněme, že chceme pokračovat ve výpočtu, který jsme začali v části
+\ref{sec:gui-example-2} -- tedy máme soubor \texttt{search-1.txt}, který je 
+částečným výsledekm prohledávání z pozice \texttt{puzzle6-two-moves.txt}.
 Výsledek chceme uložit do souboru \texttt{search-3.txt}.
 
-Nyní tedy místo parametru \texttt{-p} uvedeme parametr \texttt{-s} specifikující předešlé vyhledávání. Tedy -- za
-předpokladu, že soubor \texttt{search-1.txt} je uložen v kořenovém adresáři programu -- bude celý příkaz vypadat
-následovně:
-\begin{center}\verb+python batch.py -s search-1.txt -d search-3.txt+\end{center}
-
-\subsection{Transpoziční tabulka a její vliv na výpočet}
-Během výpočtu si program pamatuje některé navštívené pozice v \emph{transpoziční tabulce}. To umožňuje zrychlení
-výpočtu, neboť někdy je možné ke stejné pozici dojít vícero způsoby a transpoziční tabulka pak zajišťuje, že není třeba
-stejnou pozici vyhodnocovat vícekrát.
-
-Do transpoziční tabulky se však nemohou vejít všechny záznamy. Počet záznamů, které se do tabulky vejdou, je přímo určen
-její velikostí v paměti. Velikost transpoziční tabulky lze nastavit v grafickém rozhraní volbou \emph{Transposition
-Table Size}, v řádkovém rozhraní pak parametrem \texttt{-r}.
+Nyní tedy místo parametru \texttt{-p} uvedeme parametr \texttt{-s} specifikující
+předešlé vyhledávání. Tedy -- za předpokladu, že soubor \texttt{search-1.txt} je 
+uložen v kořenovém adresáři programu -- bude celý příkaz vypadat následovně:
+\begin{center}\texttt{python batch.py -s search-1.txt -d search-3.txt}
+\end{center}
 
 \subsection{Zobrazované informace během výpočtu}
-Během prohledávání stavového prostoru program vypisuje některé informace. Mezi ně patří \begin{description}
-\item[\emph{Search Memory Usage}] Přibližné množství paměti používané programem. Tato hodnota nezahrnuje všechnu
-použitou paměť, a tedy zobrazená hodnota bude vždy nižší než hodnota skutečná. Přesto však může sloužit jako dobrý
-ukazatel paměťové náročnosti programu.
-\item[\emph{Unique Positions Total}] Celkový počet pozic.
-\item[\emph{New Positions per Second}] Navýšení hodnoty \emph{Unique Positions Total} za poslední sekundu.
-\item[\emph{Root PN} a \emph{Root DN}] Okamžité hodnoty \emph{PN} a \emph{DN} kořenového vrcholu.
-\item[\emph{Transposition Table Size}] Paměť použitá transpoziční tabulkou. Tato hodnota je též započítána do
-\emph{Search Memory Usage}.
-\item[\emph{Transposition Table Hits}] Počet úspěšných vyhledání v transpoziční tabulce.
-\item[\emph{Transposition Table Misses}] Počet neúspěšných pokusů o vyhledání v transpoziční tabulce.
+Během prohledávání stavového prostoru program vypisuje některé informace. Mezi
+ně patří \begin{description}
+\item[\emph{Search Memory Usage}] Přibližné množství paměti používané programem.
+  Tato hodnota nezahrnuje všechnu použitou paměť, a tedy zobrazená hodnota bude 
+  vždy nižší než hodnota skutečná. Přesto však může sloužit jako dobrý ukazatel 
+  paměťové náročnosti programu.
+\item[\emph{Unique Positions Total}] Celkový počet vrcholů ve stromě.
+\item[\emph{New Positions per Second}] Navýšení hodnoty \emph{Unique Positions
+  Total} za poslední sekundu.
+\item[\emph{Root PN} a \emph{Root DN}] Okamžité hodnoty \emph{PN} a \emph{DN}
+  kořenového vrcholu.
+\item[\emph{Transposition Table Size}] Paměť použitá transpoziční tabulkou.
+\item[\emph{Proof Table Size}] Paměť použitá důkazovou tabulkou.
+\item[\emph{Transposition Table Hits}] Počet úspěšných vyhledání v transpoziční
+  tabulce.
+\item[\emph{Transposition Table Misses}] Počet neúspěšných pokusů o vyhledání v
+  transpoziční tabulce.
+\item[\emph{Proof Table Hits} a \emph{Proof Table Misses}] Podobně jako 
+  příslušné hodnoty pro transpoziční tabulku.
+\item[\emph{History Table Size}] Počet záznamů v \emph{history table}.
+\item[\emph{Total Killer Count}] Celkový počet záznamů v tabulce killerů.
 \end{description}
 
-\section{Překlad programu}
-\label{sec:compiling}
+\section{Prohledávací algoritmus}
+Program funguje postupným prohledáváním všech možných pozic vzniklých ze zadané
+počáteční pozice. Pozice jsou uloženy ve vyhledávacím stromu, kde každý vrchol 
+představuje jednu možnou pozici a jeho potomci jsou vrcholy vzniklé provedením
+nějakého platného kroku. Celý tento strom představuje \emph{stavový prostor}
+hry.
 
-\subsection{Prerekvizity}
-Pro překlad je třeba mít kompletní zdrojový kód programu. Ten lze obstarat přes systém git příkazem
-\begin{center}\verb+git clone git://github.com/Oxyd/APNS.git+\end{center} či stažením zdrojového archivu ve formátu
-\texttt{.zip} či \texttt{.tar.gz} z \url{https://github.com/Oxyd/APNS}.
+Algoritmus \emph{Proof-Number Search} je \emph{best-first} algoritmus na
+prohledávání stavového prostoru. Pracuje postupným rozšiřováním stavového 
+prostoru dokud nedojde k výsledku. Přitom v každé iteraci vždy najde jeden list 
+stromu a ten \emph{expanduje} -- vygeneruje všechny možné platné kroky z listu 
+a každý jako nový potomek listu připojí ke stromu.
 
-Dále je třeba mít v systému instalovány následující knihovny a nástroje\begin{description}
-\item[SCons] Používaný nástroj pro sestavení programu. Instalátor pro Windows je možné získat na
-\url{http://scons.org/}. Na systému FreeBSD stačí instalovat port \texttt{devel/scons}.
-\item[Boost] Kolekce knihoven, z nichž některé program používá. Je třeba mít verzi aspoň 1.44. Stáhnout lze z
-\url{http://boost.org/}, kde jsou i informace pro sestavení kolekce. Na FreeBSD je možné instalovat port
-\texttt{devel/boost-all}.
-\item[Google Test] Není nezbytně nutný pro překlad; používá se pouze pro jednotkové testy. Na FreeBSD existuje v portu
-\texttt{devel/googletest}. Pro Windows se stačí obrátit na stránky projektu na
-\url{http://code.google.com/p/googletest/}.
-\end{description}
-
-Je třeba dále mít k dispozici překladač jazyka C++. Sestavovací skript automaticky použije překladač z \emph{Microsoft
-Visual Studia} na systému Windows -- je třeba mít verzi 10. (Měla by stačit i verze 9 a 8, ale to není otestované.) Na
-FreeBSD se pro překlad používá překladač \emph{GCC} -- je ovšem třeba mít překladač verze aspoň 4.5. Ten lze instalovat
-z portu \texttt{lang/gcc45}.
-
-Překlad na Windows by měl být možný i pomocí kolekce \emph{MinGW} -- sestavovací skript to však nepodporuje, a bylo by
-tedy nutné ho před tím upravit. Dále očekávám, že program půjde beze změn či jenom s minimálními změnami přeložit a
-spustit i na dalších systémech, zejména různých distribucích systému \emph{GNU/Linux} -- to jsem ovšem netestoval, a
-výsledek není zaručen.
-
-\subsection{Konfigurace pro překlad}
-Než je možné program přeložit, je třeba určit umístění používaných knihoven na systému, kde má překlad probíhat. To se
-provádí úpravou souboru \texttt{build\_config.py}. V souboru jsou komentáře vysvětlující jak nastavit příslušné hodnoty.
-
-\subsection{Překlad}
-Překlad lze spustit příkazem \verb+scons+ v kořenovém adresáři se zdrojovým kódem programu. Pokud překlad proběhne
-úspěšně, není třeba žádných dalších kroků; program je spustitelný tak, jak bylo popsáno v části \ref{sec:running}.
-
-Pro účely vývoje programu může být vhodné přeložit program tak, aby obsahoval ladicí informace. V tom případě je třeba
-překlad spustit příkazem \verb+scons debug=1+. Navíc je možné specifikovat cíl \texttt{tests}, který přeloží a provede
-jednotkové testy -- tedy použít příkaz \verb+scons tests+. Jednotlivé jednotkové testy je možné vyvolat cílem
-\emph{jméno\_testu}, kde \emph{jméno\_testu} odpovídá jménu souboru v adresáři \texttt{apns\_module/tests} bez koncovky
-\texttt{.cpp}. Například tedy pro spuštění jednotkových testů ze souboru \texttt{apns\_module/tests/board\_test.cpp} se
-dá použít příkaz \verb+scons board_test+.
-
-Při překladu na systému Windows je též možné specifikovat parametr \texttt{bits=32} nebo \texttt{bits=64}, který určuje,
-zda má výsledný program být přeložen pro 32bitovou nebo 64bitovou verzi systému. Kromě toho existuje cíl
-\texttt{distrib}, který vytvoří \texttt{zip} soubor s binární distribucí programu.
-
-\section{Vstupní a výstupní data}
-\subsection{Pozice}
-Vstupní pozice je textový soubor ve formátu popsaném na adrese \url{http://arimaa.com/arimaa/learn/notation.html} v
-části \emph{Notation for Recording Arimaa Positions}. Program ale ignoruje číslo tahu a předešlé kroky. Konkrétní příklady pozic
-jsou v adresáři \texttt{example-positions}.
-
-\subsection{Strom}
-Stavový strom je ukládán v textovém formátu. Struktura souboru je \begin{itemize}
-  \item Na první řádce je počáteční pozice v kompaktním formátu: Seznam figurek na hrací ploše, které jsou oddělené
-  mezerami. Jedna figurka je popsána trojznakovým řetězcem, kde první znak určuje řádek ('1' až '8'), druhý značí
-  sloupec ('a' až 'h') a třetí znak typ figurky podle oficiálního značení: 'E' značí slona, 'M' velblouda, 'H' koně, 'D'
-  psa, 'C' kočku a 'R' zajíce. Typ je značen velkým písmenem, pokud je to figurka zlatého hráče -- figurky stříbrného
-  hráče jsou značeny písmeny malými. Například: \begin{center}\verb+5cC 6bE 6cd 6dR 6ee 7cr+\end{center}
-  \item Na druhé řádce je \begin{itemize}
-    \item Hráč, který je první na tahu jako řetězec buď \texttt{gold} nebo \texttt{silver}.
-    \item Počet vrcholů stromu v desítkové soustavě
-    \item Obě hodnoty jsou odděleny mezerou
-  \end{itemize}
-  Například tedy: \begin{center}\verb+gold 100617+\end{center}
-  \item Následuje seznam vrcholů stromu. Jeden vrchol je na jedné řádce. Každý vrchol je popsán
-  následovně: \begin{center}\texttt{\textit{tah} : \textit{typ} \textit{kroky} \textit{PN}
-  \textit{DN} \textit{děti}}\end{center}
-  Kde jednotlivé položky jsou:\begin{description}
-	  \item[\textit{tah}] Textový popis tahu vedoucího do této pozice z rodičovského vrcholu. Používá se oficiální notace pro 
-        zápis tahů hry Arimaa. Kořen má místo tahu řetězec \texttt{root}.
-	  \item[\textit{typ}] Řetězec \texttt{or} nebo řetězec \texttt{and}. Udává typ vrcholu.
-	  \item[\textit{kroky}] Číslo v dekadickém zápisu udávající počet kroků, které ještě může hráč učinit v rámci svého
-	  tahu.
-	  \item[\textit{PN}] Hodnota \emph{proof number} pro tento vrchol v dekadickém zápisu nebo řetězec ,,\textit{infty}``
-	  značící nekonečno.
-	  \item[\textit{DN}] Hodnota \emph{disproof number} pro tento vrchol v dekadickém zápisu nebo řetězec ,,\textit{infty}``
-	  značící nekonečno.
-	  \item[\textit{děti}] Počet potomků tohoto vrcholu v dekadickém zápisu.
-  \end{description}
-  \item Vrcholy jsou ve stromu uloženy tak, že první je kořen a po každém vrcholu následují jeho potomci. Strom je tedy
-  v souboru uložen v pořadí pre-order průchodu do hloubky.
-\end{itemize}
-
-\section{Vyhledávací algoritmus}
-Program funguje postupným prohledáváním všech možných pozic vzniklých ze zadané počáteční pozice. Pozice jsou uloženy ve
-vyhledávacím stromu, kde každý vrchol představuje jednu možnou pozici a jeho potomci jsou vrcholy vzniklé provedením
-nějakého platného kroku. Celý tento strom představuje \emph{stavový prostor} hry.
-
-Algoritmus \emph{Proof-Number Search} je \emph{best-first} algoritmus na prohledávání stavového prostoru. Pracuje
-postupným rozšiřováním stavového prostoru dokud nedojde k výsledku. Přitom v každé iteraci vždy najde jeden list stromu
-a ten \emph{expanduje} -- vygeneruje všechny možné platné kroky z listu a každý jako nový potomek listu připojí ke
-stromu.
-
-Jeden vrchol stromu se nazývá \emph{dokázaný}, pokud má útočník zaručené vítězství, dostane-li se hra do tohoto
-vrcholu. Pokud tento vrchol zaručuje vítězství obránce, pak je vrchol \emph{vyvrácený}. Cílem algoritmu je dokázat či
+Jeden vrchol stromu se nazývá \emph{dokázaný}, pokud má útočník zaručené 
+vítězství, dostane-li se hra do tohoto vrcholu. Pokud tento vrchol zaručuje 
+vítězství obránce, pak je vrchol \emph{vyvrácený}. Cílem algoritmu je dokázat či
 vyvrátit kořenový vrchol.
 
-Kvůli velikosti celého stavového prostoru hry je vhodné snažit se prozkoumávat nejdříve ty části stavového prostoru, u
-kterých je nejvyšší šance, že v nich algoritmus nalezne řešení celého problému -- tedy že buď najde způsob, jakým může
-útočník zvítězit nebo prokáže, že tento hráč nikdy zvítězit nemůže. K tomuto účelu má každý vrchol přiřazena dvě
-čísla: \emph{PN} (\emph{proof number}) a \emph{DN} (\emph{disproof number}). Číslo \emph{PN} udává minimální počet
-vrcholů, které je potřeba dokázat na dokázání tohoto vrcholu; \emph{DN} zase udává minimální počet vrcholů potřebných na
-vyvrácení tohoto vrcholu.
+Kvůli velikosti celého stavového prostoru hry je vhodné snažit se prozkoumávat
+nejdříve ty části stavového prostoru, u kterých je nejvyšší šance, že v nich 
+algoritmus nalezne řešení celého problému -- tedy že buď najde způsob, jakým může
+útočník zvítězit nebo prokáže, že tento hráč nikdy zvítězit nemůže. K tomuto
+účelu má každý vrchol přiřazena dvě čísla: \emph{PN} (\emph{proof number}) a 
+\emph{DN} (\emph{disproof number}). Číslo \emph{PN} udává spodní odhad počtu
+vrcholů, které je potřeba dokázat na dokázání tohoto vrcholu; \emph{DN} zase
+udává spodní odhad na počet vrcholů potřebných na vyvrácení tohoto vrcholu.
 
 \subsection{Proof-number a disproof-number}
-Každý vrchol má dále přiřazen typ -- ten je buď \emph{AND} nebo \emph{OR}. Typ \emph{OR} znamená, že z tohoto vrcholu
-táhne útočník. Typ \emph{AND} zase, že hraje obránce. Kořen je vždy typu \emph{OR}.
+Každý vrchol má dále přiřazen typ -- ten je buď \emph{AND} nebo \emph{OR}. Typ
+\emph{OR} znamená, že z tohoto vrcholu táhne útočník. Typ \emph{AND} zase, že 
+táhne obránce. Kořen je vždy typu \emph{OR}.
 
-Pro dokázání vrcholu typu \emph{OR} stačí dokázat jednoho potomka -- útočník vybírá svůj tah a může si tedy vybrat
-ten nejlepší. Naopak pro vyvrácení takového vrcholu je nutné vyvrátit úplně všechny potomky -- neboli dokázat, že
-útočník vždy prohraje, ať zvolí jakýkoliv tah.
+Pro dokázání vrcholu typu \emph{OR} stačí dokázat jednoho potomka -- útočník
+vybírá svůj tah a může si tedy vybrat ten nejlepší. Naopak pro vyvrácení takového 
+vrcholu je nutné vyvrátit úplně všechny potomky -- neboli dokázat, že útočník 
+vždy prohraje, ať zvolí jakýkoliv tah.
 
-U vrcholu typu \emph{AND} je situace opačná. Dokázat takový vrchol znamená, že ať soupeř zvolí jakýkoliv tah, útočník
-vyhrává. Je tedy nutné dokázat všechny potomky. Pro jeho vyvrácení stačí vyvrátit jediného potomka.
+U vrcholu typu \emph{AND} je situace opačná. Dokázat takový vrchol znamená, že
+ať soupeř zvolí jakýkoliv tah, útočník vyhrává. Je tedy nutné dokázat všechny 
+potomky. Pro jeho vyvrácení stačí vyvrátit jediného potomka.
 
 Pro vrchol $v$ typu \emph{OR} jsou tedy čísla $v.PN$ a $v.DN$ určena následovně:
 \begin{align*}
-	v.PN &:= \min_{u \text{ je potomek $v$}} u.PN \\
-	v.DN &:= \sum_{u \text{ je potomek $v$}} u.DN
+  v.PN &:= \min_{u \text{ je potomek $v$}} u.PN \\
+  v.DN &:= \sum_{u \text{ je potomek $v$}} u.DN
 \end{align*}
 
 Pro vrchol typu \emph{AND} se tyto hodnoty počítají analogicky.
 
+Ve formulích výše se za minimum z prázdné množiny bere $+\infty$, za součet přes
+prázdnou množinu zase $0$. Tím se implicitně detekují situace, kde některý z
+hráčů prohrává tím, že nemá žádný možný krok.
+
 \subsection{Procházení stromu}
-Při sestupu stromem od kořene k listu se program snaží najít takový list, na jehož dokázání či vyvrácení bude třeba co
-nejméně práce. Vybírání listu probíhá následovně:
+Při sestupu stromem od kořene k listu se program snaží najít takový list, na
+jehož dokázání či vyvrácení bude třeba co nejméně práce. Vybírání listu probíhá 
+následovně:
 
 \begin{figure}[H]
 {\bf procedure} $\text{findLeaf}(v)$
 \begin{algorithmic}
-	\IF{$\text{leaf}(v)$}
-		\STATE {\bf return} v
-	\ELSIF{$\text{type}(v) = OR$}
-		\STATE $u \gets \mathrm{arg\, min}_{c \in \mathrm{children}(v)} c.PN$
-		\STATE {\bf return} $\text{findLeaf}(u)$
-	\ELSE
-		\STATE $u \gets \mathrm{arg\, min}_{c \in \mathrm{children}(v)} c.DN$
-		\STATE {\bf return} $\text{findLeaf}(u)$
-	\ENDIF
+  \IF{$\text{leaf}(v)$}
+    \STATE {\bf return} v
+  \ELSIF{$\text{type}(v) = OR$}
+    \STATE $u \gets \mathrm{arg\, min}_{c \in \mathrm{children}(v)} c.PN$
+    \STATE {\bf return} $\text{findLeaf}(u)$
+  \ELSE
+    \STATE $u \gets \mathrm{arg\, min}_{c \in \mathrm{children}(v)} c.DN$
+    \STATE {\bf return} $\text{findLeaf}(u)$
+  \ENDIF
 \end{algorithmic}
 \end{figure}
 
-\subsection{Nové listy}
-Hodnoty \emph{PN} a \emph{DN} pro nové listy se v této verzi vždy volí rovny jedné. V příštích verzích by bylo vhodné
-zavést lepší heuristiku pro určování těchto iniciálních hodnot pro listy.
-
-\subsection{Transpoziční tabulka}
-Při prohledávání stavového prostoru se může stát, že program dojde jinou cestou do stavu, který již prozkoumal. Je
-výhodné pamatovat si již prozkoumané vrcholy v nějaké struktuře. K tomu slouží transpoziční tabulka -- je to asociativní
-pole indexované \emph{hashem vrcholu}. \emph{Hash vrcholu} je nějaké 64-bitové číslo takové, že dva vrcholy odpovídající
-stejnému rozestavení figurek a stejnému hráči na tahu mají vždy stejný hash.
-
-Všech možných hašů je $2^{64}$ -- víc, než se vejde do paměti. Proto je velikost transpoziční tabulky nastavitelná
-uživatelem. Je-li velikost tabulky $T$ záznamů, pak se do ní neindexuje přímo hashem $H$ ale hodnotou $H \bmod T$. Tím
-můžou vznikat kolize.
-
-Při rozvíjení listu se pak program podívá do transpoziční tabulky, jestli tam není už pro tuto pozici uložen nějaký
-záznam, a pokud ano, pak použije hodnoty \emph{PN}, \emph{DN} z uloženého záznamu.
-
 \subsection{Rozvíjení listu}
-Při rozvíjení listu program vygeneruje všechny možné kroky z dané pozice -- obou hráčů, pokud mohou oba z toho stavu
-hrát. Hra Arimaa má však dvě pravidla, která znamenají, že ne každá úplně každý možný krok je platný:
+Při rozvíjení listu program vygeneruje všechny možné kroky z dané pozice. Nové 
+kroky coby vrcholy se pak připojí k rozvíjenému vrcholu. Je dobré uvědomit si, 
+že pokud daný hráč nemá žádný platný krok, který by mohl z rozvíjeného stavu
+učinit, k listu se nepřipojí žádní noví potomci.
+
+Hra Arimaa má dvě pravidla, která znamenají, že ne úplně každý možný krok je 
+platný:
 \begin{enumerate}
-  \item Po skončení celého tahu jednoho hráče musí být rozestavění figurek na hrací ploše jiné než na začátku tahu. Tedy
-  hráč nesmí udělat ,,prázdný`` tah.
-  \item Pokud po skončení celého tahu hráče vznikne potřetí v celé historii jedné hry stejná pozice, ze které má táhnout
-  stejný hráč, pak hráč, který právě skončil tah prohrává. Tzv. pravidlo \emph{third-time repetition}.
+\item Po skončení celého tahu jednoho hráče musí být rozestavění figurek na
+  hrací ploše jiné než na začátku tahu. Tedy hráč nesmí udělat ,,prázdný`` tah.
+\item Pokud po skončení celého tahu hráče vznikne potřetí v celé historii
+  jedné hry stejná pozice, ze které má táhnout stejný hráč, pak hráč, který 
+  právě skončil tah prohrává. Tzv. pravidlo \emph{third-time repetition}.
 \end{enumerate}
 
-Tato dvě pravidla mimo jiné zajišťují konečnost každé hry. Pro vyhledávací algoritmus je konečnost hry podstatná,
-protože jinak by mohl ve smyčce rozvíjet stále stejné pozice, čímž by neobjevoval žádné nové stavy, ale akorát zbytečně
+Tato dvě pravidla mimo jiné zajišťují konečnost každé hry. Pro vyhledávací
+algoritmus je konečnost hry podstatná, protože jinak by mohl ve smyčce rozvíjet 
+stále stejné pozice, čímž by neobjevoval žádné nové stavy, ale akorát zbytečně
 spotřebovával čas a paměť.
 
-Pro zohlednění tohoto pravidla si algoritmus při sestupu z kořene k listu navíc vytváří \emph{historii} -- seznam dvojic
-$(\text{pozice}, \text{hráč})$ pro každý první krok každého tahu. Před připojením listu představující ukončení tahu
-aktuálního hráče se nejprve zkontroluje, zda tím nevznikne nějaká pozice, která už je v historii. Pokud se zjistí
-porušení některého ze dvou výše uvedených pravidel, tak se tato pozice připojí jako dokázaná či vyvrácená v závislosti
+Pro zohlednění tohoto pravidla si algoritmus při sestupu z kořene k listu navíc
+vytváří \emph{historii} -- seznam dvojic $(\text{pozice}, \text{hráč})$ pro 
+každý první krok každého tahu. Před připojením listu představující ukončení tahu
+aktuálního hráče se nejprve zkontroluje, zda tím nevznikne nějaká pozice, která
+už je v historii. Pokud se zjistí porušení některého ze dvou výše uvedených 
+pravidel, tak se tato pozice připojí jako dokázaná či vyvrácená v závislosti
 na tom, který hráč se dopustil porušení pravidla.
 
 Rozvíjení listu pak vypadá následovně:
@@ -371,104 +348,390 @@ Rozvíjení listu pak vypadá následovně:
 {\bf procedure} $\text{expand}(\text{leaf}, \text{history})$
 \begin{algorithmic}
 \FORALL{$s \gets \text{possibleSteps}(\text{leaf})$}
-	\IF{$\text{type}(s) = \text{type}(\text{leaf})$}
-		\STATE $\text{attach}(\text{leaf}, \text{Vertex}(s, PN=1, DN=1))$
-	\ELSE
-		\STATE $pos \gets \text{position}(\text{leaf}, s)$
-		\STATE $pl \gets \text{opponent}(\text{leaf})$
-		\STATE $rep \gets \left|\left\{ (a, b) \in \text{history} \;:\; a = pos, b = pl \right\}\right|$
-		\IF{$rep \ge 3 \lor (pos, pl) = \text{last}(\text{history})$}
-			\STATE $\text{attach}(\text{leaf}, \text{Vertex}(s, \text{lose}))$
-		\ELSE
-			\STATE $\text{attach}(\text{leaf}, \text{Vertex}(s, PN=1, DN=1))$
-		\ENDIF
-	\ENDIF
+  \IF{$\text{type}(s) = \text{type}(\text{leaf})$}
+    \STATE $\text{attach}(\text{leaf}, \text{Vertex}(s, PN=1, DN=1))$
+  \ELSE
+    \STATE $pos \gets \text{position}(\text{leaf}, s)$
+    \STATE $pl \gets \text{opponent}(\text{leaf})$
+    \STATE $rep \gets \left|\left\{ (a, b) \in \text{history} \;:\; 
+                                    a = pos, b = pl \right\}\right|$
+    \IF{$rep \ge 3 \lor (pos, pl) = \text{last}(\text{history})$}
+      \STATE $\text{attach}(\text{leaf}, \text{Vertex}(s, \text{lose}))$
+    \ELSE
+      \STATE $\text{attach}(\text{leaf}, \text{Vertex}(s, PN=1, DN=1))$
+    \ENDIF
+  \ENDIF
 \ENDFOR
 \end{algorithmic}
 \end{figure}
 
+\subsection{Heuristiky}
+\label{sec:heuristics}
+Naivní průchod, jak byl popsán výše, je poměrně málo efektivní. Je výhodné
+sdílet některé údaje mezi jednotlivými větvemi stromu, aby se některé větve
+nemusely vůbec rozvíjet. K tomu je v programu zahrnuto několik heuristik.
+
+\subsubsection{Transpoziční tabulka}
+\label{sec:heur-tt}
+Při prohledávání stavového prostoru se dost často stává, že program dojde jinou
+cestou do pozice, kterou již dříve prozkoumal. Aby se zabránilo opakovanému
+prozkoumávání podstromů, které odpovídají již prozkoumané části hry, ukládají
+se hodnoty PN a DN do \emph{transpoziční tabulky}. Transpoziční tabulka je
+asociativní pole indexované \emph{hashem vrcholu}. Hash vrcholu je nějaké
+64bitové číslo s tím, že dvě stejné pozice (stejné rozestavení figurek a stejný
+hráč na tahu) mají stejný hash.
+
+Protože všech možných hashů je \(2^{64}\), jako index do transpoziční tabulky
+se bere hash modulo \(N\), kde \(N\) je uživatelem nastavitelná hodnota 
+odpovídající maximálnímu možnému počtu záznamů v transpoziční tabulce.
+
+Při vytváření nových vrcholů se program nejprve podívá do transpoziční tabulky
+a, najde-li tam příslušný záznam, použije hodnoty z ní.
+
+Při použití transpoziční tabulky jsou dva problémy: První je možnost kolizí --
+jak v hashi samotném, tak ve skutečném indexu, tedy \(H \bmod N\). Druhý je
+problém \emph{graph history interaction} -- díky pravidlu third-time repetition
+je možné, že podstrom, který se právě rozvíjí, může vypadat jinak než ten, ze
+kterého se do transpoziční tabulky uložily hodnoty. To by mohlo vést k 
+nesprávným výsledkům, pokud by se z transpoziční tabulky braly informace o
+dokázaných či vyvrácených vrcholech (tedy záznamy s PN či DN rovnými nule). 
+
+Možné řešení by bylo ukládat do transpoziční tabulky informace o historii
+každého uloženého vrcholu. To by však stálo prostor i výpočetní čas pro 
+ověřování historií. V programu jsou tyto problémy vyřešeny tak, že se do
+transpoziční tabulky neukládají dokázané ani vyvrácené vrcholy. Tím se při
+vyzvednutí špatných hodnot může stát, že část výpočtu bude neefektivní, ale 
+zabraňuje to vydání špatných výsledků.
+
+Pro řešení kolizí (tedy situací, kde v tabulce je záznam s hešem \(H_1\) a má se
+do ní uložit záznam s hešem \(H_2\), přičemž \(H_1 \equiv H_2 \pmod N\)) se ke
+každému záznamu v transpoziční tabulce se ukládá i původní heš, aby bylo možné 
+tyto kolize detekovat. V případě kolize se preferuje záznam s větší hloubkou (za 
+hloubku se považuje ply záznamu, tedy počet tahů od kořene).
+
+\subsubsection{Důkazová tabulka}
+\label{sec:heur-pt}
+Informace o dokázaných či vyvrácených vrcholech jsou i tak poměrně důležité a
+můžou algoritmu pomoct ve výpočtu. Proto jsem zavedl navíc ještě \emph{důkazovou
+tabulku (proof table)}. Ta funguje v principu stejně jako transpoziční tabulka,
+s několika rozdíly:\begin{enumerate}
+\item Ukládají se do ní \emph{pouze} dokázané či vyvrácené vrcholy (tedy 
+  informace v transpoziční a důkazové tabulce jsou navzájem disjunktní).
+\item Ke každému záznamu se navíc ukládá historie vrcholu, ze kterého záznam
+  pochází.
+\end{enumerate}
+
+\emph{Historie} v důkazové tabulce je seznam hešů všech těch pozic na cestě od 
+kořene k příslušnému vrcholu, ze kterých začíná svůj tah jeden z hráčů. (Neboli
+těch vrcholů, které mají opačný typ než jejich rodič, případně kořenového
+vrcholu.)
+
+Při vyzvedávání záznamu z důkazové tabulky se porovnává uložená historie s 
+historií vrcholu, ke kterému se hledají hodnoty PN, DN. Pro každý hash z obou
+historií se spočítá, kolikrát se celkem v obou historiích vyskytuje. Pokud se
+zjistí, že některý hash se vyskytuje aspoň třikrát, je záznam zamítnut a
+považuje se, že v důkazové tabulce vůbec nebyl nalezen.
+
+Důkazová tabulka je oddělená od transpoziční kvůli větší spotřebě paměti a
+časově náročnějšímu vyhledávání záznamů. Takto se cena za ukládání historie
+platí pouze u záznamů, u kterých je to nezbytně nutné.
+
+\subsubsection{Killery}
+\label{sec:heur-killers}
+Další informace, kterou je výhodné sdílet mezi větvemi stromu, jsou vrcholy,
+které někdy v průběhu prohledování způsobily \emph{cutoff} -- tedy to, že jejich
+sousedi se již nemusely prohledávat. (Pro OR vrchol to je dokázaný potomek, pro
+AND vrchol zase potomek vyvrácený.) Dá se očekávat, že tento vrchol způsobí
+cutoff i ve vedlejší větvi -- například pokud se tyto větve liší jenom pozicí
+některé málo významné figurky.
+
+Pro každou hladinu stromu (počet vrcholů od kořene) se udržuje pro každý typ
+seznam \(K\) kroků, které v minulosti způsobily cutoff. Hodnota \(K\) je 
+nastavitelná uživatelem -- protože pro každý typ se udržuje jeden seznam,
+celkem je pro každou hladinu udržováno až \(2K\) záznamů.
+
+Před samotným rozvinutím listu se nejdříve v tabulce killerů algoritmus pokusí
+najít krok, který je z listu platný podle pravidel hry, a pokud se nějaký najde,
+připojí se jako nový list, který se vyhodnotí. Pokud tento vrchol způsobí cutoff,
+není třeba jeho sourozence vůbec vytvářet. Pokud cutoff nezpůsobil, zkouší se
+rekurzivně killery o hladinu níž. Protože cílem je najít cutoff, zkouší se jenom
+kroky jednoho hráče -- rekurze má tedy nejvíš čtyři hladiny, kde na každé se
+zkouší nejvýš \(K\) kroků.
+
+Popsaný proces se nazývá \emph{simulace}. Je to snaha použít cestu k důkazu,
+která byla úspěšná ve vedlejší větvi bez rozvíjení celého podstromu.
+
+Pokud simulace selže -- tedy se nepovede najít cutoff -- pak se přejde k
+normálnímu rozvinutí listu, ovšem s tím, že vrcholy, které jsou pro danou
+hladinu vedeny jako killery, se dají na první místo v seznamu potomků.
+
+\subsubsection{History table}
+\label{sec:heur-ht}
+Druhý obecnější způsob na sdílení cutoffů mezi větvemi je \emph{history table}.
+Je to asociativní pole indexované krokem. Pokud vrchol v hladině \(h\) způsobí
+cutoff, do history table se k záznamu pro krok vedoucí do toho vrcholu přičte
+hodnota \(h^2\).
+
+Po rozvinutí listu se jeho noví potomci uspořádají podle hodnot z history table
+-- čím vyšší hodnota přísluší nějakému vrcholu, tím blíž je začátku seznamu
+následníků. Při řazení následníků se vždy na první místa dávají killery a 
+teprve ostatní místa se řadí podle history table.
+
+\subsection{Depth-First varianta}
+\label{sec:dfpns}
+Pro snížení paměťové náročnosti algoritmu jsem implementoval i depth-first
+variantu. Pro každý vrchol se navíc udržují jeho \emph{limity} -- dvojice 
+čísel PNt a DNt. Prohledávání podstromu pak pokračuje tak dlouho, dokud tento
+podstrom není buď dokázaný či vyvrácený nebo dokud PN nepřesáhne limit PNt či
+DN nepřesáhne DNt. Kořenu stromu má oba limity nastaveny na \(+\infty\).
+
+Buďte \(p, v, u\) vrcholy s tím, že \(u, v\) jsou potomci \(p\). Pokud \(p\) je 
+typu OR, \(v\) je nejlepší následník a \(u\) je druhý nejlepší následník, pak
+limity pro \(v\) jsou dány následovně:
+\begin{align*}
+  v.pnt &:= \min \{ p.pnt, \lceil u.pn (1 + \epsilon) \rceil \} \\
+  v.dnt &:= p.dnt - p.dn + v.dn
+\end{align*}
+
+\(\epsilon\) je v současné implementaci rovno \(0.1\).
+
+Algoritmus rozvíjí podstrom dokud jsou PN, DN kořene podstromu menší než
+příslušné limity. Při překročení limitu se s rozvíjením podstromu končí a 
+algoritmus se vrací po rodičích směrem ke kořeni, dokud nenajde takový vrchol,
+jehož PN, DN vyhovují limitům (aspoň kořen stromu tuto podmínku vždy splňuje).
+
+Jako optimalizace se při vracení směrem ke kořeni neodřezávají potomci každého
+vrcholu, ale jen těch vrcholů, jejichž typ je rozdílný od typu potomka, který
+byl dosud na prohledávané cestě. Neboli odřezávání probíhá po tazích místo po
+krocích.
+
+V psedudokódu jedna iterace algoritmu \emph{dfpns} vypadá takto:
+\begin{figure}[H]
+\begin{algorithmic}
+  \WHILE{\(\text{proved}(v) \lor \text{over\_limits}(v)\)}
+    \STATE \COMMENT{Vzestup po rodičích k vrcholu v rámci limitů}
+    \IF{\(v.\text{type} \ne \text{parent}(v).\text{type}\)}
+      \STATE \(\text{remove}(v)\)
+    \ENDIF
+    \STATE \(v \gets \text{parent}(v)\)
+  \ENDWHILE
+  
+  \COMMENT{\(v\) nyní je vrchol splňující limity}
+  \WHILE{\(\neg \text{leaf}(v)\)}
+    \STATE \(v \gets \text{best\_successor}(v)\)
+  \ENDWHILE
+  
+  \STATE \(\text{expand}(v)\)
+  \STATE \(\text{update\_path}(v, \text{parent}(v), 
+                               \text{parent}(\text{parent}(v)),
+                               \ldots,
+                               \text{root})\)
+\end{algorithmic}
+\end{figure}
+
+\section{Překlad programu}
+\label{sec:compiling}
+
+\subsection{Prerekvizity}
+Pro překlad je třeba mít kompletní zdrojový kód programu. Ten lze obstarat přes
+systém git příkazem
+\begin{center}\texttt{git clone git://github.com/Oxyd/APNS.git}\end{center} či
+stažením zdrojového archivu ve formátu
+\texttt{.zip} či \texttt{.tar.gz} z \url{https://github.com/Oxyd/APNS}.
+
+Dále je třeba mít v systému instalovány následující knihovny a
+nástroje\begin{description}
+\item[SCons] Používaný nástroj pro sestavení programu. Instalátor pro Windows je
+  možné získat na
+  \url{http://scons.org/}. Na distribucích GNU/Linuxu stačí zpravidla instalovat 
+  příslušný balíček od distributora.
+\item[Boost] Kolekce knihoven, z nichž některé program používá. Je třeba mít
+  verzi aspoň 1.44. Stáhnout lze z
+  \url{http://boost.org/}, kde jsou i informace pro sestavení kolekce. Na 
+  systému GNU/Linux opět zpravidla distributor dodává předpřipravený balíček.
+\item[Google Test] Není nezbytně nutný pro překlad; používá se pouze pro
+  jednotkové testy. Pro Windows se stačí obrátit na stránky projektu na
+  \url{http://code.google.com/p/googletest/}. Je zapotřebí verze aspoň 1.5.
+\end{description}
+
+Je třeba dále mít k dispozici překladač jazyka C++. Sestavovací skript
+automaticky použije překladač z \emph{Microsoft Visual Studia} na systému 
+Windows -- je třeba mít verzi 10. (Měla by stačit i verze 9 a 8, ale to není 
+otestované.) Na GNU/Linuxu se pro překlad používá překladač \emph{GCC} -- je 
+ovšem třeba mít překladač verze aspoň 4.5.
+
+Program je možné na GNU/Linuxu přeložit i překladačem Clang -- sestavovacímu
+skriptu stačí předat parametr \texttt{toolchain=clang}.
+
+Na Windows není podporován překlad jiným překladačem než z \emph{Visual Studia}.
+Důvodem je špatná podpora překládání modulů jazyka Python jiným překladačem než
+tímto.
+
+\subsection{Konfigurace pro překlad}
+Různé překladové parametry -- zejména cesty ke knihovnám -- je možné nastavit
+v souboru \texttt{config/\textit{platforma}.py}. Při použití systémového 
+překladače na systému GNU/Linux by žádná konfigurace neměla být potřeba. Na 
+systému Windows bude třeba v \texttt{config/windows.py} správně nastavit cesty k
+hlavičkovým souborům a statickým knihovnám.
+
+\subsection{Překlad}
+Překlad lze spustit příkazem \texttt{scons} v kořenovém adresáři se zdrojovým
+kódem programu. Pokud překlad proběhne úspěšně, není třeba žádných dalších 
+kroků; program je spustitelný tak, jak bylo popsáno v části \ref{sec:running}.
+
+Pro účely vývoje programu může být vhodné přeložit program tak, aby obsahoval
+ladicí informace. V tom případě je třeba překlad spustit příkazem 
+\texttt{scons debug=1}. Navíc je možné specifikovat cíl \texttt{tests}, který 
+přeloží a provede jednotkové testy -- tedy použít příkaz \texttt{scons tests}. 
+Jednotlivé jednotkové testy je možné vyvolat cílem \emph{jméno\_testu}, kde 
+\emph{jméno\_testu} odpovídá jménu souboru v adresáři 
+\texttt{apns\_module/tests} bez koncovky \texttt{.cpp}. Například tedy pro 
+spuštění jednotkových testů ze souboru 
+\texttt{apns\_module/tests/board\_test.cpp} se dá použít příkaz 
+\texttt{scons board\_test}.
+
+Při překladu na systému Windows je též možné specifikovat parametr
+\texttt{bits=32} nebo \texttt{bits=64}, který určuje, zda má výsledný program 
+být přeložen pro 32bitovou nebo 64bitovou verzi systému. Kromě toho existuje cíl
+\texttt{distrib}, který vytvoří \texttt{zip} soubor s binární distribucí
+programu.
+
+\section{Vstupní a výstupní data}
+\subsection{Pozice}
+Vstupní pozice je textový soubor ve formátu popsaném na adrese
+\url{http://arimaa.com/arimaa/learn/notation.html} v části 
+\emph{Notation for Recording Arimaa Positions}. Program ale ignoruje číslo tahu 
+a předešlé kroky. Konkrétní příklady pozic jsou v adresáři 
+\texttt{example-positions}.
+
+\subsection{Strom}
+Stavový strom je ukládán v textovém formátu. Struktura souboru je
+\begin{itemize}
+\item Na první řádce je počáteční pozice v kompaktním formátu: Seznam figurek
+  na hrací ploše, které jsou oddělené mezerami. Jedna figurka je popsána 
+  trojznakovým řetězcem, kde první znak určuje řádek ('1' až '8'), druhý značí
+  sloupec ('a' až 'h') a třetí znak typ figurky podle oficiálního značení: 'E'
+  značí slona, 'M' velblouda, 'H' koně, 'D' psa, 'C' kočku a 'R' zajíce. Typ je 
+  značen velkým písmenem, pokud je to figurka zlatého hráče -- figurky 
+  stříbrného hráče jsou značeny písmeny malými. Například: \begin{center}
+  \texttt{5cC 6bE 6cd 6dR 6ee 7cr}\end{center}
+\item Na druhé řádce je hráč, který je první na tahu jako řetězec buď 
+  \texttt{gold} nebo \texttt{silver}.
+\item Následuje seznam vrcholů stromu. Jeden vrchol je na jedné řádce. Každý
+  vrchol je popsán následovně: \begin{center}
+    \texttt{\textit{tah} : \textit{typ} \textit{kroky} \textit{PN} \textit{DN} 
+      \textit{děti}}
+    \end{center}
+  Kde jednotlivé položky jsou:\begin{description}
+  \item[\textit{tah}] Textový popis tahu vedoucího do této pozice z
+    rodičovského vrcholu. Používá se oficiální notace pro zápis tahů hry Arimaa. 
+    Kořen má místo tahu řetězec \texttt{root}.
+  \item[\textit{typ}] Řetězec \texttt{or} nebo řetězec \texttt{and}. Udává typ 
+    vrcholu.
+  \item[\textit{kroky}] Číslo v dekadickém zápisu udávající počet kroků, které 
+    ještě může hráč učinit v rámci svého tahu.
+  \item[\textit{PN}] Hodnota \emph{proof number} pro tento vrchol v dekadickém 
+    zápisu nebo řetězec ,,\textit{infty}`` značící nekonečno.
+  \item[\textit{DN}] Hodnota \emph{disproof number} pro tento vrchol v 
+    dekadickém zápisu nebo řetězec ,,\textit{infty}`` značící nekonečno.
+  \item[\textit{děti}] Počet potomků tohoto vrcholu v dekadickém zápisu.
+  \end{description}
+\item Vrcholy jsou ve stromu uloženy tak, že první je kořen a po každém vrcholu 
+  následují jeho potomci. Strom je tedy v souboru uložen v pořadí pre-order 
+  průchodu do hloubky.
+\end{itemize}
+
 \section{Implementace}
 \subsection{Struktura programu}
-Program sestává ze dvou částí: Nativního modulu, který implementuje algoritmus samotný a pomocné datové typy a algoritmy
-pro reprezentaci hry; a uživatelského rozhraní, které je implementované v jazyku Python.
+Program sestává ze dvou částí: Nativního modulu, který implementuje algoritmus
+samotný a pomocné datové typy a algoritmy pro reprezentaci hry; a uživatelského 
+rozhraní, které je implementované v jazyku Python.
 
-Algoritmus je v nativním modulu kvůli běhové rychlosti nativního kódu a kvůli tomu, že umožňuje detailnější správu
-paměti. Naproti tomu uživatelské rozhraní není příliš výpočetně náročné, tedy není třeba mít ho v nativním kódu. Jazyk
-Python navíc obsahuje spoustu předpřipravených knihoven, které velmi usnadňují vývoj grafického (i dávkového)
-uživatelského rozhraní.
+Algoritmus je v nativním modulu kvůli běhové rychlosti nativního kódu a kvůli
+tomu, že umožňuje detailnější správu paměti. Naproti tomu uživatelské rozhraní 
+není příliš výpočetně náročné, tedy není třeba mít ho v nativním kódu. Jazyk
+Python navíc obsahuje spoustu předpřipravených knihoven, které velmi usnadňují
+vývoj grafického (i dávkového) uživatelského rozhraní.
 
-Implementace celého programu v jazyku C++ by vedlo k přílišnému zesložitění kódu pro interakci s uživatelem. To by nebyl
-takový problém, pokud by program žádné grafické rozhraní neměl -- připadá mi ale, že vizualizace stromu a jednotlivých
+Implementace celého programu v jazyku C++ by vedlo k přílišnému zesložitění kódu
+pro interakci s uživatelem. To by nebyl takový problém, pokud by program žádné 
+grafické rozhraní neměl -- připadá mi ale, že vizualizace stromu a jednotlivých
 pozic umožňuje uživateli vytvořit si lepší představu o funkci algoritmu.
 
-Rovněž by bylo možné implementovat celý projekt jako několik programů: Samotný výpočetní program, který by neměl žádné
-(nebo jen minimální) uživatelské rozhraní a pak další programy, které by jeho výstup nějak zpracovávaly a vizualizovaly.
-To by znamenalo, že program nebude během výpočtu platit za nezbytnou existenci interpreteru jazyka Python v paměti jak
-je tomu teď. Na druhou stranu by však nemohl program poskytovat uživateli průběné informace během výpočtu -- leda by
-současně běžel druhý program s uživatelským rozhraním a oba programy by spolu nějakým způsobem komunikovaly -- to by
-ovšem představovalo stejný overhead jako nyní a navíc overhead na komunikaci mezi procesy. Dále by se některé datové
-struktury musely duplikovat ve více programech -- počítací program by měl vlastní reprezentaci stromu v paměti, ke které
-by však uživatelské rozhraní nemělo přístup. Program s uživatelským rozhraním by pak musel mít vlastní reprezentaci
-stromu.
+Rovněž by bylo možné implementovat celý projekt jako několik programů: Samotný
+výpočetní program, který by neměl žádné (nebo jen minimální) uživatelské 
+rozhraní a pak další programy, které by jeho výstup nějak zpracovávaly a 
+vizualizovaly. To by znamenalo, že program nebude během výpočtu platit za 
+nezbytnou existenci interpreteru jazyka Python v paměti jak je tomu teď. Na 
+druhou stranu by však nemohl program poskytovat uživateli průběné informace 
+během výpočtu -- leda by současně běžel druhý program s uživatelským rozhraním 
+a oba programy by spolu nějakým způsobem komunikovaly -- to by ovšem 
+představovalo stejný overhead jako nyní a navíc overhead na komunikaci mezi 
+procesy. Dále by se některé datové struktury musely duplikovat ve více 
+programech -- počítací program by měl vlastní reprezentaci stromu v paměti, ke 
+které by však uživatelské rozhraní nemělo přístup. Program s uživatelským 
+rozhraním by pak musel mít vlastní reprezentaci stromu.
 
-Výpočetní část programu je tedy implementována jako nativní modul jazyka Python. Vnitřní datové struktury -- jako strom
-samotný či hrací plocha a reprezentace kroků -- jsou přímo přístupné kódu v Pythonu a nemusí se duplikovat. To také
-znamená, že je teoreticky možné implementovat část algoritmu v Pythonu -- například různé heuristické funkce. Tím sice
-jistě vznikne netriviální overhead, ale umožní to snadno testovat experimentální vylepšení algoritmu -- pokud se
+Výpočetní část programu je tedy implementována jako nativní modul jazyka Python.
+Vnitřní datové struktury -- jako strom samotný či hrací plocha a reprezentace 
+kroků -- jsou přímo přístupné kódu v Pythonu a nemusí se duplikovat. To také
+znamená, že je teoreticky možné implementovat část algoritmu v Pythonu --
+například různé heuristické funkce. Tím sice jistě vznikne netriviální overhead, 
+ale umožní to snadno testovat experimentální vylepšení algoritmu -- pokud se
 vylepšení prokáže jako rozumné, nebude problém ho přepsat do nativního modulu.
 
-Rovněž je možné spustit interpret Pythonu v interaktivním režimu, v něm načíst výpočetní modul a interaktivně spouštět
-části algoritmu či procházet vzniklé datové struktury. To se mi prokázalo jako poměrně praktický nástroj při ladění
+Rovněž je možné spustit interpret Pythonu v interaktivním režimu, v něm načíst
+výpočetní modul a interaktivně spouštět části algoritmu či procházet vzniklé 
+datové struktury. To se mi prokázalo jako poměrně praktický nástroj při ladění
 programu.
 
 \subsection{Reprezentace dat}
 \subsubsection{Hrací plocha}
-Hrací plocha je reprezentována jednoduše jako 64-prvkové pole, kde každý prvek obsahuje záznam, zda na tom poli je figurka,
-jakého je typu a jaké barvy. Dohromady tedy aspoň 3 B na jedno možné pole. Tato reprezentace, ač se zdá neefektivní
-(teoreticky by stačil 1 B na jedno pole, či dokonce jen 4 bity), se mi prakticky projevila jako nejlepší, neboť
-nevyžaduje žádnou další interpretaci dat -- každý bajt je možné bez další konverze přímo interpretovat jako správnou
-informaci. Implementace se navíc snaží nevytvářet zbytečné kopie hrací plochy.
+Hrací plocha je reprezentována jednoduše jako 64-prvkové pole, kde každý prvek
+je tvořen jedním znakem, který reprezentuje figurku na příslušné pozici.
 
 \subsubsection{Kroky}
-Krok -- změna hrací plochy z jednoho platného stavu do druhého platného stavu -- je reprezentován jako řetězec ve
-stejném formátu v jakém jsou kroky popisovány v oficiálních zápisech hry. Program vytváří poměrně mnoho kroků a
-prakticky se mi ukázalo vhodné zvolit tuto poměrně kompaktní reprezentaci oproti přímějším variantám.
+Krok -- změna hrací plochy z jednoho platného stavu do druhého platného stavu --
+je reprezentován jako řetězec ve stejném formátu v jakém jsou kroky popisovány v 
+oficiálních zápisech hry. Program vytváří poměrně mnoho kroků a prakticky se mi 
+ukázalo vhodné zvolit tuto poměrně kompaktní reprezentaci oproti přímějším 
+variantám.
 
-Krok samotný navíc nevyžaduje, aby k němu byla v paměti uložena odpovídající hrací plocha. V každém vrcholu stromu je
-proto uložen jenom krok, kterým vznikne patřičná hrací plocha z rodičovského vrcholu, namísto aby tam byla uložena celá
+Krok samotný navíc nevyžaduje, aby k němu byla v paměti uložena odpovídající
+hrací plocha. V každém vrcholu stromu je proto uložen jenom krok, kterým vznikne 
+patřičná hrací plocha z rodičovského vrcholu, namísto aby tam byla uložena celá
 hrací plocha.
 
 \subsubsection{Vrchol stromu}
-Kromě nezbytných informací o kroku, hodnotách \emph{PN} a \emph{DN} je v každém vrcholu třeba udržovat informaci o jeho
-rodiči a potomcích.
+Kromě nezbytných informací o kroku, hodnotách \emph{PN} a \emph{DN} je v každém
+vrcholu třeba udržovat informaci o jeho potomcích.
 
-Pro reprezentaci potomků jsem zvolil pole následníků. Tato reprezentace má několik výhod:\begin{itemize}
-  \item Nízký overhead: V každém vrcholu stačí mít uložený pouze ukazatel na začátek pole následníků a velikost tohoto
-  pole. Žádné další informace nejsou potřeba.
-  \item Následníci jsou v paměti uloženi pořadě ihned za sebou. Taková reprezentace je cache-friendly při sekvenčním
-  procházení všech následníků, což je velmi častá operace. (Jiný druh průchodu ostatně ani není třeba.)
-\end{itemize}
+Pro reprezentaci potomků jsem zvolil pole ukazatelů na následníky. To poněkud
+usnadňuje implementaci, jelikož je možné v programu pracovat s ukazateli na
+některé vrcholy bez toho, že hrozilo přesunutí těchto vrcholů zatímco jiná část
+programu drží ukazatel na některý z nich.
 
-Na druhou stranu taková reprezentace neumožňuje snadno měnit seznam potomků bez zavedení další režie. Algoritmu však
-stačí vytvářet listy, které jsou bez potomků, a pak listy rozvíjet -- to lze udělat tak, aby se všichni potomci přidali
-najednou. Po rozvinutí vrcholu se jeho seznam potomků již nemění.
-
-Tato reprezentace mi tedy připadá jako nejvhodnější, ač je poměrně neflexibilní.
+Nevýhodou je, že pro přístup k následníkovi vrcholu je potřeba prvně přístup do
+paměti k seznamu ukazatelů a následně druhý přístup k vrcholu samotnému. 
 
 \section{Závěrem}
-Můj původní záměr byl reprezentovat stavový prostor hry jako orientovaný acyklický graf (DAG) -- místo používání pouze
-hodnot \emph{PN}, \emph{DN} z transpoziční tabulky by se k rozvíjenému listu připojil přímo již existující vrchol. To by
-znamenalo zefektivnění výpočtu, protože většina duplicitních pozic by nemusela být ve stromu vícekrát.
+Můj původní záměr byl reprezentovat stavový prostor hry jako orientovaný
+acyklický graf (DAG) -- místo používání pouze hodnot \emph{PN}, \emph{DN} z 
+transpoziční tabulky by se k rozvíjenému listu připojil přímo již existující 
+vrchol. To by znamenalo zefektivnění výpočtu, protože většina duplicitních pozic 
+by nemusela být ve stromu vícekrát.
 
-Zajištění acykličnosti grafu se však prokázalo jako netriviální ale velmi podstatné. Cyklus v grafu neznamená jenom
-možnost zacyklení celého algoritmu při výběru nejlepšího listu, ale též to nereprezentuje správně stavový prostor hry --
-pravidla explicitně znemožňují opakování stále těch samých pozic dokola (pravidlo \emph{third-time repetition}).
+Zajištění acykličnosti grafu se však prokázalo jako netriviální ale velmi
+podstatné. Cyklus v grafu neznamená jenom možnost zacyklení celého algoritmu při 
+výběru nejlepšího listu, ale též to nereprezentuje správně stavový prostor hry 
+-- pravidla explicitně znemožňují opakování stále těch samých pozic dokola 
+(pravidlo \emph{third-time repetition}).
 
-Nakonec jsem od tohoto záměru upustil a rozhodl se pro jednodušší, i když méně efektivní reprezentaci obyčejným
-stromem. Transpoziční tabulka pouze dodává ,,lepší`` počáteční hodnoty \emph{PN}, \emph{DN}. I zde vzniká problém s
-\emph{graph history interaction} -- vyzvednuté hodnoty mohou být nesprávné. Pokud jsou to hodnoty, kde \emph{PN} i \emph{DN}
-jsou nenulové, pak nesprávné hodnoty ovlivní pouze efektivitu algoritmu, nikoliv jeho správnost. Program však do transpoziční
-tabulky nemůže ukládat záznamy, které říkají, že vrchol je dokázaný či vyvrácený -- tedy ty, které mají \emph{PN} nebo \emph{DN}
-nulové.
+Nakonec jsem od tohoto záměru upustil a rozhodl se pro jednodušší, i když méně
+efektivní reprezentaci obyčejným stromem. Další možností by bylo DAGem
+reprezentovat pouze tah jednoho hráče -- tím by nemohly vzniknout problémy s
+opakování stále stejných pozic (protože pravidla o opakování se týkají jenom
+pozic po ukončení tahu hráče) a vedlo by to k aspoň nějaké redukci počtu 
+vrcholů.
 \end{document}
 % vim:textwidth=120

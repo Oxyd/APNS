@@ -242,7 +242,6 @@ public:
 private:
   //! Pieces are stored in a container of this type.
   typedef boost::array<
-    //boost::optional<piece>,
     char,
     ROWS * COLUMNS
   > pieces_cont;
