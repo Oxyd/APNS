@@ -406,8 +406,9 @@ zabraňuje to vydání špatných výsledků.
 Pro řešení kolizí (tedy situací, kde v tabulce je záznam s hešem \(H_1\) a má se
 do ní uložit záznam s hešem \(H_2\), přičemž \(H_1 \equiv H_2 \pmod N\)) se ke
 každému záznamu v transpoziční tabulce se ukládá i původní heš, aby bylo možné 
-tyto kolize detekovat. V případě kolize se preferuje záznam s větší hloubkou (za 
-hloubku se považuje ply záznamu, tedy počet tahů od kořene).
+tyto kolize detekovat. V případě kolize se preferuje záznam s menší hloubkou (za 
+hloubku se považuje počet vrcholů od kořene) -- tedy ten záznam, pod kterým 
+je nejspíš větší podstrom.
 
 \subsubsection{Důkazová tabulka}
 \label{sec:heur-pt}

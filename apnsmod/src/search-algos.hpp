@@ -614,7 +614,7 @@ protected:
     search_stack::path_sequence::const_iterator path_end,
     search_stack::history_sequence::const_iterator history_begin,
     search_stack::history_sequence::const_iterator history_end,
-    zobrist_hasher::hash_t hash, std::size_t ply
+    zobrist_hasher::hash_t hash
   ) {
     vertex::number_t const old_pn = current.proof_number;
     vertex::number_t const old_dn = current.disproof_number;
@@ -630,18 +630,18 @@ protected:
     if (proved && numbers_changed)
       log_proof(path_begin, path_end);
 
-    if (cutoff) {
-      std::size_t const level = std::distance(path_begin, path_end);
+    std::size_t const level = std::distance(path_begin, path_end);
 
+    if (cutoff) {
       store_in_ht(current, level);
       if (parent)
         store_in_killer_db(level, parent->type, current);
     }
 
     if (proved)
-      store_in_pt(history_begin, history_end, ply, hash, current);
+      store_in_pt(history_begin, history_end, level, hash, current);
     else
-      store_in_tt(hash, ply, current);
+      store_in_tt(hash, level, current);
   }
 
   void expand_and_eval() {

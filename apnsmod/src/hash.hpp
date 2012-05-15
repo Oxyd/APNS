@@ -187,7 +187,8 @@ public:
   /**
    * Insert an element to the table.
    * \param hash Key of the element.
-   * \param vertex Value of the element.
+   * \param depth Depth of the element.
+   * \param entry Value of the element.
    */
   void insert(hash_t hash, unsigned depth, entry_t entry) {
     record* r = find_record(hash, true);

@@ -827,7 +827,7 @@ void proof_number_search::do_iterate() {
       current, parent,
       stack_.path().begin(), stack_.path().end(),
       stack_.history().begin(), stack_.history().end(),
-      stack_.hashes_top(), ply(stack_)
+      stack_.hashes_top()
     );
 
     if (parent)
@@ -913,8 +913,7 @@ void depth_first_pns::do_iterate() {
       *current, parent,
       stack_.path().begin(), current_path.base(),
       stack_.history().begin(), current_history.base(),
-      *current_hash,
-      ply
+      *current_hash
     );
 
     if (parent) {
