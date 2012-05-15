@@ -529,6 +529,53 @@ V psedudokódu jedna iterace algoritmu \emph{dfpns} vypadá takto:
 \end{algorithmic}
 \end{figure}
 
+\subsection{Garbage collector}
+Algoritmus má přese všechny heuristiky poměrně velkou paměťovou náročnost. Jako
+ad-hoc řešení jsem zavedl \emph{garbage collector}. Jeho parametry jsou dvě
+čísla, obě udávající počet vrcholů: \emph{GC high} a \emph{GC low}.
+
+Pokud je GC zaplý a počet vrcholů překročí GC high, prohledávání se
+přeruší a ze stromu se začnou ořezávat vrcholy tak dlouho, dokud velikost
+stromu neklesne pod GC low nebo již není možné odstranit žádný vrchol.
+
+GC funguje rekurzivně: Nejprve se na úrovni pod kořenem odstraní následníci 
+všech vyvrácených vrcholů. Pokud je stále velikost celého stromu nad hodnotou 
+GC low, vybere se z této úrovně nejhorší vrchol, který není list, a kolektor do 
+něj sestoupí. Tam se opět odstraní potomci vyvrácených (či dokázaných) vrcholů 
+a pokud je stále velikost stromu nad GC low, pokračuje se rekurzivně.
+
+Jakmile již není možné v rekurzi pokračovat, protože všichni následníci jsou
+listy, odstraní se všichni tito následníci a kolektor se vynoří o jednu hladinu
+z rekurze. Tam se opět vybere nejhorší následník, který není list (pokud takový
+existuje) a pokračuje se stejným způsobem.
+
+V pseudokódu:
+\begin{figure}[H]
+{\bf procedure} \(\text{GC}(v)\):
+\begin{algorithmic}
+  \FORALL{\(c \in \text{children}(v)\)}
+    \IF{\(\left( v.\text{type} = \text{OR} \land c.\text{dn} = 0 \right)
+        \lor \left( v.\text{type} = \text{AND} \land c.\text{pn} = 0 \right)\)}
+      \STATE \(\text{remove\_children\_of}(c)\)
+    \ENDIF
+  \ENDFOR
+  
+  \WHILE{\(\text{tree\_size} > \text{gc\_low}\)}
+    \STATE \(w \gets \text{ worst non-leaf successor of } v\)
+    \IF{\(w \ne \text{NULL}\)}
+      \STATE \(\text{GC}(w)\)
+    \ELSE
+      \STATE \(\text{remove\_children\_of}(v)\)
+    \ENDIF
+  \ENDWHILE
+\end{algorithmic}
+\end{figure}
+
+Tímto způsobem se algoritmus GC snaží odstraňovat vrcholy postupně od nejhoršího 
+a nejhlubšího, aby se jako první odstranily ,,málo potřebné`` vrcholy, či 
+takové, ve kterých není zakořeněný příliš hluboký podstrom, který by se pak
+musel případně počítat odznova.
+
 \section{Překlad programu}
 \label{sec:compiling}
 
