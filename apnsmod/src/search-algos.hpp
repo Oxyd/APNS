@@ -653,12 +653,6 @@ protected:
       size_ += expand(*stack_.path_top(), stack_.state(), game_->attacker);
       evaluate_children();
     }
-
-#ifndef NDEBUG
-    vertex_counter counter;
-    traverse(game_->root, backtrack(), boost::ref(counter));
-    assert(counter.count == size_);
-#endif
   }
 
   void evaluate_children() {

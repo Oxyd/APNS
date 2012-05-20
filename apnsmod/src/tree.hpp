@@ -575,6 +575,14 @@ struct vertex_counter {
   std::size_t count;
 };
 
+//! Get the size of the subtree rooted in a given vertex, including the root
+//! itself. (E.g. subtree_size(a_leaf) == 1.)
+inline std::size_t subtree_size(vertex const& v) {
+  vertex_counter counter;
+  traverse(v, backtrack(), boost::ref(counter));
+  return counter.count;
+}
+
 //! Holds an instance of a concrete traversal policy object and delegates the 
 //! traversal to it.
 struct virtual_traversal_policy {

@@ -162,6 +162,11 @@ void export_movement() {
                   "How many steps this steps counts as? Ordinary steps count as one, pushes and pulls as two. Captures are "
                   "not counted.")
 
+    .add_property("elementarySteps",
+                  range(&apns::step::step_sequence_begin,
+                        &apns::step::step_sequence_end),
+                  "Elementary steps that make up this whole step.")
+
     .def("__str__", &apns::step::to_string)
     .def("__repr__", &apns::step::to_string)
     ;
@@ -196,6 +201,8 @@ void export_movement() {
 
   def("allSteps", &all_steps,
       "allSteps(Board, Color) -> [Step]\n\n"
-      "Create an iterator object that goes through all possible steps for a given player from a given position");
+      "Create an iteratoor object that goes through all possible steps for a given player from a given position");
+
+  scope().attr("MAX_STEPS") = apns::MAX_STEPS;
 }
 

@@ -730,6 +730,16 @@ std::size_t cut(vertex& parent) {
   return cut_counter.count - 1;  // parent has been counted but not removed.
 }
 
+namespace {
+
+void undo_add_child(vertex& parent, std::size_t& size) {
+  assert(parent.children_count() == 1);
+  parent.remove_child(parent.children_begin());
+  --size;
+}
+
+}
+
 bool simulate(search_stack& stack, piece::color_t attacker,
               std::size_t& size,
               killer_db const& killers,
@@ -745,7 +755,8 @@ bool simulate(search_stack& stack, piece::color_t attacker,
     killer != killers.level_end(level, parent.type);
     ++killer
   ) {
-    if (killer->revalidate(position, player)) {
+    if (killer->revalidate(position, player) &&
+        parent.steps_remaining - killer->steps_used() >= 0) {
       assert(parent.leaf());
 
       // First append the step as a new child of opposite type (so that it makes
@@ -758,6 +769,12 @@ bool simulate(search_stack& stack, piece::color_t attacker,
 
       vertex::children_iterator child = parent.add_child();
       ++size;
+
+      transaction child_added(boost::bind(
+        &undo_add_child,
+        boost::ref(parent),
+        boost::ref(size)
+      ));
 
       child->step = *killer;
       child->proof_number = child->disproof_number = 1;
@@ -773,6 +790,12 @@ bool simulate(search_stack& stack, piece::color_t attacker,
 
       if (cutoff(parent, *child)) {
         log << stack << " proved by simulation\n";
+
+        update_numbers(parent);
+        assert(parent.proof_number == 0 || parent.disproof_number == 0);
+
+        child_added.commit();
+
         return true;
       } else {
         // No proof -- flip the type, set the apropriate number of remaining
@@ -785,11 +808,14 @@ bool simulate(search_stack& stack, piece::color_t attacker,
 
           bool const success = simulate(stack, attacker, size,
                                         killers, proof_tbl, log);
-          if (success)
-            return true;
-        }
+          if (success) {
+            update_numbers(parent);
+            assert(parent.proof_number == 0 || parent.disproof_number == 0);
 
-        size -= cut(parent);
+            child_added.commit();
+            return true;
+          }
+        }
       }
     }
   }

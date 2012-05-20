@@ -56,7 +56,7 @@ def loadBoard(filename):
         else:
           raise RuntimeError('Bad input file format: Invalid column labelling')
 
-      elif lastLine[charIndex] in (' ', '\n'):
+      elif lastLine[charIndex] in (' ', '\n', '\r'):
         pass  # Space and newline are okay, just skip them.
       else:
         raise RuntimeError(
