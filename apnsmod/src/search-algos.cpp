@@ -239,11 +239,13 @@ void history_table::sort(vertex& v) const {
 
     for (vertex::children_iterator child = sorted_end; 
          child != v.children_end(); ++child) {
-      history_table::table_t::const_iterator value = table_.find(*child->step);
-      if (value != table_.end() &&
-          (value->second > max_value || max == v.children_end())) {
-        max = child;
-        max_value = value->second;
+      if (child->step) {
+        history_table::table_t::const_iterator value = table_.find(*child->step);
+        if (value != table_.end() &&
+            (value->second > max_value || max == v.children_end())) {
+          max = child;
+          max_value = value->second;
+        }
       }
     }
 
@@ -342,7 +344,6 @@ void search_stack::push(vertex* v) {
   assert(!path_.empty());
   assert(!hashes_.empty());
   assert(!history_.empty());
-  assert(v->step);
   assert(hasher_);
 
   vertex* const                 parent        = path_.back();
@@ -350,21 +351,28 @@ void search_stack::push(vertex* v) {
   piece::color_t const          parent_player =
     vertex_player(*parent, attacker_);
   piece::color_t const          v_player      = vertex_player(*v, attacker_);
-  zobrist_hasher::hash_t const  v_hash        = hasher_->update(
-    parent_hash,
-    v->step->step_sequence_begin(), v->step->step_sequence_end(),
-    parent_player, v_player
-  );
+  zobrist_hasher::hash_t const  v_hash        =
+    v->step
+    ?
+      hasher_->update(
+        parent_hash,
+        v->step->step_sequence_begin(), v->step->step_sequence_end(),
+        parent_player, v_player
+      )
+    : zobrist_hasher::hash_t();
 
   int stage = 0;
 
   try {
     path_.push_back(v); ++stage;
-    hashes_.push_back(v_hash); ++stage;
 
-    if (v->type != parent->type) {
-      history_.push_back(v_hash);
-      ++stage;
+    if (v->step) {
+      hashes_.push_back(v_hash); ++stage;
+
+      if (v->type != parent->type) {
+        history_.push_back(v_hash);
+        ++stage;
+      }
     }
   } catch (...) {
     switch (stage) {
@@ -382,23 +390,24 @@ void search_stack::pop() {
     throw std::logic_error("pop: Attempted to pop root");
 
   assert(path_.size() >= 2);
-  assert(hashes_.size() >= 2);
 
   vertex* const top = path_.back();
   vertex* const parent = *(path_.end() - 2);
 
-  assert(top->step);
-
   if (state_pos_ == path_.size() - 1) {
-    unapply(*top->step, state_);
+    if (top->step)
+      unapply(*top->step, state_);
     --state_pos_;
   }
 
   path_.pop_back();
-  hashes_.pop_back();
 
-  if (top->type != parent->type)
-    history_.pop_back();
+  if (top->step) {
+    hashes_.pop_back();
+
+    if (top->type != parent->type)
+      history_.pop_back();
+  }
 }
 
 void search_stack::reset_to_root() {
@@ -411,7 +420,8 @@ board const& search_stack::state() const {
 
   while (state_pos_ != path_.size() - 1) {
     ++state_pos_;
-    apply(*path_[state_pos_]->step, state_);
+    if (path_[state_pos_]->step)
+      apply(*path_[state_pos_]->step, state_);
   }
 
   assert(state_pos_ == path_.size() - 1);
@@ -442,7 +452,9 @@ std::ostream& format_path(
   apns::search_stack::path_sequence::const_iterator v = begin;
   while (v != end) {
     out << (v != begin ? " -> " : "")
-        << ((**v).step ? (**v).step->to_string() : "root")
+        << ((**v).step ?
+            (**v).step->to_string() :
+            (v == begin ? "root" : "pass"))
         << " (" << ((**v).type == apns::vertex::type_or ? "OR" : "AND") << ")";
 
     ++v;
@@ -504,7 +516,8 @@ void killer_order(killer_db const& killers, std::size_t level, vertex& v) {
     child != v.children_end();
     ++child
   ) {
-    if (child != killers_end && killers.is_killer(level, v.type, *child->step))
+    if (child != killers_end && child->step &&
+        killers.is_killer(level, v.type, *child->step))
       v.swap_children(child, killers_end++);
   }
 }
@@ -518,6 +531,9 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker) {
   steps_seq steps;
 
   piece::color_t const player = vertex_player(leaf, attacker);
+  std::size_t player_steps = 0;
+  std::size_t opponent_steps = 0;
+
   for (all_steps_iter new_step = all_steps_begin(state, player);
        new_step != all_steps_end(); ++new_step) {
     int const remaining =
@@ -525,32 +541,50 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker) {
 
     if (remaining >= 0) {
       steps.push_back(std::make_pair(*new_step, opposite_type(leaf.type)));
-      if (remaining >= 1)
+      ++opponent_steps;
+
+      if (remaining >= 1) {
         steps.push_back(std::make_pair(*new_step, leaf.type));
+        ++player_steps;
+      }
     }
   }
 
-  leaf.resize(steps.size());
+  leaf.resize(player_steps);
+  vertex* opponent_root = opponent_steps > 0 ? make_lambdas(leaf) : 0;
+  if (opponent_root)
+    opponent_root->resize(opponent_steps);
 
   vertex::children_iterator child = leaf.children_begin();
+  vertex::children_iterator opponent_child =
+    opponent_root
+      ? opponent_root->children_begin()
+      : vertex::children_iterator();
+
   for (steps_seq::const_iterator s = steps.begin(); s != steps.end(); 
-       ++s, ++child) {
-    child->step = s->first;
-    child->type = s->second;
+       ++s) {
+    assert(s->second == leaf.type || opponent_root != 0);
 
-    if (child->type == leaf.type)
-      child->steps_remaining =
-        leaf.steps_remaining - static_cast<signed>(child->step->steps_used());
+    vertex::children_iterator current =
+      s->second == leaf.type ? child++ : opponent_child++;
+
+    current->step = s->first;
+    current->type = s->second;
+
+    if (current->type == leaf.type)
+      current->steps_remaining =
+        leaf.steps_remaining - static_cast<signed>(current->step->steps_used());
     else
-      child->steps_remaining = MAX_STEPS;
+      current->steps_remaining = MAX_STEPS;
 
-    child->proof_number = 1;
-    child->disproof_number = 1;
+    current->proof_number = 1;
+    current->disproof_number = 1;
 
-    assert(child->step);
+    assert(current->step);
   }
 
-  return leaf.children_count();
+  // Don't forget to count lambda vertices in as well.
+  return player_steps + opponent_steps + (leaf.steps_remaining - 1);
 }
 
 void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
@@ -822,6 +856,20 @@ bool simulate(search_stack& stack, piece::color_t attacker,
 
   assert(parent.leaf());
   return false;
+}
+
+vertex* make_lambdas(vertex& parent) {
+  vertex* current = &parent;
+
+  while (current->steps_remaining > 1) {
+    std::size_t steps = current->steps_remaining - 1;
+    current = &*current->add_child();
+    current->type = parent.type;
+    current->proof_number = current->disproof_number = 1;
+    current->steps_remaining = steps;
+  }
+
+  return current;
 }
 
 void proof_number_search::do_iterate() {

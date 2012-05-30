@@ -92,10 +92,10 @@ def main():
   #parser.add_argument('-M', '--move-cache-size', type=int, default=32,
   #                    metavar='move cache size', dest='moveCacheSize',
   #                    help='Size of the move cache')
-  parser.add_argument('-g', '--gc-low', type=int, default=0,
+  parser.add_argument('-g', '--gc-low', type=int, default=5000000,
                       metavar='gc low', dest='gcLow',
                       help='Garbage collector low threshold.')
-  parser.add_argument('-G', '--gc-high', type=int, default=0,
+  parser.add_argument('-G', '--gc-high', type=int, default=3000000,
                       metavar='gc high', dest='gcHigh',
                       help='Garbage collector high threshold.')
   parser.add_argument('-q', '--quiet', const=True, default=False,

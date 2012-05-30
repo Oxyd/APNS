@@ -416,6 +416,9 @@ inline bool cutoff(vertex const& parent, vertex const& child) {
     (parent.type == vertex::type_and && child.disproof_number == 0);
 }
 
+//! Create a sequence of lambda vertices and return pointer to the last one.
+vertex* make_lambdas(vertex& parent);
+
 //! A CRTP base class for search algorithms.
 template <typename Algo>
 class search_algo : private boost::noncopyable {

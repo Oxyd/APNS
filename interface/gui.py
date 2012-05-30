@@ -496,8 +496,13 @@ class ResultsController(object):
       self._best = best
       self.principal = principal
 
-      name = 'root' if self.vertex.step is None \
-                    else self.vertex.step.toString()
+      if self.vertex.step is not None:
+        name = self.vertex.step.toString()
+      elif parent is not None:
+        name = 'lambda'
+      else:
+        name = 'root'
+      
       parent = self.parent.handle if self.parent is not None else None
       self.handle = display.addNode(parent, name, self._getType(),
                                     strFromNum(self.vertex.proofNumber),
@@ -1539,8 +1544,8 @@ class SearchProgressDialog(Observable):
     killerCountLbl      = ttk.Label(stats, text='Total killer count:')
     #moveCacheHitsLbl    = ttk.Label(stats, text='Move cache hits:')
     #moveCacheMissesLbl  = ttk.Label(stats, text='Move cache misses:')
-    posCountLbl         = ttk.Label(stats, text='Unique positions total:')
-    posPerSecLbl        = ttk.Label(stats, text='New positions per second:')
+    posCountLbl         = ttk.Label(stats, text='Vertex count:')
+    posPerSecLbl        = ttk.Label(stats, text='New vertices per second:')
 
     self._memoryAlloc     = ttk.Label(stats)
     self._transTblSize    = ttk.Label(stats)
