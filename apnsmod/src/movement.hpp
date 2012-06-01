@@ -356,7 +356,9 @@ private:
 };
 
 inline bool operator == (step_holder const& lhs, step_holder const& rhs) {
-  return (lhs.empty() && rhs.empty()) || (*lhs == *rhs);
+  return
+    (lhs.empty() && rhs.empty()) ||
+    (!lhs.empty() && !rhs.empty() && *lhs == *rhs);
 }
 
 inline bool operator != (step_holder const& lhs, step_holder const& rhs) {

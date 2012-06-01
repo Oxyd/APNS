@@ -522,69 +522,75 @@ void killer_order(killer_db const& killers, std::size_t level, vertex& v) {
   }
 }
 
+namespace {
+
+template <typename Iter>
+void append_steps(Iter begin, Iter end, vertex& leaf, vertex::e_type type) {
+  while (begin != end) {
+    vertex& child = *leaf.add_child();
+    child.step            = *begin++;
+    child.type            = type;
+    child.steps_remaining =
+      type == leaf.type
+        ? leaf.steps_remaining - child.step->steps_used()
+        : MAX_STEPS;
+    child.proof_number    =
+    child.disproof_number = 1;
+  }
+}
+
+}
+
 std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker) {
   if (!leaf.leaf())
     throw std::logic_error("expand: Attempt to expand a non-leaf vertex");
 
-  // Make a list of all possible steps.
   typedef std::vector<std::pair<step, vertex::e_type> > steps_seq;
+
   steps_seq steps;
+  piece::color_t player = vertex_player(leaf, attacker);
 
-  piece::color_t const player = vertex_player(leaf, attacker);
-  std::size_t player_steps = 0;
-  std::size_t opponent_steps = 0;
-
-  for (all_steps_iter new_step = all_steps_begin(state, player);
-       new_step != all_steps_end(); ++new_step) {
+  for (
+    all_steps_iter new_step = all_steps_begin(state, player);
+    new_step != all_steps_end();
+    ++new_step
+  ) {
     int const remaining =
       leaf.steps_remaining - static_cast<signed>(new_step->steps_used());
 
-    if (remaining >= 0) {
+    if (remaining >= 1)
+      steps.push_back(std::make_pair(*new_step, leaf.type));
+    else if (remaining == 0)
       steps.push_back(std::make_pair(*new_step, opposite_type(leaf.type)));
-      ++opponent_steps;
-
-      if (remaining >= 1) {
-        steps.push_back(std::make_pair(*new_step, leaf.type));
-        ++player_steps;
-      }
-    }
   }
 
-  leaf.resize(player_steps);
-  vertex* opponent_root = opponent_steps > 0 ? make_lambdas(leaf) : 0;
-  if (opponent_root)
-    opponent_root->resize(opponent_steps);
+  bool const make_lambda = leaf.steps_remaining > 1;
 
+  leaf.resize(steps.size() + (make_lambda ? 1 : 0));
   vertex::children_iterator child = leaf.children_begin();
-  vertex::children_iterator opponent_child =
-    opponent_root
-      ? opponent_root->children_begin()
-      : vertex::children_iterator();
 
-  for (steps_seq::const_iterator s = steps.begin(); s != steps.end(); 
-       ++s) {
-    assert(s->second == leaf.type || opponent_root != 0);
-
-    vertex::children_iterator current =
-      s->second == leaf.type ? child++ : opponent_child++;
-
-    current->step = s->first;
-    current->type = s->second;
-
-    if (current->type == leaf.type)
-      current->steps_remaining =
-        leaf.steps_remaining - static_cast<signed>(current->step->steps_used());
+  for (
+    steps_seq::const_iterator step = steps.begin();
+    step != steps.end();
+    ++step, ++child
+  ) {
+    child->proof_number = child->disproof_number = 1;
+    child->step = step->first;
+    child->type = step->second;
+    if (child->type == leaf.type)
+      child->steps_remaining = leaf.steps_remaining - child->step->steps_used();
     else
-      current->steps_remaining = MAX_STEPS;
-
-    current->proof_number = 1;
-    current->disproof_number = 1;
-
-    assert(current->step);
+      child->steps_remaining = MAX_STEPS;
   }
 
-  // Don't forget to count lambda vertices in as well.
-  return player_steps + opponent_steps + (leaf.steps_remaining - 1);
+  if (make_lambda) {
+    assert(child != leaf.children_end());
+    child->proof_number = child->disproof_number = 1;
+    child->type = leaf.type;
+    child->steps_remaining = leaf.steps_remaining - 1;
+  }
+
+  return leaf.children_count();
 }
 
 void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
@@ -858,20 +864,6 @@ bool simulate(search_stack& stack, piece::color_t attacker,
   return false;
 }
 
-vertex* make_lambdas(vertex& parent) {
-  vertex* current = &parent;
-
-  while (current->steps_remaining > 1) {
-    std::size_t steps = current->steps_remaining - 1;
-    current = &*current->add_child();
-    current->type = parent.type;
-    current->proof_number = current->disproof_number = 1;
-    current->steps_remaining = steps;
-  }
-
-  return current;
-}
-
 void proof_number_search::do_iterate() {
   assert(game_);
   assert(!game_->root.step);
@@ -1034,6 +1026,7 @@ depth_first_pns::make_limits(
     second_best ? (*second_best).*min_num : vertex::infty;
   new_limits.*min_lim = std::min(
     parent_limits.*min_lim,
+    //second_num + 1
     static_cast<vertex::number_t>(std::ceil(second_num * (1 + EPSILON)))
   );
 

@@ -416,8 +416,15 @@ inline bool cutoff(vertex const& parent, vertex const& child) {
     (parent.type == vertex::type_and && child.disproof_number == 0);
 }
 
-//! Create a sequence of lambda vertices and return pointer to the last one.
-vertex* make_lambdas(vertex& parent);
+//! Is given vertex a lambda step?
+inline bool is_lambda(vertex const& v) {
+  return v.step == step_holder::none;
+}
+
+//! Get the depth (in levels) of the top vertex.
+inline std::size_t level(search_stack const& stack) {
+  return stack.path().size();
+}
 
 //! A CRTP base class for search algorithms.
 template <typename Algo>
@@ -574,7 +581,7 @@ protected:
   }
 
   void store_in_ht(vertex const& v, std::size_t level) {
-    if (history_tbl_) {
+    if (history_tbl_ && v.step) {
       history_tbl_->insert(*v.step, level);
 
       *log_ << v.step->to_string()
@@ -585,7 +592,7 @@ protected:
 
   void store_in_killer_db(std::size_t level, vertex::e_type parent_type,
                           vertex const& v) {
-    if (killer_db_) {
+    if (killer_db_ && v.step) {
       killer_db_->add(level, parent_type, *v.step);
 
       *log_ << v.step->to_string()
@@ -601,13 +608,13 @@ protected:
     zobrist_hasher::hash_t hash, std::size_t ply,
     vertex const& v
   ) {
-    if (proof_tbl_)
+    if (proof_tbl_ && v.step)
       pt_store(*proof_tbl_, v, hash, ply, history_begin, history_end);
   }
 
   void store_in_tt(zobrist_hasher::hash_t hash, std::size_t ply,
                    vertex const& v) {
-    if (trans_tbl_)
+    if (trans_tbl_ && v.step)
       tt_store(*trans_tbl_, v, hash, ply);
   }
 
@@ -624,27 +631,29 @@ protected:
 
     update_numbers(current);
 
-    bool const numbers_changed = current.proof_number != old_pn ||
-                                 current.disproof_number != old_dn;
-    bool const proved = current.proof_number == 0 ||
-                        current.disproof_number == 0;
-    bool const cutoff = parent && apns::cutoff(*parent, current);
+    if (!is_lambda(current)) {
+      bool const numbers_changed = current.proof_number != old_pn ||
+                                   current.disproof_number != old_dn;
+      bool const proved = current.proof_number == 0 ||
+                          current.disproof_number == 0;
+      bool const cutoff = parent && apns::cutoff(*parent, current);
 
-    if (proved && numbers_changed)
-      log_proof(path_begin, path_end);
+      if (proved && numbers_changed)
+        log_proof(path_begin, path_end);
 
-    std::size_t const level = std::distance(path_begin, path_end);
+      std::size_t const level = std::distance(path_begin, path_end);
 
-    if (cutoff) {
-      store_in_ht(current, level);
-      if (parent)
-        store_in_killer_db(level, parent->type, current);
+      if (cutoff) {
+        store_in_ht(current, level);
+        if (parent)
+          store_in_killer_db(level, parent->type, current);
+      }
+
+      if (proved)
+        store_in_pt(history_begin, history_end, level, hash, current);
+      else
+        store_in_tt(hash, level, current);
     }
-
-    if (proved)
-      store_in_pt(history_begin, history_end, level, hash, current);
-    else
-      store_in_tt(hash, level, current);
   }
 
   void expand_and_eval() {
