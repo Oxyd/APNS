@@ -426,7 +426,7 @@ step_holder step::from_string(std::string const& string) {
 }
 
 bool step::revalidate(board const& board, piece::color_t player) const {
-  el_steps_iterator second_noncapture = std::find_if(
+  iterator second_noncapture = std::find_if(
     boost::next(step_sequence_begin()), step_sequence_end(),
     !boost::bind(&elementary_step::capture, _1)
   );
@@ -438,7 +438,7 @@ bool step::revalidate(board const& board, piece::color_t player) const {
     case ordinary: {
       new_step = step::validate_ordinary_step(board, *step_sequence_begin());
       if (new_step) {
-        el_steps_iterator first = new_step->step_sequence_begin();
+        iterator first = new_step->step_sequence_begin();
         assert(first->what());
 
         if (first->what()->color() != player)
@@ -478,7 +478,7 @@ bool step::revalidate(board const& board, piece::color_t player) const {
 }
 
 bool step::capture() const {
-  for (el_steps_iterator el_step = step_sequence_begin();
+  for (iterator el_step = step_sequence_begin();
        el_step != step_sequence_end(); ++el_step)
     if (el_step->capture())
       return true;
@@ -489,13 +489,13 @@ std::string step::to_string() const {
   return representation_;
 }
 
-step::el_steps_iterator step::step_sequence_begin() const {
-  return el_steps_iterator(representation_.get().begin(), 
+step::iterator step::step_sequence_begin() const {
+  return iterator(representation_.get().begin(), 
                            representation_.get().end());
 }
 
-step::el_steps_iterator step::step_sequence_end() const {
-  return el_steps_iterator(representation_.get().end(),
+step::iterator step::step_sequence_end() const {
+  return iterator(representation_.get().end(),
                            representation_.get().end());
 }
 
@@ -554,8 +554,8 @@ step step::make_push_pull(board const& board, elementary_step first_step,
 step_holder step_holder::none;
 
 bool operator == (step const& lhs, step const& rhs) {
-  step::el_steps_iterator left = lhs.step_sequence_begin();
-  step::el_steps_iterator right = rhs.step_sequence_begin();
+  step::iterator left = lhs.step_sequence_begin();
+  step::iterator right = rhs.step_sequence_begin();
 
   for (; left != lhs.step_sequence_end() && right != rhs.step_sequence_end(); 
        ++left, ++right)
@@ -654,7 +654,7 @@ void apply(step const& step, board& board) {
 }
 
 bool try_apply(step const& step, board& board) {
-  for (apns::step::el_steps_iterator es = step.step_sequence_begin();
+  for (apns::step::iterator es = step.step_sequence_begin();
        es != step.step_sequence_end(); ++es) {
     if (!apply_elementary(*es, board)) {
       // The application has failed. We now need to roll back everything 

@@ -364,7 +364,7 @@ void search_stack::push(vertex* v) {
       ? hasher_->update(
           parent_hash,
           v->step->step_sequence_begin(), v->step->step_sequence_end(),
-          parent_player, v_player
+          parent_player, v_player, parent->steps_remaining
         )
       : parent_hash;
 
@@ -552,7 +552,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
       zobrist_hasher::hash_t child_hash = hasher.update(
         last(move_hist),
         new_step->step_sequence_begin(), new_step->step_sequence_end(),
-        player, player
+        player, player, leaf.steps_remaining
       );
       if (std::find(move_hist.begin(), move_hist.end(), child_hash) ==
           move_hist.end())

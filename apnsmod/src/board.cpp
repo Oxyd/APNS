@@ -404,8 +404,29 @@ bool empty(position pos, board const& board) {
 }
 
 bool trap(position pos) {
-  return (pos.column() == 'c' && (pos.row() == 3 || pos.row() == 6)) ||
-         (pos.column() == 'f' && (pos.row() == 3 || pos.row() == 6));
+  return board::mask::TRAPS[pos];
+}
+
+board_masks masks_from_board(board const& board) {
+  board_masks result;
+  for (board::iterator it = board.begin(); it != board.end(); ++it) {
+    result.occupied[it->first] = true;
+    result.players[index_from_color(it->second.color())][it->first] = true;
+    result.types[index_from_type(it->second.type())][it->first] = true;
+  }
+
+  return result;
+}
+
+board::mask neighbourhood(position pos) {
+  board::mask center;
+  center[pos] = true;
+  return
+    center.shift(north) |
+    center.shift(south) |
+    center.shift(east)  |
+    center.shift(west)
+    ;
 }
 
 directions_iter directions_begin() {

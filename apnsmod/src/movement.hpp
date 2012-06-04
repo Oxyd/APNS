@@ -171,8 +171,8 @@ class step {
 
 public:
   //! Iterator over the sequence of elementary steps.
-  struct el_steps_iterator : boost::iterator_facade<
-    el_steps_iterator, 
+  struct iterator : boost::iterator_facade<
+    iterator, 
     elementary_step const, 
     boost::bidirectional_traversal_tag,
     elementary_step const
@@ -194,7 +194,7 @@ public:
         position_ -= 5;
     }
 
-    bool equal(el_steps_iterator const& other) const {
+    bool equal(iterator const& other) const {
       return position_ == other.position_; 
     }
 
@@ -204,13 +204,13 @@ public:
     std::string::const_iterator position_;
     std::string::const_iterator end_;
 
-    explicit el_steps_iterator(std::string::const_iterator pos,
+    explicit iterator(std::string::const_iterator pos,
                                std::string::const_iterator end) 
       : position_(pos), end_(end) 
     { }
   };
 
-  typedef boost::reverse_iterator<el_steps_iterator> reverse_el_steps_iterator;
+  typedef boost::reverse_iterator<iterator> reverse_el_steps_iterator;
 
   //! Validate and possibly construct an ordinary step.
   //! \param board The board which is to be affected by this step.
@@ -256,8 +256,8 @@ public:
   //! Get the beginning of the full sequence of elementary steps that
   //! represent this one step. Elementary steps in this sequence are
   //! guaranteed to have a non-empty value for the elementary_step::what member.
-  el_steps_iterator step_sequence_begin() const;
-  el_steps_iterator step_sequence_end() const;
+  iterator step_sequence_begin() const;
+  iterator step_sequence_end() const;
 
   reverse_el_steps_iterator step_sequence_rbegin() const;
   reverse_el_steps_iterator step_sequence_rend() const;

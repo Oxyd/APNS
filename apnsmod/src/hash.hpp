@@ -53,7 +53,8 @@ public:
    * \param steps_remaining How many steps does the player have remaining?
    * \return The hash value.
    */
-  hash_t generate_initial(board const& board, piece::color_t on_move) const;
+  hash_t generate_initial(board const& board, piece::color_t on_move,
+                          int steps_remaining) const;
 
   /**
    * Update the hash value after the situation on board has changed.
@@ -62,17 +63,16 @@ public:
    * \param steps_begin Beginning of a sequence of elementary steps that 
    *   describe the movement of the pieces on the board.
    * \param steps_end End of the sequence of elementary steps.
-   * \param current_steps_remaining How many steps were remaining for the 
-   *   current player before having made this step?
-   * \param next_steps_remaining How many steps remain for the next player 
-   *   after having made this step?
    * \param current_player Who made the steps described?
    * \param next_player Whose turn is it now?
+   * \param steps_remaining Number of remaining steps before this the steps
+   *        were made.
    */
   template <typename Iter>
     hash_t update(
       hash_t old_hash, Iter steps_begin, Iter steps_end, 
-      piece::color_t current_player, piece::color_t next_player
+      piece::color_t current_player, piece::color_t next_player,
+      int steps_remaining
     ) const;
 
   //! Given a hash, return the hash value corresponding to the same board 
@@ -86,18 +86,24 @@ public:
 private:
   typedef boost::multi_array<hash_t, 4>   codes_cont;
   typedef boost::array<hash_t, 2>         players_cont;
-  typedef boost::array<hash_t, 4>         steps_cont;
 
   codes_cont    codes_;
   players_cont  players_;
+  hash_t        admits_double_;
 };
 
 template <typename Iter>
 zobrist_hasher::hash_t zobrist_hasher::update(
   hash_t old_hash, Iter steps_begin, Iter steps_end, 
-  piece::color_t current_player, piece::color_t next_player
+  piece::color_t current_player, piece::color_t next_player,
+  int steps_remaining
 ) const {
+  assert(steps_remaining > 0 && steps_remaining <= signed(MAX_STEPS));
+
   hash_t hash = old_hash;
+
+  if (steps_remaining >= 2)
+    hash ^= admits_double_;
 
   for (Iter step = steps_begin; step != steps_end; ++step) {
     position const& old_position = step->from();
@@ -116,11 +122,15 @@ zobrist_hasher::hash_t zobrist_hasher::update(
                     [index_from_color(piece.color())]
                     [new_position.row() - position::MIN_ROW]
                     [new_position.column() - position::MIN_COLUMN];
+      --steps_remaining;
     }
   }
 
   hash ^= players_[current_player];
   hash ^= players_[next_player];
+
+  if (steps_remaining >= 2 || current_player != next_player)
+    hash ^= admits_double_;
 
   return hash;
 }

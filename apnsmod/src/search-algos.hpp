@@ -575,7 +575,8 @@ protected:
               std::size_t position_count = 1) 
     : game_(game)
     , initial_hash_(
-        hasher_.generate_initial(game->initial_state, game->attacker)
+        hasher_.generate_initial(game->initial_state, game->attacker,
+                                 MAX_STEPS)
       )
     , stack_(hasher_, initial_hash_, &game_->root, game_->attacker,
              game_->initial_state)

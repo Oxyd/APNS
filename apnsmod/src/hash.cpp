@@ -1,5 +1,6 @@
 #include "hash.hpp"
 #include "board.hpp"
+#include "movement.hpp"
 
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
@@ -38,10 +39,12 @@ apns::zobrist_hasher::zobrist_hasher()
 
   for (std::size_t player = 0; player < piece::color_count; ++player)
     players_[player] = rand_distrib(prng);
+
+  admits_double_ = rand_distrib(prng);
 }
 
 apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(
-  board const& board, piece::color_t on_move
+  board const& board, piece::color_t on_move, int steps_remaining
 ) const {
   hash_t hash = 0;
 
@@ -57,6 +60,9 @@ apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(
   }
 
   hash ^= players_[on_move];
+
+  if (steps_remaining >= 2)
+    hash ^= admits_double_;
 
   return hash;
 }

@@ -151,8 +151,10 @@ TEST(search_stack, push_pop_test) {
   b.put(position(8, 'h'), piece(piece::silver, piece::cat));
 
   zobrist_hasher hasher;
-  zobrist_hasher::hash_t root_hash = hasher.generate_initial(b, piece::gold);
+  zobrist_hasher::hash_t root_hash =
+    hasher.generate_initial(b, piece::gold, MAX_STEPS);
   vertex root;
+  root.steps_remaining = MAX_STEPS;
 
   search_stack stack(hasher, root_hash, &root, piece::gold, b);
 
@@ -172,6 +174,7 @@ TEST(search_stack, push_pop_test) {
   vertex* child = &*root.children_begin();
   child->step = step::validate_ordinary_step(b, elementary_step::displacement(position(1, 'a'), north));
   child->type = vertex::type_or;
+  child->steps_remaining = MAX_STEPS - 1;
 
   stack.push(child);
 
@@ -183,7 +186,8 @@ TEST(search_stack, push_pop_test) {
 
   board child_board(b);
   apply(*child->step, child_board);
-  zobrist_hasher::hash_t child_hash = hasher.generate_initial(child_board, piece::gold);
+  zobrist_hasher::hash_t child_hash =
+    hasher.generate_initial(child_board, piece::gold, MAX_STEPS - 1);
 
   EXPECT_FALSE(stack.at_root());
   EXPECT_EQ(child_hash, stack.hashes().back());
@@ -194,11 +198,13 @@ TEST(search_stack, push_pop_test) {
   vertex* second_child = &*child->children_begin();
   second_child->step = step::validate_ordinary_step(child_board, elementary_step::displacement(position(8, 'h'), south));
   second_child->type = vertex::type_and;
+  second_child->steps_remaining = MAX_STEPS - 2;
 
   board second_child_board(child_board);
   apply(*second_child->step, second_child_board);
 
-  zobrist_hasher::hash_t second_child_hash = hasher.generate_initial(second_child_board, piece::silver);
+  zobrist_hasher::hash_t second_child_hash =
+    hasher.generate_initial(second_child_board, piece::silver, MAX_STEPS - 2);
 
   stack.push(second_child);
 
@@ -233,16 +239,21 @@ TEST(search_stack, checkpoint_test) {
   b.put(position(8, 'h'), piece(piece::silver, piece::cat));
 
   zobrist_hasher hasher;
-  zobrist_hasher::hash_t root_hash = hasher.generate_initial(b, piece::gold);
+  zobrist_hasher::hash_t root_hash =
+    hasher.generate_initial(b, piece::gold, MAX_STEPS);
   vertex root;
+  root.steps_remaining = MAX_STEPS;
 
   search_stack stack(hasher, root_hash, &root, piece::gold, b);
 
   root.resize(1);
   vertex* child = &*root.children_begin();
 
-  child->step = step::validate_ordinary_step(b, elementary_step::displacement(position(1, 'a'), north));
+  child->step = step::validate_ordinary_step(
+    b, elementary_step::displacement(position(1, 'a'), north)
+  );
   child->type = vertex::type_or;
+  child->steps_remaining = MAX_STEPS - 1;
 
   stack.push(child);
 
@@ -256,6 +267,7 @@ TEST(search_stack, checkpoint_test) {
     vertex* second_child = &*child->children_begin();
     second_child->step = step::validate_ordinary_step(child_board, elementary_step::displacement(position(2, 'a'), north));
     second_child->type = vertex::type_and;
+    second_child->steps_remaining = MAX_STEPS - 2;
 
     stack.push(second_child);
   }

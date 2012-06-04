@@ -627,6 +627,24 @@ bool empty(position pos, board const& board);
 /// Is the given position a trap?
 bool trap(position pos);
 
+/// Bitmask representation of a board.
+struct board_masks {
+  typedef boost::array<board::mask, colors_array_t::static_size>
+    player_masks_cont;
+  typedef boost::array<board::mask, types_array_t::static_size>
+    type_masks_cont;
+
+  board::mask       occupied;
+  player_masks_cont players;
+  type_masks_cont   types;
+};
+
+/// Convert board to bitmasks.
+board_masks masks_from_board(board const& b);
+
+/// Get a mask representing the valid neighbourhood of pos.
+board::mask neighbourhood(position pos);
+
 /// Iterator type going through all four possible directions.
 typedef direction const* directions_iter;
 

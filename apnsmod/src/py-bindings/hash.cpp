@@ -9,9 +9,12 @@ apns::zobrist_hasher::hash_t zobrist_hasher_update(
   apns::zobrist_hasher const& hasher,
   apns::zobrist_hasher::hash_t original,
   std::vector<apns::elementary_step> const& steps,
-  apns::piece::color_t from, apns::piece::color_t to)
+  apns::piece::color_t from, apns::piece::color_t to,
+  int steps_remaining)
 {
-  return hasher.update(original, steps.begin(), steps.end(), from, to);
+  return hasher.update(
+    original, steps.begin(), steps.end(), from, to, steps_remaining
+  );
 }
 
 template <typename Table>
