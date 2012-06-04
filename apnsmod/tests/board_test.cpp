@@ -58,6 +58,31 @@ TEST_F(position_test, linear_order) {
   EXPECT_TRUE(!(p1 < p5) && !(p5 < p1));
 }
 
+TEST_F(position_test, increment_test) {
+  position p1(board::MIN_ROW, board::MIN_COLUMN);
+  position p2(board::MIN_ROW, board::MIN_COLUMN);
+
+  for (std::size_t i = 0; i < board::ROWS * board::COLUMNS; ++i) {
+    position p3 = p1 + i;
+
+    position::row_t r = i / board::ROWS + board::MIN_ROW;
+    position::col_t c = i % board::COLUMNS + board::MIN_COLUMN;
+
+    EXPECT_EQ(r, p3.row());
+    EXPECT_EQ(c, p3.column());
+
+    EXPECT_EQ(r, p2.row());
+    EXPECT_EQ(c, p2.column());
+
+    ++p2;
+  }
+
+  EXPECT_THROW(++p2, std::logic_error);
+  EXPECT_THROW(p1 + 65, std::logic_error);
+  EXPECT_THROW(p1 - 1, std::logic_error);
+  EXPECT_THROW(--p1, std::logic_error);
+}
+
 TEST_F(position_test, make_adjacent_test) {
   position pos(1, 'a');
 
@@ -113,6 +138,22 @@ TEST_F(position_test, is_adjacent_valid_test) {
   EXPECT_EQ(adjacent_valid(pos, north), true);
   EXPECT_EQ(adjacent_valid(pos, west), true);
   EXPECT_EQ(adjacent_valid(pos, south), true);
+}
+
+TEST_F(position_test, order_test) {
+  position p1(1, 'a');
+  position p2(1, 'a');
+
+  for (std::size_t i = 0; i < board::ROWS * board::COLUMNS; ++i) {
+    position p3 = p1 + i;
+    EXPECT_EQ(i, p3.order());
+    EXPECT_EQ(i, p2.order());
+    ++p2;
+
+    position::row_t row = i / board::COLUMNS + board::MIN_ROW;
+    position::col_t col = i % board::COLUMNS + board::MIN_COLUMN;
+    EXPECT_EQ(i, position(row, col).order());
+  }
 }
 
 TEST_F(position_test, adjacent_test) {
@@ -361,6 +402,93 @@ TEST_F(adjacent_pieces_test, four_adjacent) {
   EXPECT_PRED3(expect_in_it, adjacent, piece::gold, piece::horse);
   EXPECT_PRED3(expect_in_it, adjacent, piece::silver, piece::cat);
   EXPECT_PRED3(expect_in_it, adjacent, piece::gold, piece::camel);
+}
+
+TEST(mask, set_get) {
+  board::mask m;
+  m.set(position(2, 'c'), true);
+  EXPECT_TRUE(m.get(position(2, 'c')));
+
+  m.set(position(2, 'c'), false);
+  EXPECT_FALSE(m.get(position(2, 'c')));
+
+  EXPECT_FALSE(m.get(position(3, 'e')));
+
+  m.set(position(1, 'a'), true);
+  EXPECT_TRUE(m.get(position(1, 'a')));
+
+  m.set(position(8, 'h'), true);
+  EXPECT_TRUE(m.get(position(8, 'h')));
+}
+
+TEST(mask, row_test) {
+  for (position::row_t r = board::MIN_ROW; r <= board::MAX_ROW; ++r) {
+    board::mask m = board::mask::row(r);
+
+    for (position::row_t row = board::MIN_ROW; row <= board::MAX_ROW; ++row)
+      for (
+        position::col_t col = board::MIN_COLUMN;
+        col <= board::MAX_COLUMN;
+        ++col
+      )
+        if (row == r)
+          EXPECT_TRUE(m.get(position(row, col))) << row << ' ' << col;
+        else
+          EXPECT_FALSE(m.get(position(row, col))) << row << ' ' << col;
+  }
+}
+
+TEST(mask, column_test) {
+  for (position::col_t c = board::MIN_COLUMN; c <= board::MAX_COLUMN; ++c) {
+    board::mask m = board::mask::column(c);
+
+    for (position::row_t row = board::MIN_ROW; row <= board::MAX_ROW; ++row)
+      for (
+        position::col_t col = board::MIN_COLUMN;
+        col <= board::MAX_COLUMN;
+        ++col
+      )
+        if (col == c)
+          EXPECT_TRUE(m.get(position(row, col)));
+        else
+          EXPECT_FALSE(m.get(position(row, col)));
+  }
+}
+
+TEST(mask, set_test) {
+  board::mask m;
+  m.set(position(3, 'c'), true);
+  m.set(position(3, 'f'), true);
+  m.set(position(6, 'c'), true);
+  m.set(position(6, 'f'), true);
+
+  EXPECT_TRUE(board::mask::TRAPS == m);
+}
+
+TEST(mask, shift_test) {
+  EXPECT_EQ(board::mask::column('d'),
+            board::mask::column('e').shift(west));
+  EXPECT_EQ(board::mask::row(5),
+            board::mask::row(6).shift(south));
+  EXPECT_TRUE(board::mask::column('h').shift(east).empty());
+}
+
+TEST(mask, iteration) {
+  board::mask m;
+  m.set(position(1, 'a'), true);
+  m.set(position(3, 'g'), true);
+  m.set(position(8, 'a'), true);
+  m.set(position(8, 'h'), true);
+
+  std::set<position> result;
+  for (board::mask::iterator it = m.begin(); it != m.end(); ++it)
+    result.insert(*it);
+
+  EXPECT_EQ(4, result.size());
+  EXPECT_TRUE(result.find(position(1, 'a')) != result.end());
+  EXPECT_TRUE(result.find(position(3, 'g')) != result.end());
+  EXPECT_TRUE(result.find(position(8, 'a')) != result.end());
+  EXPECT_TRUE(result.find(position(8, 'h')) != result.end());
 }
 
 int main(int argc, char** argv) {

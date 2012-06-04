@@ -323,6 +323,22 @@ bool try_apply(move_path const& path, board& board);
 //! Unapply a move from a board.
 void unapply(move_path const& path, board& board);
 
+//! A sequence of hashes from the start of a move to one of its inner vertices.
+//! Some elements may be set to 0 value indicating that they are to be ignored.
+typedef boost::array<zobrist_hasher::hash_t, MAX_STEPS> move_history_seq;
+
+//! Get a move history for the move that leads to the current top vertex.
+move_history_seq move_history(search_stack const& stack);
+
+//! Get the last non-zero element of a move history.
+inline zobrist_hasher::hash_t last(move_history_seq const& mh) {
+  using namespace boost::lambda;
+  move_history_seq::const_reverse_iterator it =
+    std::find_if(mh.rbegin(), mh.rend(), _1 != 0);
+  assert(it != mh.rend());
+  return *it;
+}
+
 //! Get the parent of the top vertex. If the top is the root, returns 0.
 vertex* parent(search_stack const& stack);
 
@@ -341,9 +357,13 @@ void killer_order(killer_db const& killers, std::size_t level, vertex& v);
 //! \param leaf The leaf
 //! \param state State in the leaf.
 //! \param attacker Attacking player in the whole game.
+//! \param move_hist History of this move to avoid creating duplicate vertices.
+//! \param hasher Hasher instance used to create hashes stored in move_hist.
 //! \returns Number of new children.
 //! \throws std::logic_error if the vertex is not a leaf.
-std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker);
+std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
+                   move_history_seq const& move_hist,
+                   zobrist_hasher const& hasher);
 
 //! Evaluate the top of the stack.
 void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log);
@@ -662,7 +682,8 @@ protected:
                              proof_tbl_, *log_);
 
     if (!simulated) {
-      size_ += expand(*stack_.path_top(), stack_.state(), game_->attacker);
+      size_ += expand(*stack_.path_top(), stack_.state(), game_->attacker,
+                      move_history(stack_), hasher_);
       evaluate_children();
     }
   }
@@ -671,27 +692,29 @@ protected:
     vertex& current = *stack_.path_top();
     for (vertex::children_iterator child = current.children_begin();
          child != current.children_end(); ++child) {
-      search_stack_checkpoint checkpoint(stack_);
-      stack_.push(&*child);
+      if (!is_lambda(*child)) {
+        search_stack_checkpoint checkpoint(stack_);
+        stack_.push(&*child);
 
-      bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_);
-      if (!found_in_pt) {
-        bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_,
-                                                         stack_.hashes_top(),
-                                                         *child);
+        bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_);
+        if (!found_in_pt) {
+          bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_,
+                                                           stack_.hashes_top(),
+                                                           *child);
 
-        if (!found_in_tt)
-          evaluate(stack_, game_->attacker, *log_);
-      } else {
-        // found_in_pt
-        *log_ << stack_ << " proved by proof table\n";
-      }
+          if (!found_in_tt)
+            evaluate(stack_, game_->attacker, *log_);
+        } else {
+          // found_in_pt
+          *log_ << stack_ << " proved by proof table\n";
+        }
 
-      bool const cutoff = apns::cutoff(current, *child);
+        bool const cutoff = apns::cutoff(current, *child);
 
-      if (cutoff) {
-        store_in_ht(*child, stack_.size());
-        store_in_killer_db(stack_.size(), current.type, *child);
+        if (cutoff) {
+          store_in_ht(*child, stack_.size());
+          store_in_killer_db(stack_.size(), current.type, *child);
+        }
       }
     }
   }

@@ -194,6 +194,7 @@ two_best_successors(vertex& parent) {
 
     assert(best != second_best);
 
+    assert(&*best == best_successor(parent));
     return std::make_pair(&*best, &*second_best);
   } else {
     return std::make_pair(best_successor(parent),
@@ -240,7 +241,8 @@ void history_table::sort(vertex& v) const {
     for (vertex::children_iterator child = sorted_end; 
          child != v.children_end(); ++child) {
       if (child->step) {
-        history_table::table_t::const_iterator value = table_.find(*child->step);
+        history_table::table_t::const_iterator value =
+          table_.find(*child->step);
         if (value != table_.end() &&
             (value->second > max_value || max == v.children_end())) {
           max = child;
@@ -353,27 +355,19 @@ void search_stack::push(vertex* v) {
   piece::color_t const          v_player      = vertex_player(*v, attacker_);
   zobrist_hasher::hash_t const  v_hash        =
     v->step
-    ?
-      hasher_->update(
-        parent_hash,
-        v->step->step_sequence_begin(), v->step->step_sequence_end(),
-        parent_player, v_player
-      )
-    : zobrist_hasher::hash_t();
+      ? hasher_->update(
+          parent_hash,
+          v->step->step_sequence_begin(), v->step->step_sequence_end(),
+          parent_player, v_player
+        )
+      : parent_hash;
 
   int stage = 0;
 
   try {
     path_.push_back(v); ++stage;
-
-    if (v->step) {
-      hashes_.push_back(v_hash); ++stage;
-
-      if (v->type != parent->type) {
-        history_.push_back(v_hash);
-        ++stage;
-      }
-    }
+    hashes_.push_back(v_hash); ++stage;
+    if (v->type != parent->type) { history_.push_back(v_hash); ++stage; }
   } catch (...) {
     switch (stage) {
     case 3:   history_.pop_back();
@@ -401,13 +395,8 @@ void search_stack::pop() {
   }
 
   path_.pop_back();
-
-  if (top->step) {
-    hashes_.pop_back();
-
-    if (top->type != parent->type)
-      history_.pop_back();
-  }
+  hashes_.pop_back();
+  if (top->type != parent->type) history_.pop_back();
 }
 
 void search_stack::reset_to_root() {
@@ -454,7 +443,7 @@ std::ostream& format_path(
     out << (v != begin ? " -> " : "")
         << ((**v).step ?
             (**v).step->to_string() :
-            (v == begin ? "root" : "pass"))
+            (v == begin ? "root" : "lambda"))
         << " (" << ((**v).type == apns::vertex::type_or ? "OR" : "AND") << ")";
 
     ++v;
@@ -493,6 +482,18 @@ void unapply(move_path const& path, board& board) {
   }
 }
 
+move_history_seq move_history(search_stack const& stack) {
+  search_stack::path_sequence::const_reverse_iterator v = stack.path().rbegin();
+  search_stack::hashes_sequence::const_iterator hash = stack.hashes().end();
+  move_history_seq result = {{}};
+
+  vertex::e_type const type = stack.path_top()->type;
+  while (v != stack.path().rend() && (**v++).type == type) --hash;
+  std::copy(hash, stack.hashes().end(), result.begin());
+
+  return result;
+}
+
 vertex* parent(search_stack const& stack) {
   if (!stack.at_root())
     return *boost::next(stack.path().rbegin());
@@ -522,26 +523,9 @@ void killer_order(killer_db const& killers, std::size_t level, vertex& v) {
   }
 }
 
-namespace {
-
-template <typename Iter>
-void append_steps(Iter begin, Iter end, vertex& leaf, vertex::e_type type) {
-  while (begin != end) {
-    vertex& child = *leaf.add_child();
-    child.step            = *begin++;
-    child.type            = type;
-    child.steps_remaining =
-      type == leaf.type
-        ? leaf.steps_remaining - child.step->steps_used()
-        : MAX_STEPS;
-    child.proof_number    =
-    child.disproof_number = 1;
-  }
-}
-
-}
-
-std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker) {
+std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
+                   move_history_seq const& move_hist,
+                   zobrist_hasher const& hasher) {
   if (!leaf.leaf())
     throw std::logic_error("expand: Attempt to expand a non-leaf vertex");
 
@@ -558,9 +542,16 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker) {
     int const remaining =
       leaf.steps_remaining - static_cast<signed>(new_step->steps_used());
 
-    if (remaining >= 1)
-      steps.push_back(std::make_pair(*new_step, leaf.type));
-    else if (remaining == 0)
+    if (remaining >= 1) {
+      zobrist_hasher::hash_t child_hash = hasher.update(
+        last(move_hist),
+        new_step->step_sequence_begin(), new_step->step_sequence_end(),
+        player, player
+      );
+      if (std::find(move_hist.begin(), move_hist.end(), child_hash) ==
+          move_hist.end())
+        steps.push_back(std::make_pair(*new_step, leaf.type));
+    } else if (remaining == 0)
       steps.push_back(std::make_pair(*new_step, opposite_type(leaf.type)));
   }
 
@@ -599,42 +590,44 @@ void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
 
   piece::color_t const player = vertex_player(*parent, attacker);
 
-  // Only check for win if this is the start of a move and if a rabbit was
-  // moved or captured in this move.
-  if (child.type != parent->type) {
-    boost::optional<piece::color_t> winner;
+  boost::optional<piece::color_t> winner;
 
-    search_stack::path_sequence::const_reverse_iterator iter =
-      stack.path().rbegin();
+  // Only check for win if a rabbit was moved or captured in this move.
 
-    do {  // Iterate over the move.
-      vertex* const current = *iter;
-      if (current->step && current->step->moves_rabbit()) {
-        winner = apns::winner(stack.state(), player);
-        break;
-      }
+  search_stack::path_sequence::const_reverse_iterator iter =
+    stack.path().rbegin();
 
-      ++iter;
-    } while (iter != stack.path().rend() && (**iter).type == parent->type);
+  do {  // Iterate over the move.
+    vertex* const current = *iter;
+    if (current->step && current->step->moves_rabbit()) {
+      winner = apns::winner(stack.state(), player);
+      break;
+    }
 
-    if (winner) {
+    ++iter;
+  } while (iter != stack.path().rend() && (**iter).type == parent->type);
+
+  if (winner) {
+    // If this isn't the start of a move, only consider wins, not losses.
+
+    if (child.type != parent->type || *winner == player) {
       log << stack << " proved by evaluation function\n";
 
       if (*winner == attacker) {
         child.proof_number = 0;
         child.disproof_number = vertex::infty;
-      } else {
+      } else if (child.type != parent->type) {
         child.proof_number = vertex::infty;
         child.disproof_number = 0;
       }
-    } else {
-      // Last chance is losing due to a repetition.
-      if (repetition(stack)) {
-        log << stack << " proved by repetition\n";
+    }
+  } else if (child.type != parent->type) {
+    // Last chance is losing due to a repetition.
+    if (repetition(stack)) {
+      log << stack << " proved by repetition\n";
 
-        child.proof_number = player == attacker ? vertex::infty : 0;
-        child.disproof_number = player == attacker ? 0 : vertex::infty;
-      }
+      child.proof_number = player == attacker ? vertex::infty : 0;
+      child.disproof_number = player == attacker ? 0 : vertex::infty;
     }
   }
 }
@@ -915,7 +908,6 @@ void depth_first_pns::do_iterate() {
 
   // Go up while we're at a vertex whose numbers are off-limits.
   vertex* current = stack_.path_top();
-
   while (!stack_.at_root() &&
          (current->proof_number == 0 || 
           current->proof_number > limits_.back().pn_limit ||
@@ -926,15 +918,17 @@ void depth_first_pns::do_iterate() {
     stack_.pop();
     limits_.pop_back();
 
-    current = stack_.path_top();
-
     if (cut)
       size_ -= apns::cut(*current);
+
+    current = stack_.path_top();
 
     assert(!limits_.empty());
   }
 
   assert(current->proof_number > 0 && current->disproof_number > 0);
+  assert(current->proof_number <= limits_.back().pn_limit &&
+         current->disproof_number <= limits_.back().dn_limit);
 
   // And go back down until we reach a leaf.
   while (!current->leaf()) {
@@ -959,7 +953,8 @@ void depth_first_pns::do_iterate() {
     assert(current->disproof_number <= limits_.back().dn_limit);
   }
 
-  size_ += expand(*current, stack_.state(), game_->attacker);
+  size_ += expand(*current, stack_.state(), game_->attacker,
+                  move_history(stack_), hasher_);
   evaluate_children();
 
   search_stack::path_sequence::const_reverse_iterator
@@ -1005,25 +1000,25 @@ depth_first_pns::make_limits(
   boost::optional<vertex const&> second_best,
   limits_t parent_limits
 ) {
-  double const EPSILON = 0.1;
+  double const EPSILON = 0.5;
 
   vertex::number_t vertex::* min_num = 
-    parent.type == vertex::type_or ? &vertex::proof_number 
-                                   : &vertex::disproof_number;
+    v.type == vertex::type_or ? &vertex::proof_number
+                              : &vertex::disproof_number;
   vertex::number_t limits_t::* min_lim =
-    parent.type == vertex::type_or ? &limits_t::pn_limit 
-                                   : &limits_t::dn_limit;
+    v.type == vertex::type_or ? &limits_t::pn_limit
+                              : &limits_t::dn_limit;
   vertex::number_t vertex::* dif_num = 
-    parent.type == vertex::type_or ? &vertex::disproof_number 
-                                   : &vertex::proof_number;
+    v.type == vertex::type_or ? &vertex::disproof_number
+                              : &vertex::proof_number;
   vertex::number_t limits_t::* dif_lim =
-    parent.type == vertex::type_or ? &limits_t::dn_limit 
-                                   : &limits_t::pn_limit;
+    v.type == vertex::type_or ? &limits_t::dn_limit
+                              : &limits_t::pn_limit;
 
   limits_t new_limits;
 
   vertex::number_t second_num = 
-    second_best ? (*second_best).*min_num : vertex::infty;
+    second_best ? (*second_best).*min_num : v.*min_num;
   new_limits.*min_lim = std::min(
     parent_limits.*min_lim,
     //second_num + 1
@@ -1035,6 +1030,9 @@ depth_first_pns::make_limits(
       parent_limits.*dif_lim - parent.*dif_num + v.*dif_num;
   else
     new_limits.*dif_lim = vertex::infty;
+
+  assert(v.*min_num <= new_limits.*min_lim);
+  assert(v.*dif_num <= new_limits.*dif_lim);
 
   return new_limits;
 }

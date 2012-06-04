@@ -692,6 +692,38 @@ TEST(revalidate, push_capture) {
   EXPECT_TRUE(valid);
 }
 
+TEST(holder, comparisons) {
+  step_holder a, b;
+  EXPECT_TRUE(a == b);
+  EXPECT_FALSE(a != b);
+
+  b = step_holder::none;
+  EXPECT_TRUE(a == b);
+  EXPECT_FALSE(a != b);
+
+  board pos;
+  pos.put(position(1, 'a'), piece(piece::gold, piece::camel));
+  a = step::validate_ordinary_step(
+    pos,
+    elementary_step::displacement(position(1, 'a'), north)
+  );
+  ASSERT_TRUE(a);
+
+  EXPECT_FALSE(a == b);
+  EXPECT_TRUE(a != b);
+
+  b = a;
+  EXPECT_TRUE(a == b);
+  EXPECT_FALSE(a != b);
+
+  b = step::validate_ordinary_step(
+    pos,
+    elementary_step::displacement(position(1, 'a'), north)
+  );
+  EXPECT_TRUE(a == b);
+  EXPECT_FALSE(a != b);
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

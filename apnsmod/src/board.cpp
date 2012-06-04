@@ -149,48 +149,68 @@ piece::color_t color_from_int(int value) {
   }
 }
 
-position::position(row_t row, std::string const& col)
-  : row_(row)
-{
+position::position(row_t row, std::string const& col) {
   if (col.length() != 1)
-    throw std::domain_error(
+    throw std::invalid_argument(
       "position::position: Expected a single-character string"
     );
 
-  column_ = col[0];
+  col_t column = col[0];
 
   if (row < board::MIN_ROW || row > board::MAX_ROW
-      || column_ < board::MIN_COLUMN || column_ > board::MAX_COLUMN) {
+      || column < board::MIN_COLUMN || column > board::MAX_COLUMN) {
     std::ostringstream message;
     message << "position::position: attempted to create an invalid position: "
-            << row << column_;
-    throw std::domain_error(message.str());
+            << row << column;
+    throw std::invalid_argument(message.str());
   }
+
+  data_ = ((row - board::MIN_ROW) << ROW_OFFSET) | (column - board::MIN_COLUMN);
 }
 
 position::row_t position::row() const {
-  return row_;
+  return (data_ >> ROW_OFFSET) + board::MIN_ROW;
 }
 
 position::col_t position::column() const {
-  return column_;
+  return (data_ & COLUMN_MASK) + board::MIN_COLUMN;
 }
 
 std::string position::py_column() const {
   return std::string(1, column());
 }
 
-bool operator == (position lhs, position rhs) {
-  return lhs.row() == rhs.row() && lhs.column() == rhs.column();
+void position::set_row(row_t new_row) {
+  if (new_row >= board::MIN_ROW && new_row <= board::MAX_ROW)
+    data_ = ((new_row - board::MIN_ROW) << ROW_OFFSET) | (data_ & COLUMN_MASK);
+  else
+    throw std::invalid_argument("position::set_row");
 }
 
-bool operator != (position lhs, position rhs) {
-  return !(operator == (lhs, rhs));
+void position::set_column(col_t new_column) {
+  if (new_column >= board::MIN_COLUMN && new_column <= board::MAX_COLUMN)
+    data_ = (new_column - board::MIN_COLUMN) | (data_ & ~COLUMN_MASK);
+  else
+    throw std::invalid_argument("position::set_column");
 }
 
-bool operator < (position lhs, position rhs) {
-  return lhs.row() * board::COLUMNS + lhs.column() - board::MIN_COLUMN
-         < rhs.row() * board::COLUMNS + rhs.column() - board::MIN_COLUMN;
+position& position::operator += (std::size_t n) {
+  data_ += n;
+  if (data_ > MAX || n > MAX)
+    throw std::invalid_argument("position::operator +=");
+
+  return *this;
+}
+
+position& position::operator -= (std::size_t n) {
+  data_ -= n;
+
+  // data_ is unsigned, so it'll wrap around if someone tries to decrement too
+  // much.
+  if (data_ > MAX || n > MAX)
+    throw std::invalid_argument("position::operator -=");
+
+  return *this;
 }
 
 bool adjacent_valid(position pos, direction direction) {
@@ -250,6 +270,91 @@ position::row_t const board::MAX_ROW;
 position::col_t const board::MIN_COLUMN;
 position::col_t const board::MAX_COLUMN;
 #endif
+
+namespace {
+
+// Index table for the de Bruijn multiplication algorithm below.
+std::size_t const index64[64] = {
+   63,  0, 58,  1, 59, 47, 53,  2,
+   60, 39, 48, 27, 54, 33, 42,  3,
+   61, 51, 37, 40, 49, 18, 28, 20,
+   55, 30, 34, 11, 43, 14, 22,  4,
+   62, 57, 46, 52, 38, 26, 32, 41,
+   50, 36, 17, 19, 29, 10, 13, 21,
+   56, 45, 25, 31, 35, 16,  9, 12,
+   44, 24, 15,  8, 23,  7,  6,  5
+};
+
+}
+
+std::size_t board::mask::iterator::bitscan() const {
+  // NB: I split this into two constants OR'd together so that there is no
+  // problem with 64-bit integer constants on 32-bit systems.
+  boost::uint64_t const DE_BRUIJN =
+    (boost::uint64_t(0x07EDD5E5ul) << 32) |
+     boost::uint64_t(0x9A4E28C2ul);
+
+  assert(mask_ != 0);
+  return index64[((mask_ & -mask_) * DE_BRUIJN) >> 58];
+}
+
+namespace {
+
+// NB: These exist mainly for the purpose of promoting stuff to uint64_t in
+// integral expressions.
+
+boost::uint64_t const U1 = 1;
+boost::uint64_t const ROW1 = 0xFF;
+boost::uint64_t const COL1 =
+  (U1 << (0 * board::COLUMNS)) |
+  (U1 << (1 * board::COLUMNS)) |
+  (U1 << (2 * board::COLUMNS)) |
+  (U1 << (3 * board::COLUMNS)) |
+  (U1 << (4 * board::COLUMNS)) |
+  (U1 << (5 * board::COLUMNS)) |
+  (U1 << (6 * board::COLUMNS)) |
+  (U1 << (7 * board::COLUMNS))
+  ;
+
+}
+
+board::mask const board::mask::ROW[] = {
+  mask(ROW1 << (0 * board::COLUMNS)),
+  mask(ROW1 << (1 * board::COLUMNS)),
+  mask(ROW1 << (2 * board::COLUMNS)),
+  mask(ROW1 << (3 * board::COLUMNS)),
+  mask(ROW1 << (4 * board::COLUMNS)),
+  mask(ROW1 << (5 * board::COLUMNS)),
+  mask(ROW1 << (6 * board::COLUMNS)),
+  mask(ROW1 << (7 * board::COLUMNS))
+};
+
+board::mask const board::mask::COLUMN[] = {
+  mask(COL1 << 0),
+  mask(COL1 << 1),
+  mask(COL1 << 2),
+  mask(COL1 << 3),
+  mask(COL1 << 4),
+  mask(COL1 << 5),
+  mask(COL1 << 6),
+  mask(COL1 << 7)
+};
+
+board::mask const board::mask::TRAPS =
+  (board::mask::row(3) & board::mask::column('c')) |
+  (board::mask::row(3) & board::mask::column('f')) |
+  (board::mask::row(6) & board::mask::column('c')) |
+  (board::mask::row(6) & board::mask::column('f'));
+
+board::mask board::mask::shift(direction dir) const {
+  switch (dir) {
+  case north: return mask(bits_ << COLUMNS);
+  case south: return mask(bits_ >> COLUMNS);
+  case east:  return mask((bits_ << 1) & ~column(board::MIN_COLUMN).bits_);
+  case west:  return mask((bits_ >> 1) & ~column(board::MAX_COLUMN).bits_);
+  default:    assert(!"Can't get here"); return board::mask();
+  }
+}
 
 board::pieces_iterator::pieces_iterator()
   : board::pieces_iterator::iterator_adaptor_(base_type())
