@@ -933,12 +933,12 @@ all_steps_iter::all_steps_iter()
 
 all_steps_iter::all_steps_iter(apns::board const& board, piece::color_t player)
   : board_(&board)
-  , current_piece_(board.pieces_begin())
+  , current_piece_(board.begin())
   , player_(player)
 {
   assert(this->board_);
   forward_to_mobile();
-  if (current_piece_ != board.pieces_end()) {
+  if (current_piece_ != board.end()) {
     current_step_ = steps_iter(current_piece_->first, board);
     forward();
 
@@ -985,13 +985,13 @@ void all_steps_iter::forward() {
 
 void all_steps_iter::forward_to_mobile() {
   assert(board_);
-  while (current_piece_ != board_->pieces_end() && 
+  while (current_piece_ != board_->end() && 
          (current_piece_->second.color() != player_ || 
           frozen(current_piece_->first, *board_))) {
     ++current_piece_;
   }
 
-  if (current_piece_ == board_->pieces_end()) {
+  if (current_piece_ == board_->end()) {
     board_ = 0;
   }
 

@@ -522,7 +522,7 @@ private:
   friend class boost::iterator_core_access;
 
   apns::board const*            board_;
-  apns::board::pieces_iterator  current_piece_;
+  apns::board::iterator  current_piece_;
   steps_iter                    current_step_;
   piece::color_t                player_;
 

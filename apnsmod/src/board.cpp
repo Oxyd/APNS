@@ -270,6 +270,8 @@ position::col_t const position::MAX_COLUMN;
 
 position::row_t const board::ROWS;
 position::col_t const board::COLUMNS;
+
+char const board::NONE;
 #endif
 
 namespace {
@@ -357,124 +359,12 @@ board::mask board::mask::shift(direction dir) const {
   }
 }
 
-board::pieces_iterator::pieces_iterator()
-  : board::pieces_iterator::iterator_adaptor_(base_type())
-  , pos_(0)
-{ }
-
-board::pieces_iterator::pieces_iterator(base_type original, std::size_t pos)
-  : board::pieces_iterator::iterator_adaptor_(original)
-  , pos_(pos)
-{
-  forward_to_nonempty();
-}
-
-board::pieces_iterator::reference board::pieces_iterator::dereference() const {
-  assert(pos_ < board::ROWS * board::COLUMNS);
-  assert(*base() != ' ');
-
-  std::pair<position::row_t, position::col_t> const coordinates =
-    board_from_linear(pos_);
-  return std::make_pair(position(coordinates.first, coordinates.second), 
-                        *piece_from_letter(*base()));
-}
-
-void board::pieces_iterator::increment() {
-  // Keep incrementing the iterator until we find a nonempty position. If there
-  // is no more nonempty position on the board, let the base iterator go to the
-  // one-past-the-end position and let pos = one-past-the-end-index.
-
-  ++pos_;
-  ++base_reference();
-
-  forward_to_nonempty();
-}
-
-void board::pieces_iterator::decrement() {
-  // Iverse algorithm to increment(). Keep decrementing until we reach either a
-  // nonempty position or until we reach the (1, 'a') coordinate.
-
-  --pos_;
-  --base_reference();
-
-  reverse_to_nonempty();
-}
-
-void board::pieces_iterator::forward_to_nonempty() {
-  while (pos_ < board::ROWS * board::COLUMNS) {
-    if (*base() != ' ')
-      return;  // We're done, this is the next nonempty position.
-
-    ++pos_;
-    ++base_reference();
-  }
-
-  // There are no more nonempty positions. Furthermore, base and pos contain
-  // their one-past-the-end values.
-}
-
-void board::pieces_iterator::reverse_to_nonempty() {
-  // Once it gets down to pos == 0, then we don't have to do anything more:
-  // either there's really something here or we got here by decrementing a
-  // begin() iterator which results in undefined behaviour.
-
-  while (pos_ > 0) {
-    if (*base() != ' ')
-      return;
-
-    --pos_;
-    --base_reference();
-  }
-}
-
-board::board() {
-  std::fill(pieces_.begin(), pieces_.end(), ' ');
-}
-
-void board::put(position where, piece what) {
-  std::size_t const linear = linear_from_board(where.row(), where.column());
-  if (pieces_[linear] == ' ')
-    pieces_[linear] = letter_from_piece(what);
-  else
-    throw std::logic_error(
-      "board: Attempted to put a piece at an occupied position"
-    );
-}
-
-void board::remove(position where) {
-  std::size_t const linear = linear_from_board(where.row(), where.column());
-  if (pieces_[linear] != ' ')
-    pieces_[linear] = ' ';
-  else
-    throw std::logic_error(
-      "board: Attempted to remove a piece from a vacant position"
-    );
-}
-
-board::pieces_iterator board::pieces_begin() const {
-  pieces_iterator it(pieces_.begin(), 0);
-  return it;
-}
-
-board::pieces_iterator board::pieces_end() const {
-  pieces_iterator it(pieces_.end(), ROWS * COLUMNS);
-  return it;
-}
-
-bool operator == (board const& lhs, board const& rhs) {
-  return lhs.equal(rhs);
-}
-
-bool operator != (board const& lhs, board const& rhs) {
-  return !operator == (lhs, rhs);
-}
-
 std::string string_from_board(board const& board) {
   std::ostringstream output;
 
-  for (board::pieces_iterator pos_piece = board.pieces_begin();
-       pos_piece != board.pieces_end(); ++pos_piece) {
-    if (pos_piece != board.pieces_begin())
+  for (board::iterator pos_piece = board.begin();
+       pos_piece != board.end(); ++pos_piece) {
+    if (pos_piece != board.begin())
       output << ' ';
 
     position const pos  = pos_piece->first;

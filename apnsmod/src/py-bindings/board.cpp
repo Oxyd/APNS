@@ -137,7 +137,7 @@ void export_board() {
         return_value_policy<return_by_value>(),
         "Make a copy of this Board")
 
-    .add_property("pieces", range(&apns::board::pieces_begin, &apns::board::pieces_end))
+    .add_property("pieces", range(&apns::board::begin, &apns::board::end))
 
     .def(self == self)
     .def(self != self)

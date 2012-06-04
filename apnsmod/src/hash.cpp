@@ -45,8 +45,8 @@ apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(
 ) const {
   hash_t hash = 0;
 
-  for (board::pieces_iterator p = board.pieces_begin();
-       p != board.pieces_end(); ++p) {
+  for (board::iterator p = board.begin();
+       p != board.end(); ++p) {
     position position = p->first;
     piece piece = p->second;
 

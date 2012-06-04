@@ -227,7 +227,7 @@ TEST_F(board_test, put_remove_invalid_test) {
 
 TEST_F(board_test, iteration) {
   bool iterated = false;
-  for (board::pieces_iterator p = b.pieces_begin(); p != b.pieces_end(); ++p) {
+  for (board::iterator p = b.begin(); p != b.end(); ++p) {
     iterated = true;
   }
 
@@ -241,7 +241,7 @@ TEST_F(board_test, iteration) {
   unsigned gold_count = 0;
   unsigned silver_count = 0;
 
-  for (board::pieces_iterator piece = b.pieces_begin(); piece != b.pieces_end(); ++piece) {
+  for (board::iterator piece = b.begin(); piece != b.end(); ++piece) {
     if (piece->second.color() == piece::silver) {
       ++silver_count;
     } else {
@@ -259,8 +259,8 @@ TEST_F(board_test, iteration) {
     }
   }
 
-  EXPECT_EQ(gold_count, 3);
-  EXPECT_EQ(silver_count, 1);
+  EXPECT_EQ(3, gold_count);
+  EXPECT_EQ(1, silver_count);
 }
 
 TEST_F(board_test, is_trap_test) {

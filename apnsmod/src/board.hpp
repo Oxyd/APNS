@@ -13,6 +13,7 @@
 #include <boost/iterator/iterator_adaptor.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/static_assert.hpp>
+#include <boost/ref.hpp>
 
 #include <string>
 #include <ostream>
@@ -366,6 +367,28 @@ public:
     };
     typedef iterator const_iterator;
 
+    /// References a single bit in the mask.
+    class reference {
+    public:
+      operator bool () const { return bits_ & (bits_t(1) << order_); }
+      reference& operator = (bool b) {
+        if (b)
+          bits_ |= (bits_t(1) << order_);
+        else
+          bits_ &= ~(bits_t(1) << order_);
+
+        return *this;
+      }
+
+    private:
+      friend class mask;
+
+      bits_t&     bits_;
+      std::size_t order_;
+
+      reference(bits_t& b, std::size_t order) : bits_(b), order_(order) { }
+    };
+
     ///@{ Pre-defined masks
     static mask const ROW[];
     static mask const COLUMN[];
@@ -391,6 +414,7 @@ public:
     bool get(position p) const  { return bits_ & (bits_t(1) << p.order()); }
     bool empty() const          { return bits_ == 0; }
     bool equals(mask other)     { return bits_ == other.bits_; }
+    bool less(mask other)       { return bits_ < other.bits_; }
     ///@}
 
     ///@{ Iteration
@@ -411,6 +435,8 @@ public:
     ///@}
 
     ///@{ Operators
+    reference operator [] (position p) { return reference(bits_, p.order()); }
+    bool operator [] (position p) const { return get(p); }
     mask operator ~ () { return mask(~bits_); }
 
     mask& operator &= (mask other) { bits_ &= other.bits_; return *this; }
@@ -431,56 +457,88 @@ private:
     ROWS * COLUMNS
   > pieces_cont;
 
+  static char const NONE = ' ';
+
 public:
   /// Bidirectional iterator type over elements of type pair<position, piece>.
-  class pieces_iterator : public boost::iterator_adaptor<
-    pieces_iterator,
+  class iterator : public boost::iterator_adaptor<
+    iterator,
     pieces_cont::const_iterator,
     std::pair<position, piece> const,
     boost::bidirectional_traversal_tag,
     std::pair<position, piece> const
-  >
-  {
+  > {
   public:
-    pieces_iterator();  ///< Construct a singular iterator.
+    /// Construct a singular iterator.
+    iterator() : iterator::iterator_adaptor_(0) { }
 
   private:
-    /// Construct an iterator from an iterator into the underlying sequence
-    /// given that the iterator into the underlying sequence corresponds with
-    /// an element with an index pos.
-    explicit pieces_iterator(base_type original, std::size_t pos);
-
     friend class boost::iterator_core_access;
     friend class board;
 
-    reference dereference() const;  ///< Implement the * operation.
-    void increment();               ///< Implement the ++ operation.
-    void decrement();               ///< Implement the -- operation.
+    explicit iterator(
+      pieces_cont const& pieces,
+      position p = position(position::MIN_ROW, position::MIN_COLUMN)
+    )
+      : iterator::iterator_adaptor_(pieces.begin() + p.order())
+      , pos_(p)
+    {
+      if (pos_ != position() && *base() == NONE)
+        increment();
 
-    /// Iterate to the first non-empty position at or after the current one.
-    void forward_to_nonempty();
+      assert(pos_ != position() || base() == pieces.end());
+    }
 
-    /// Iterate to the first non-empty position at or before the current one.
-    void reverse_to_nonempty();
+    reference dereference() const {
+      assert(pos_ != position());
+      assert(*base() != NONE);
+      return std::make_pair(pos_, piece_from_letter_unsafe(*base()));
+    }
 
-    std::size_t pos_;  ///< Index into board::pieces that this iterator is
-                       ///< currently pointing to.
+    void increment() {
+      do
+        ++pos_, ++base_reference();
+      while (pos_ != position() && *base() == NONE);
+    }
+
+    void decrement() {
+      // --'ing a .begin() iterator is undefined behaviour.
+      do --pos_, --base_reference(); while (*base() == NONE);
+    }
+
+    position pos_;
   };
 
-  board();
+  board() { clear(); }
 
+  ///@{ Modifiers
   /**
    * Put a piece on a given position.
    * \throws std::logic_error #where already contains a piece.
    */
-  void put(position where, piece what);
+  void put(position where, piece what) {
+    if (pieces_[where.order()] == NONE)
+      pieces_[where.order()] = letter_from_piece(what);
+    else throw std::logic_error(
+        "board: Attempted to put a piece at an occupied position");
+  }
 
   /**
    * Remove the piece from the given position.
    * \throws std::logic_error #where is empty.
    */
-  void remove(position where);
+  void remove(position where) {
+    if (pieces_[where.order()] != NONE)
+      pieces_[where.order()] = NONE;
+    else throw std::logic_error(
+        "board: Attempted to remove a piece from a vacant position");
+  }
 
+  /// Remove all pieces from the board.
+  void clear() { std::fill(pieces_.begin(), pieces_.end(), NONE); }
+  ///@}
+
+  ///@{ Observers
   /**
    * Get a piece from the given position.
    *
@@ -488,35 +546,22 @@ public:
    * there is no piece at that position.
    */
   boost::optional<piece> get(position from) const {
-    char const p =
-      pieces_[(from.row() - position::MIN_ROW) * board::COLUMNS +
-              (from.column() - position::MIN_COLUMN)];
-    if (p != ' ')
-      return piece_from_letter_unsafe(p);
-    else
-      return boost::none;
+    char const p = pieces_[from.order()];
+    if (p != NONE) return piece_from_letter_unsafe(p); else return boost::none;
   }
-
-  /// Remove all pieces from the board.
-  void clear() {
-    std::fill(pieces_.begin(), pieces_.end(), ' ');
-  }
-
-  pieces_iterator pieces_begin() const;  ///< Get the start iterator of the
-                                         ///< sequence of all pieces stored
-                                         ///< within this board.
-
-  pieces_iterator pieces_end() const;    ///< Get the one-past-the-end iterator
-                                         ///< of the sequence.
 
   /// Compare boards;
-  bool equal(board const& other) const { return pieces_ == other.pieces_; }
-  bool less(board const& other) const  { return pieces_ < other.pieces_; }
+  bool equal(board const& other) const  { return pieces_ == other.pieces_; }
+  bool less(board const& other) const   { return pieces_ < other.pieces_; }
+  ///@}
+
+  ///@{ Iterators
+  iterator begin() const  { return iterator(pieces_); }
+  iterator end() const    { return iterator(pieces_, position()); }
+  ///@}
 
 private:
   pieces_cont pieces_;
-
-
 };
 
 ///@{ board::mask operators
@@ -540,9 +585,19 @@ inline board::mask operator ^ (board::mask lhs, board::mask rhs) {
   return lhs ^= rhs;
 }
 
+inline bool operator < (board::mask lhs, board::mask rhs) {
+  return lhs.less(rhs);
+}
+
 /// Test whether two board contain exactly the same elements.
-bool operator == (board const& lhs, board const& rhs);
-bool operator != (board const& lhs, board const& rhs);
+inline bool operator == (board const& lhs, board const& rhs) {
+  return lhs.equal(rhs);
+}
+
+inline bool operator != (board const& lhs, board const& rhs) {
+  return !(lhs == rhs);
+}
+
 inline bool operator <  (board const& lhs, board const& rhs) {
   return lhs.less(rhs); 
 }
