@@ -85,14 +85,14 @@ winner(board const& board, piece::color_t player) {
   piece::color_t const opponent = opponent_color(player);
 
   position::row_t const players_target_row =
-    player == piece::gold ? board::MAX_ROW : board::MIN_ROW;
+    player == piece::gold ? position::MAX_ROW : position::MIN_ROW;
   position::row_t const opponents_target_row =
-    player == piece::gold ? board::MIN_ROW : board::MAX_ROW;
+    player == piece::gold ? position::MIN_ROW : position::MAX_ROW;
 
   bool player_has_rabbits = false;
   bool opponent_has_rabbits = false;
 
-  for (position::col_t col = board::MIN_COLUMN; col <= board::MAX_COLUMN;
+  for (position::col_t col = position::MIN_COLUMN; col <= position::MAX_COLUMN;
        ++col) {
     boost::optional<piece> const piece =
       board.get(position(players_target_row, col));
@@ -106,7 +106,7 @@ winner(board const& board, piece::color_t player) {
     }
   }
 
-  for (position::col_t col = board::MIN_COLUMN; col <= board::MAX_COLUMN;
+  for (position::col_t col = position::MIN_COLUMN; col <= position::MAX_COLUMN;
        ++col) {
     boost::optional<piece> const piece =
       board.get(position(opponents_target_row, col));
@@ -125,10 +125,16 @@ winner(board const& board, piece::color_t player) {
   if (!(player_has_rabbits && opponent_has_rabbits)) {
     // It is possible for one player to lose due to loss of all rabbits.
 
-    for (position::row_t row = board::MIN_ROW + 1; row <= board::MAX_ROW - 1;
-         ++row) {  // We've already cheched first and last row.
-      for (position::col_t col = board::MIN_COLUMN; col <= board::MAX_COLUMN; 
-           ++col) {
+    for (
+      position::row_t row = position::MIN_ROW + 1;
+      row <= position::MAX_ROW - 1;
+      ++row
+    ) {  // We've already cheched first and last row.
+      for (
+        position::col_t col = position::MIN_COLUMN;
+        col <= position::MAX_COLUMN;
+        ++col
+      ) {
         boost::optional<piece> const piece = board.get(position(row, col));
         if (piece && piece->type() == piece::rabbit) {
           if (piece->color() == player)

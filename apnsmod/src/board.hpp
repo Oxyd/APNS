@@ -149,6 +149,11 @@ public:
   typedef unsigned      row_t;  ///< Type used for representation of rows.
   typedef unsigned char col_t;  ///< Type used for representation of columns.
 
+  static row_t const MIN_ROW = 1;
+  static row_t const MAX_ROW = 8;
+  static col_t const MIN_COLUMN = 'a';
+  static col_t const MAX_COLUMN = 'h';
+
   /// Construct the one-past-the-end position.
   position() : data_(MAX) { }
 
@@ -164,7 +169,17 @@ public:
    *               exception will be thrown.
    * \throws std::invalid_argument Specified row or column was not valid.
    */
-  position(row_t row, col_t column);
+  position(row_t row, col_t column)
+    : data_(((row - MIN_ROW) << ROW_OFFSET) | (column - MIN_COLUMN))
+  {
+    if (row < MIN_ROW || row > MAX_ROW
+        || column < MIN_COLUMN || column > MAX_COLUMN) {
+      throw std::domain_error(
+        "position::position: attempted to create an invalid position"
+      );
+    }
+  }
+
   position(row_t row, std::string const& column);
 
   ///@{ Observers
@@ -291,11 +306,6 @@ public:
   static position::row_t const ROWS    = 8;
   static position::col_t const COLUMNS = 8;
 
-  static position::row_t const MIN_ROW = 1;
-  static position::row_t const MAX_ROW = 8;
-  static position::col_t const MIN_COLUMN = 'a';
-  static position::col_t const MAX_COLUMN = 'h';
-
   /// A mask of the board. This can act either as a filter or as partial
   /// information about the board.
   class mask {
@@ -323,6 +333,7 @@ public:
       /// any mask.
       iterator() { }
 
+    private:
       position dereference() const { return pos_ + offset_; }
 
       bool equal(iterator other) const {
@@ -336,8 +347,8 @@ public:
           offset_ = bitscan();
       }
 
-    private:
       friend class board::mask;
+      friend class boost::iterator_core_access;
 
       bits_t      mask_;
       position    pos_;
@@ -345,7 +356,7 @@ public:
 
       explicit iterator(mask::bits_t m)
         : mask_(m)
-        , pos_(position(MIN_ROW, MIN_COLUMN)) {
+        , pos_(position(position::MIN_ROW, position::MIN_COLUMN)) {
         if (mask_ > 0)
           offset_ = bitscan();
       }
@@ -367,12 +378,12 @@ public:
 
     /// Create mask with true's on given row, and false's everywhere else.
     static mask row(position::row_t r) {
-      return ROW[r - MIN_ROW];
+      return ROW[r - position::MIN_ROW];
     }
 
     /// Create mask with true's on given column and false everywhere else.
     static mask column(position::col_t c) {
-      return COLUMN[c - MIN_COLUMN];
+      return COLUMN[c - position::MIN_COLUMN];
     }
     ///@}
 
@@ -477,8 +488,9 @@ public:
    * there is no piece at that position.
    */
   boost::optional<piece> get(position from) const {
-    char const p = pieces_[(from.row() - board::MIN_ROW) * board::COLUMNS +
-                   (from.column() - board::MIN_COLUMN)];
+    char const p =
+      pieces_[(from.row() - position::MIN_ROW) * board::COLUMNS +
+              (from.column() - position::MIN_COLUMN)];
     if (p != ' ')
       return piece_from_letter_unsafe(p);
     else
@@ -503,6 +515,8 @@ public:
 
 private:
   pieces_cont pieces_;
+
+
 };
 
 ///@{ board::mask operators
@@ -636,20 +650,6 @@ adjacent_pieces_begin(board const& board, position center);
 
 /// Return the singular iterator of adjacent pieces sequence.
 adjacent_pieces_iter adjacent_pieces_end();
-
-// Why? Because I can. This is an often-used constructor, it might be 
-// advantageous to give the compiler a better chance at inlining
-// it.
-inline position::position(row_t row, col_t column)
-  : data_(((row - board::MIN_ROW) << ROW_OFFSET) | (column - board::MIN_COLUMN))
-{
-  if (row < board::MIN_ROW || row > board::MAX_ROW
-      || column < board::MIN_COLUMN || column > board::MAX_COLUMN) {
-    throw std::domain_error(
-      "position::position: attempted to create an invalid position"
-    );
-  }
-}
 
 } // namespace apns
 

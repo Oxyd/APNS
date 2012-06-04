@@ -59,14 +59,14 @@ TEST_F(position_test, linear_order) {
 }
 
 TEST_F(position_test, increment_test) {
-  position p1(board::MIN_ROW, board::MIN_COLUMN);
-  position p2(board::MIN_ROW, board::MIN_COLUMN);
+  position p1(position::MIN_ROW, position::MIN_COLUMN);
+  position p2(position::MIN_ROW, position::MIN_COLUMN);
 
   for (std::size_t i = 0; i < board::ROWS * board::COLUMNS; ++i) {
     position p3 = p1 + i;
 
-    position::row_t r = i / board::ROWS + board::MIN_ROW;
-    position::col_t c = i % board::COLUMNS + board::MIN_COLUMN;
+    position::row_t r = i / board::ROWS + position::MIN_ROW;
+    position::col_t c = i % board::COLUMNS + position::MIN_COLUMN;
 
     EXPECT_EQ(r, p3.row());
     EXPECT_EQ(c, p3.column());
@@ -150,8 +150,8 @@ TEST_F(position_test, order_test) {
     EXPECT_EQ(i, p2.order());
     ++p2;
 
-    position::row_t row = i / board::COLUMNS + board::MIN_ROW;
-    position::col_t col = i % board::COLUMNS + board::MIN_COLUMN;
+    position::row_t row = i / board::COLUMNS + position::MIN_ROW;
+    position::col_t col = i % board::COLUMNS + position::MIN_COLUMN;
     EXPECT_EQ(i, position(row, col).order());
   }
 }
@@ -174,23 +174,32 @@ protected:
 };
 
 TEST_F(board_test, put_get_remove_test) {
-  for (unsigned row = board::MIN_ROW; row <= board::MAX_ROW; ++row) {
-    for (unsigned char column = board::MIN_COLUMN; column <= board::MAX_COLUMN; ++column) {
+  for (
+    position::row_t row = position::MIN_ROW; row <= position::MAX_ROW; ++row
+  )
+    for (
+      position::col_t column = position::MIN_COLUMN;
+      column <= position::MAX_COLUMN;
+      ++column
+    )
       EXPECT_TRUE(!b.get(position(row, column)));
-    }
-  }
 
   b.put(position(3, 'g'), piece(piece::gold, piece::horse));
 
-  for (unsigned row = board::MIN_ROW; row <= board::MAX_ROW; ++row) {
-    for (unsigned char column = board::MIN_COLUMN; column <= board::MAX_COLUMN; ++column) {
-      if (position(row, column) != position(3, 'g')) {
+  for (
+    position::row_t row = position::MIN_ROW;
+    row <= position::MAX_ROW;
+    ++row
+  )
+    for (
+      position::col_t column = position::MIN_COLUMN;
+      column <= position::MAX_COLUMN;
+      ++column
+    )
+      if (position(row, column) != position(3, 'g'))
         EXPECT_TRUE(!b.get(position(row, column)));
-      } else {
+      else
         ASSERT_TRUE(b.get(position(row, column)));
-      }
-    }
-  }
 
   piece p = *b.get(position(3, 'g'));
   EXPECT_EQ(p.color(), piece::gold);
@@ -260,15 +269,20 @@ TEST_F(board_test, is_trap_test) {
   EXPECT_TRUE(trap(position(3, 'f')));
   EXPECT_TRUE(trap(position(6, 'f')));
 
-  for (position::row_t row = board::MIN_ROW; row <= board::MAX_ROW; ++row) {
-    for (position::col_t column = board::MIN_COLUMN; column <= board::MAX_COLUMN; ++column) {
-      if (row != 3 && row != 6) {
+  for (
+    position::row_t row = position::MIN_ROW;
+    row <= position::MAX_ROW;
+    ++row
+  )
+    for (
+      position::col_t column = position::MIN_COLUMN;
+      column <= position::MAX_COLUMN;
+      ++column
+    )
+      if (row != 3 && row != 6)
         EXPECT_TRUE(!trap(position(row, column)));
-      } else if (column != 'c' && column != 'f') {
+      else if (column != 'c' && column != 'f')
         EXPECT_TRUE(!trap(position(row, column)));
-      }
-    }
-  }
 }
 
 TEST_F(board_test, string_serialization_test) {
@@ -422,13 +436,16 @@ TEST(mask, set_get) {
 }
 
 TEST(mask, row_test) {
-  for (position::row_t r = board::MIN_ROW; r <= board::MAX_ROW; ++r) {
+  for (position::row_t r = position::MIN_ROW; r <= position::MAX_ROW; ++r) {
     board::mask m = board::mask::row(r);
 
-    for (position::row_t row = board::MIN_ROW; row <= board::MAX_ROW; ++row)
+    for (
+      position::row_t row = position::MIN_ROW;
+      row <= position::MAX_ROW;
+      ++row)
       for (
-        position::col_t col = board::MIN_COLUMN;
-        col <= board::MAX_COLUMN;
+        position::col_t col = position::MIN_COLUMN;
+        col <= position::MAX_COLUMN;
         ++col
       )
         if (row == r)
@@ -439,13 +456,21 @@ TEST(mask, row_test) {
 }
 
 TEST(mask, column_test) {
-  for (position::col_t c = board::MIN_COLUMN; c <= board::MAX_COLUMN; ++c) {
+  for (
+    position::col_t c = position::MIN_COLUMN;
+    c <= position::MAX_COLUMN;
+    ++c
+  ) {
     board::mask m = board::mask::column(c);
 
-    for (position::row_t row = board::MIN_ROW; row <= board::MAX_ROW; ++row)
+    for (
+      position::row_t row = position::MIN_ROW;
+      row <= position::MAX_ROW;
+      ++row
+    )
       for (
-        position::col_t col = board::MIN_COLUMN;
-        col <= board::MAX_COLUMN;
+        position::col_t col = position::MIN_COLUMN;
+        col <= position::MAX_COLUMN;
         ++col
       )
         if (col == c)

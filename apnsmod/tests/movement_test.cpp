@@ -8,8 +8,16 @@
 using namespace apns;
 
 TEST(elementary_step, elementary_step_test) {
-  for (position::row_t row = board::MIN_ROW; row < board::MAX_ROW; ++row) {
-    for (position::col_t column = board::MIN_COLUMN; column < board::MAX_COLUMN; ++column) {
+  for (
+    position::row_t row = position::MIN_ROW;
+    row < position::MAX_ROW;
+    ++row
+  )
+    for (
+      position::col_t column = position::MIN_COLUMN;
+      column < position::MAX_COLUMN;
+      ++column
+    ) {
       position pos(row, column);
       direction dir = north;
       elementary_step es = elementary_step::displacement(pos, dir);
@@ -22,7 +30,6 @@ TEST(elementary_step, elementary_step_test) {
       EXPECT_TRUE(capture.from() == pos);
       EXPECT_EQ(capture.capture(), true);
     }
-  }
 }
 
 TEST(movement, is_frozen_test) {
@@ -62,8 +69,16 @@ TEST(movement, is_frozen_test) {
 }
 
 TEST(movement, simple_move_test) {
-  for (position::row_t row = board::MIN_ROW; row <= board::MAX_ROW; ++row) {
-    for (position::col_t column = board::MIN_COLUMN; column <= board::MIN_COLUMN; ++column) {
+  for (
+    position::row_t row = position::MIN_ROW;
+    row <= position::MAX_ROW;
+    ++row
+  )
+    for (
+      position::col_t column = position::MIN_COLUMN;
+      column <= position::MIN_COLUMN;
+      ++column
+    ) {
       position p(row, column);
       board b;
       b.put(p, piece(piece::silver, piece::cat));
@@ -72,10 +87,10 @@ TEST(movement, simple_move_test) {
         direction dir = static_cast<direction>(d);
         elementary_step el_step = elementary_step::displacement(p, dir);
 
-        if ((dir == north && row == board::MAX_ROW)
-            || (dir == east && column == board::MAX_COLUMN)
-            || (dir == south && row == board::MIN_ROW)
-            || (dir == west && column == board::MIN_COLUMN))
+        if ((dir == north && row == position::MAX_ROW) ||
+            (dir == east && column == position::MAX_COLUMN) ||
+            (dir == south && row == position::MIN_ROW) ||
+            (dir == west && column == position::MIN_COLUMN))
         {
           EXPECT_TRUE(!step::validate_ordinary_step(b, el_step));
         } else {
@@ -83,7 +98,6 @@ TEST(movement, simple_move_test) {
         }
       }
     }
-  }
 }
 
 TEST(movement, simple_move_capture_test) {

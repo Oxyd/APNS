@@ -195,9 +195,11 @@ elementary_step_from_string(std::string const& string) {
     position::row_t const row = string[2] - '0';
     char const dir_or_capture = string[3];
 
-    if (maybe_piece
-        && board::MIN_COLUMN <= column && column <= board::MAX_COLUMN
-        && board::MIN_ROW <= row && row <= board::MAX_ROW) {
+    if (maybe_piece &&
+        position::MIN_COLUMN <= column &&
+        column <= position::MAX_COLUMN &&
+        position::MIN_ROW <= row &&
+        row <= position::MAX_ROW) {
       piece const piece = *maybe_piece;
       position const position = apns::position(row, column);
 

@@ -18,8 +18,8 @@ board_from_linear(std::size_t linear) {
   assert(linear < board::ROWS * board::COLUMNS);
 
   return std::make_pair(
-      static_cast<position::row_t>(linear / board::ROWS + board::MIN_ROW),
-      static_cast<position::col_t>(linear % board::COLUMNS + board::MIN_COLUMN)
+      static_cast<position::row_t>(linear / board::ROWS + position::MIN_ROW),
+      static_cast<position::col_t>(linear % board::COLUMNS + position::MIN_COLUMN)
   );
 }
 
@@ -27,10 +27,10 @@ board_from_linear(std::size_t linear) {
 std::size_t linear_from_board(apns::position::row_t row,
                               apns::position::col_t col) {
   using namespace apns;
-  assert(board::MIN_ROW <= row && row <= board::MAX_ROW);
-  assert(board::MIN_COLUMN <= col && col <= board::MAX_COLUMN);
+  assert(position::MIN_ROW <= row && row <= position::MAX_ROW);
+  assert(position::MIN_COLUMN <= col && col <= position::MAX_COLUMN);
 
-  return (row - board::MIN_ROW) * board::COLUMNS + (col - board::MIN_COLUMN);
+  return (row - position::MIN_ROW) * board::COLUMNS + (col - position::MIN_COLUMN);
 }
 
 apns::direction const directions[] = {
@@ -157,23 +157,23 @@ position::position(row_t row, std::string const& col) {
 
   col_t column = col[0];
 
-  if (row < board::MIN_ROW || row > board::MAX_ROW
-      || column < board::MIN_COLUMN || column > board::MAX_COLUMN) {
+  if (row < MIN_ROW || row > MAX_ROW ||
+      column < MIN_COLUMN || column > MAX_COLUMN) {
     std::ostringstream message;
     message << "position::position: attempted to create an invalid position: "
             << row << column;
     throw std::invalid_argument(message.str());
   }
 
-  data_ = ((row - board::MIN_ROW) << ROW_OFFSET) | (column - board::MIN_COLUMN);
+  data_ = ((row - MIN_ROW) << ROW_OFFSET) | (column - MIN_COLUMN);
 }
 
 position::row_t position::row() const {
-  return (data_ >> ROW_OFFSET) + board::MIN_ROW;
+  return (data_ >> ROW_OFFSET) + MIN_ROW;
 }
 
 position::col_t position::column() const {
-  return (data_ & COLUMN_MASK) + board::MIN_COLUMN;
+  return (data_ & COLUMN_MASK) + MIN_COLUMN;
 }
 
 std::string position::py_column() const {
@@ -181,15 +181,15 @@ std::string position::py_column() const {
 }
 
 void position::set_row(row_t new_row) {
-  if (new_row >= board::MIN_ROW && new_row <= board::MAX_ROW)
-    data_ = ((new_row - board::MIN_ROW) << ROW_OFFSET) | (data_ & COLUMN_MASK);
+  if (new_row >= MIN_ROW && new_row <= MAX_ROW)
+    data_ = ((new_row - MIN_ROW) << ROW_OFFSET) | (data_ & COLUMN_MASK);
   else
     throw std::invalid_argument("position::set_row");
 }
 
 void position::set_column(col_t new_column) {
-  if (new_column >= board::MIN_COLUMN && new_column <= board::MAX_COLUMN)
-    data_ = (new_column - board::MIN_COLUMN) | (data_ & ~COLUMN_MASK);
+  if (new_column >= MIN_COLUMN && new_column <= MAX_COLUMN)
+    data_ = (new_column - MIN_COLUMN) | (data_ & ~COLUMN_MASK);
   else
     throw std::invalid_argument("position::set_column");
 }
@@ -215,10 +215,10 @@ position& position::operator -= (std::size_t n) {
 
 bool adjacent_valid(position pos, direction direction) {
   switch (direction) {
-    case north:   return pos.row() < board::MAX_ROW;
-    case south:   return pos.row() > board::MIN_ROW;
-    case east:    return pos.column() < board::MAX_COLUMN;
-    case west:    return pos.column() > board::MIN_COLUMN;
+    case north:   return pos.row() < position::MAX_ROW;
+    case south:   return pos.row() > position::MIN_ROW;
+    case east:    return pos.column() < position::MAX_COLUMN;
+    case west:    return pos.column() > position::MIN_COLUMN;
     default:      assert(!"Can't reach this."); return false;
   }
 }
@@ -263,12 +263,13 @@ piece::type_t type_from_int(int value) {
 
 // MSVS doesn't seem to like this.
 #ifndef _MSC_VER
+position::row_t const position::MIN_ROW;
+position::row_t const position::MAX_ROW;
+position::col_t const position::MIN_COLUMN;
+position::col_t const position::MAX_COLUMN;
+
 position::row_t const board::ROWS;
 position::col_t const board::COLUMNS;
-position::row_t const board::MIN_ROW;
-position::row_t const board::MAX_ROW;
-position::col_t const board::MIN_COLUMN;
-position::col_t const board::MAX_COLUMN;
 #endif
 
 namespace {
@@ -350,8 +351,8 @@ board::mask board::mask::shift(direction dir) const {
   switch (dir) {
   case north: return mask(bits_ << COLUMNS);
   case south: return mask(bits_ >> COLUMNS);
-  case east:  return mask((bits_ << 1) & ~column(board::MIN_COLUMN).bits_);
-  case west:  return mask((bits_ >> 1) & ~column(board::MAX_COLUMN).bits_);
+  case east:  return mask((bits_ << 1) & ~column(position::MIN_COLUMN).bits_);
+  case west:  return mask((bits_ >> 1) & ~column(position::MAX_COLUMN).bits_);
   default:    assert(!"Can't get here"); return board::mask();
   }
 }

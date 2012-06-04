@@ -6,26 +6,8 @@
 
 namespace {
 
-/**
- * Macro to ease generation of a bunch of helper functions. These are needed to provide a Python getter for
- * the C++ static member constants of class board. Exporting these constants directly seems to cause linker problems with
- * MSVC.
- *
- * XXX: Not anymore I guess.
- */
-#define MAKE_GETTER(type, name, constant)       \
-  apns::position:: type board_ ## name () {     \
-    return apns::board:: constant;              \
-  }
-
-MAKE_GETTER(row_t, rows, ROWS)
-MAKE_GETTER(col_t, columns, COLUMNS)
-MAKE_GETTER(row_t, min_row, MIN_ROW)
-MAKE_GETTER(row_t, max_row, MAX_ROW)
-MAKE_GETTER(col_t, min_column, MIN_COLUMN)
-MAKE_GETTER(col_t, max_column, MAX_COLUMN)
-
-//! Make a copy of a board instance. This is so that Python can explicitely ask for copies of board objects.
+//! Make a copy of a board instance. This is so that Python can explicitely ask
+//! for copies of board objects.
 apns::board board_copy(apns::board const& original) {
   return original;
 }
@@ -99,6 +81,19 @@ void export_board() {
   class_<apns::position>("Position",
     "A position on the board. Position is immutable.",
     init<apns::position::row_t, std::string const&>())
+    .def_readonly("MIN_COLUMN",
+                  &apns::position::MIN_COLUMN,
+                  "The lowest coordinate of a column.")
+    .def_readonly("MAX_COLUMN",
+                  &apns::position::MAX_COLUMN,
+                  "The highest coordinate of a column.")
+    .def_readonly("MIN_ROW",
+                  &apns::position::MIN_ROW,
+                  "The lowest coordinate of a row.")
+    .def_readonly("MAX_ROW",
+                  &apns::position::MAX_ROW,
+                  "The highest coordinate of a row.")
+
     .add_property("row", &apns::position::row)
     .add_property("column", &apns::position::py_column)
 
@@ -123,12 +118,12 @@ void export_board() {
       "Are two given positions adjacent to each other?");
 
   class_<apns::board>("Board", "Game board with pieces on it.")
-    .add_static_property("ROWS", &board_rows, "Number of rows on the board.")
-    .add_static_property("COLUMNS", &board_columns, "Number of columns on the board.")
-    .add_static_property("MIN_COLUMN", &board_min_column, "The lowest coordinate of a row.")
-    .add_static_property("MAX_COLUMN", &board_max_column, "The highest coordinate of a row.")
-    .add_static_property("MIN_ROW", &board_min_row, "The lowest coordinate of a row.")
-    .add_static_property("MAX_ROW", &board_max_row, "The highest coordinate of a row.")
+    .def_readonly("ROWS",
+                  &apns::board::ROWS,
+                  "Number of rows on the board.")
+    .def_readonly("COLUMNS",
+                  &apns::board::COLUMNS,
+                  "Number of columns on the board.")
 
     .def("put", &apns::board::put, "b.put(Position, Piece) -> None")
     .def("remove", &apns::board::remove, "b.remove(Position) -> None")

@@ -23,13 +23,18 @@ apns::zobrist_hasher::zobrist_hasher()
        ++type)
     for (colors_array_t::const_iterator color = COLORS.begin();
          color != COLORS.end(); ++color)
-      for (std::size_t row = board::MIN_ROW; row <= board::MAX_ROW; ++row)
-        for (std::size_t column = board::MIN_COLUMN;
-             column <= board::MAX_COLUMN; ++column)
+      for (
+        std::size_t row = position::MIN_ROW; row <= position::MAX_ROW; ++row
+      )
+        for (
+          std::size_t column = position::MIN_COLUMN;
+          column <= position::MAX_COLUMN;
+          ++column
+        )
           codes_[type - TYPES.begin()]
-               [color - COLORS.begin()]
-               [row - board::MIN_ROW]
-               [column - board::MIN_COLUMN] = rand_distrib(prng);
+                [color - COLORS.begin()]
+                [row - position::MIN_ROW]
+                [column - position::MIN_COLUMN] = rand_distrib(prng);
 
   for (std::size_t player = 0; player < piece::color_count; ++player)
     players_[player] = rand_distrib(prng);
@@ -46,9 +51,9 @@ apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(
     piece piece = p->second;
 
     hash ^= codes_[index_from_type(piece.type())]
-                 [index_from_color(piece.color())]
-                 [position.row() - board::MIN_ROW]
-                 [position.column() - board::MIN_COLUMN];
+                  [index_from_color(piece.color())]
+                  [position.row() - position::MIN_ROW]
+                  [position.column() - position::MIN_COLUMN];
   }
 
   hash ^= players_[on_move];

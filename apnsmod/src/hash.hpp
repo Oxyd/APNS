@@ -107,15 +107,15 @@ zobrist_hasher::hash_t zobrist_hasher::update(
     // add the piece's new position to the hash later.
     hash ^= codes_[index_from_type(piece.type())]
                   [index_from_color(piece.color())]
-                  [old_position.row() - board::MIN_ROW]
-                  [old_position.column() - board::MIN_COLUMN];
+                  [old_position.row() - position::MIN_ROW]
+                  [old_position.column() - position::MIN_COLUMN];
 
     if (!step->capture()) {
       position new_position = make_adjacent(old_position, step->where());
       hash ^= codes_[index_from_type(piece.type())]
                     [index_from_color(piece.color())]
-                    [new_position.row() - board::MIN_ROW]
-                    [new_position.column() - board::MIN_COLUMN];
+                    [new_position.row() - position::MIN_ROW]
+                    [new_position.column() - position::MIN_COLUMN];
     }
   }
 
