@@ -19,7 +19,7 @@ boost::shared_ptr<game> make_game(board& best_board) {
 
   g->root.disproof_number = 4;
 
-  vertex::children_iterator child = g->root.add_child();
+  vertex::iterator child = g->root.add();
   child->step = step::validate_ordinary_step(initial_board, elementary_step::displacement(position(2, 'd'), north));
   child->proof_number = 1;
   child->disproof_number = 5;
@@ -29,7 +29,7 @@ boost::shared_ptr<game> make_game(board& best_board) {
   board b = initial_board;
   apply(*child->step, b);
 
-  child = child->add_child();
+  child = child->add();
   child->step = step::validate_ordinary_step(b, elementary_step::displacement(position(3, 'd'), north));
   child->proof_number = 1;
   child->disproof_number = 6;
@@ -38,7 +38,7 @@ boost::shared_ptr<game> make_game(board& best_board) {
 
   apply(*child->step, b);
 
-  child = child->add_child();
+  child = child->add();
   child->step = step::validate_ordinary_step(b, elementary_step::displacement(position(4, 'd'), west));
   child->proof_number = 1;
   child->disproof_number = 7;
@@ -48,7 +48,7 @@ boost::shared_ptr<game> make_game(board& best_board) {
   apply(*child->step, b);
   best_board = b;
 
-  child = g->root.add_child();
+  child = g->root.add();
   child->step = step::validate_ordinary_step(initial_board, elementary_step::displacement(position(2, 'd'), east));
   child->proof_number = 3;
   child->disproof_number = 2;
@@ -82,17 +82,17 @@ TEST(algorithm, update_numbers_test) {
   v.disproof_number = 1;
   v.type = vertex::type_or;
 
-  vertex::children_iterator child = v.add_child();
+  vertex::iterator child = v.add();
   child->proof_number = 3;
   child->disproof_number = 5;
   child->type = vertex::type_or;
 
-  child = v.add_child();
+  child = v.add();
   child->proof_number = 8;
   child->disproof_number = 2;
   child->type = vertex::type_or;
 
-  child = v.add_child();
+  child = v.add();
   child->proof_number = 5;
   child->disproof_number = 3;
   child->type = vertex::type_and;
@@ -171,7 +171,7 @@ TEST(search_stack, push_pop_test) {
   EXPECT_EQ(b, stack.state());
 
   root.resize(1);
-  vertex* child = &*root.children_begin();
+  vertex* child = &*root.begin();
   child->step = step::validate_ordinary_step(b, elementary_step::displacement(position(1, 'a'), north));
   child->type = vertex::type_or;
   child->steps_remaining = MAX_STEPS - 1;
@@ -195,7 +195,7 @@ TEST(search_stack, push_pop_test) {
   EXPECT_EQ(child_board, stack.state());
 
   child->resize(1);
-  vertex* second_child = &*child->children_begin();
+  vertex* second_child = &*child->begin();
   second_child->step = step::validate_ordinary_step(child_board, elementary_step::displacement(position(8, 'h'), south));
   second_child->type = vertex::type_and;
   second_child->steps_remaining = MAX_STEPS - 2;
@@ -247,7 +247,7 @@ TEST(search_stack, checkpoint_test) {
   search_stack stack(hasher, root_hash, &root, piece::gold, b);
 
   root.resize(1);
-  vertex* child = &*root.children_begin();
+  vertex* child = &*root.begin();
 
   child->step = step::validate_ordinary_step(
     b, elementary_step::displacement(position(1, 'a'), north)
@@ -264,7 +264,7 @@ TEST(search_stack, checkpoint_test) {
     search_stack_checkpoint checkpoint(stack);
     child->resize(1);
 
-    vertex* second_child = &*child->children_begin();
+    vertex* second_child = &*child->begin();
     second_child->step = step::validate_ordinary_step(child_board, elementary_step::displacement(position(2, 'a'), north));
     second_child->type = vertex::type_and;
     second_child->steps_remaining = MAX_STEPS - 2;

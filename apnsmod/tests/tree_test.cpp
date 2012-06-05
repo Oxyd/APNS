@@ -18,31 +18,31 @@ boost::shared_ptr<vertex> make_tree() {
   root->proof_number = 1;
   root->disproof_number = 1;
 
-  vertex::children_iterator a = root->add_child();
+  vertex::iterator a = root->add();
   a->proof_number = 1;
   a->disproof_number = 2;
 
-  vertex::children_iterator aa = a->add_child();
+  vertex::iterator aa = a->add();
   aa->proof_number = 1;
   aa->disproof_number = 3;
 
-  vertex::children_iterator ab = a->add_child();
+  vertex::iterator ab = a->add();
   ab->proof_number = 2;
   ab->disproof_number = 3;
 
-  vertex::children_iterator b = root->add_child();
+  vertex::iterator b = root->add();
   b->proof_number = 2;
   b->disproof_number = 2;
 
-  vertex::children_iterator ba = root->add_child();
+  vertex::iterator ba = root->add();
   ba->proof_number = 1;
   ba->disproof_number = 3;
 
-  vertex::children_iterator bb = root->add_child();
+  vertex::iterator bb = root->add();
   bb->proof_number = 2;
   bb->disproof_number = 3;
 
-  vertex::children_iterator bc = root->add_child();
+  vertex::iterator bc = root->add();
   bc->proof_number = 3;
   bc->disproof_number = 3;
 
@@ -51,12 +51,12 @@ boost::shared_ptr<vertex> make_tree() {
 
 struct bfs_traversal {
   vertex const* operator () (vertex const& current) {
-    for (vertex::const_children_iterator child = current.children_begin();
-         child != current.children_end(); ++child)
+    for (vertex::const_iterator child = current.begin();
+         child != current.end(); ++child)
       queue.push(child);
 
     if (!queue.empty()) {
-      vertex::const_children_iterator n = queue.front();
+      vertex::const_iterator n = queue.front();
       queue.pop();
       return &*n;
     } else 
@@ -64,7 +64,7 @@ struct bfs_traversal {
   }
 
 private:
-  std::queue<vertex::const_children_iterator> queue;
+  std::queue<vertex::const_iterator> queue;
 };
 
 struct bfs_checker_visitor {
@@ -111,21 +111,21 @@ struct poly_visitor : virtual_visitor::base {
 };
 
 void verify_iterable(vertex const& v) {
-  for (vertex::const_children_iterator child = v.children_begin();
-       child != v.children_end();
+  for (vertex::const_iterator child = v.begin();
+       child != v.end();
        ++child)
-    EXPECT_GE(child->children_count(), 0);
+    EXPECT_GE(child->size(), 0);
 }
 
 } // anonymous namespace
 
 TEST(vertex, children_insertion_test) {
   vertex v;
-  v.add_child();
-  v.add_child();
-  v.add_child();
+  v.add();
+  v.add();
+  v.add();
 
-  EXPECT_EQ(3, v.children_count());
+  EXPECT_EQ(3, v.size());
   verify_iterable(v);
 }
 
@@ -133,7 +133,7 @@ TEST(vertex, resize_test) {
   vertex v;
   v.resize(3);
 
-  EXPECT_EQ(3, v.children_count());
+  EXPECT_EQ(3, v.size());
   verify_iterable(v);
 }
 
@@ -141,39 +141,39 @@ TEST(vertex, reserve_test) {
   vertex v;
   v.reserve(3);
 
-  EXPECT_EQ(0, v.children_count());
-  EXPECT_TRUE(v.children_begin() == v.children_end());
+  EXPECT_EQ(0, v.size());
+  EXPECT_TRUE(v.begin() == v.end());
 
-  v.add_child();
-  v.add_child();
+  v.add();
+  v.add();
 
-  EXPECT_EQ(2, v.children_count());
+  EXPECT_EQ(2, v.size());
   verify_iterable(v);
 }
 
 TEST(vertex, children_removal_test) {
   vertex v;
 
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 2;
-  v.add_child()->proof_number = 10;
-  v.add_child()->proof_number = 3;
-  v.add_child()->proof_number = 4;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 2;
+  v.add()->proof_number = 10;
+  v.add()->proof_number = 3;
+  v.add()->proof_number = 4;
 
-  EXPECT_EQ(5, v.children_count());
+  EXPECT_EQ(5, v.size());
   verify_iterable(v);
 
-  vertex::children_iterator child = v.children_begin();
-  for (; child != v.children_end(); ++child)
+  vertex::iterator child = v.begin();
+  for (; child != v.end(); ++child)
     if (child->proof_number == 10) break;
 
-  v.remove_child(child);
+  v.remove(child);
 
-  EXPECT_EQ(4, v.children_count());
+  EXPECT_EQ(4, v.size());
   
   vertex::number_t n = 0;
-  for (vertex::children_iterator child = v.children_begin();
-       child != v.children_end();
+  for (vertex::iterator child = v.begin();
+       child != v.end();
        ++child) {
     EXPECT_EQ(n + 1, child->proof_number);
     n = child->proof_number;
@@ -183,20 +183,20 @@ TEST(vertex, children_removal_test) {
 TEST(vertex, resize_down_test) {
   vertex v;
 
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 2;
-  v.add_child()->proof_number = 3;
-  v.add_child()->proof_number = 4;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 2;
+  v.add()->proof_number = 3;
+  v.add()->proof_number = 4;
 
-  EXPECT_EQ(4, v.children_count());
+  EXPECT_EQ(4, v.size());
 
   v.resize(2);
 
-  EXPECT_EQ(2, v.children_count());
+  EXPECT_EQ(2, v.size());
 
   vertex::number_t n = 0;
-  for (vertex::children_iterator child = v.children_begin();
-       child != v.children_end();
+  for (vertex::iterator child = v.begin();
+       child != v.end();
        ++child) {
     EXPECT_EQ(n + 1, child->proof_number);
     n = child->proof_number;
@@ -208,31 +208,31 @@ TEST(vertex, resize_down_test) {
 TEST(vertex, resize_to_zero_test) {
   vertex v;
 
-  vertex::children_iterator it = v.add_child();
-  v.remove_child(it);
+  vertex::iterator it = v.add();
+  v.remove(it);
 
-  EXPECT_EQ(0, v.children_count());
-  EXPECT_TRUE(v.children_begin() == v.children_end());
+  EXPECT_EQ(0, v.size());
+  EXPECT_TRUE(v.begin() == v.end());
 }
 
 TEST(vertex, pack_test) {
   vertex v;
 
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 2;
-  v.add_child()->proof_number = 3;
-  v.add_child()->proof_number = 4;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 2;
+  v.add()->proof_number = 3;
+  v.add()->proof_number = 4;
 
-  EXPECT_EQ(4, v.children_count());
+  EXPECT_EQ(4, v.size());
 
   v.resize(2);
   v.pack();
 
-  EXPECT_EQ(2, v.children_count());
+  EXPECT_EQ(2, v.size());
 
   vertex::number_t n = 0;
-  for (vertex::children_iterator child = v.children_begin();
-       child != v.children_end();
+  for (vertex::iterator child = v.begin();
+       child != v.end();
        ++child) {
     EXPECT_EQ(n + 1, child->proof_number);
     n = child->proof_number;
@@ -302,19 +302,19 @@ TEST(traverser, backtrack_test) {
 TEST(general, swap_test) {
   vertex parent;
 
-  vertex::children_iterator x = parent.add_child();
+  vertex::iterator x = parent.add();
   x->proof_number = 1;
   x->disproof_number = 2;
   x->steps_remaining = 3;
   x->step = step::from_string("Dc3n");
 
-  vertex::children_iterator y = parent.add_child();
+  vertex::iterator y = parent.add();
   y->proof_number = 10;
   y->disproof_number = 11;
   y->steps_remaining = 2;
   y->step = step::from_string("rd2e Ce5w");
 
-  x = parent.children_begin();
+  x = parent.begin();
 
   parent.swap_children(x, y);
 
@@ -335,25 +335,25 @@ TEST(general, transfer_test) {
   vertex root;
   root.resize(2);
 
-  vertex::children_iterator a = root.children_begin();
+  vertex::iterator a = root.begin();
   a->resize(2);
-  a->children_begin()->proof_number = 5;
+  a->begin()->proof_number = 5;
 
-  vertex::children_iterator b = boost::next(a);
+  vertex::iterator b = boost::next(a);
   b->resize(2);
 
-  transfer_child(*a, a->children_begin(), *b);
+  transfer_child(*a, a->begin(), *b);
 
-  EXPECT_EQ(1, a->children_count());
-  EXPECT_EQ(3, b->children_count());
-  EXPECT_EQ(5, boost::prior(b->children_end())->proof_number);
+  EXPECT_EQ(1, a->size());
+  EXPECT_EQ(3, b->size());
+  EXPECT_EQ(5, boost::prior(b->end())->proof_number);
 }
 
 namespace {
 
 void expect_sorted(vertex const& v) {
   vertex::number_t last = 0;
-  for (vertex::const_children_iterator c = v.children_begin(); c != v.children_end(); ++c) {
+  for (vertex::const_iterator c = v.begin(); c != v.end(); ++c) {
     EXPECT_LE(last, c->proof_number);
     last = c->proof_number;
   }
@@ -363,15 +363,15 @@ void expect_sorted(vertex const& v) {
 
 TEST(general, sort_test) {
   vertex v;
-  v.add_child()->proof_number = 5;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 8;
-  v.add_child()->proof_number = 3;
-  v.add_child()->proof_number = 9;
-  v.add_child()->proof_number = 3;
+  v.add()->proof_number = 5;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 8;
+  v.add()->proof_number = 3;
+  v.add()->proof_number = 9;
+  v.add()->proof_number = 3;
 
   sort_children(v, boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
-  EXPECT_EQ(6, v.children_count());
+  EXPECT_EQ(6, v.size());
 
   expect_sorted(v);
 }
@@ -380,39 +380,39 @@ TEST(general, resort_test_up) {
   vertex v;
   v.reserve(8);
 
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 2;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 2;
 
-  vertex::children_iterator out = v.add_child();
+  vertex::iterator out = v.add();
   out->proof_number = 7;
 
-  v.add_child()->proof_number = 4;
-  v.add_child()->proof_number = 5;
-  v.add_child()->proof_number = 6;
-  v.add_child()->proof_number = 7;
-  v.add_child()->proof_number = 8;
+  v.add()->proof_number = 4;
+  v.add()->proof_number = 5;
+  v.add()->proof_number = 6;
+  v.add()->proof_number = 7;
+  v.add()->proof_number = 8;
 
-  v.children_begin()->disproof_number = 10;
-  v.children_begin()->steps_remaining = 2;
+  v.begin()->disproof_number = 10;
+  v.begin()->steps_remaining = 2;
 
-  vertex::children_iterator c = resort_children(v, out, boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
+  vertex::iterator c = resort_children(v, out, boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
   EXPECT_EQ(7, c->proof_number);
   expect_sorted(v);
 
-  EXPECT_EQ(10, v.children_begin()->disproof_number);
-  EXPECT_EQ(2, v.children_begin()->steps_remaining);
+  EXPECT_EQ(10, v.begin()->disproof_number);
+  EXPECT_EQ(2, v.begin()->steps_remaining);
 
   v.resize(0);
 
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 2;
-  v.add_child()->proof_number = 3;
-  out = v.add_child();
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 2;
+  v.add()->proof_number = 3;
+  out = v.add();
   out->proof_number = 9;
-  v.add_child()->proof_number = 5;
-  v.add_child()->proof_number = 6;
-  v.add_child()->proof_number = 7;
-  v.add_child()->proof_number = 8;
+  v.add()->proof_number = 5;
+  v.add()->proof_number = 6;
+  v.add()->proof_number = 7;
+  v.add()->proof_number = 8;
 
   c = resort_children(v, out, boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
   EXPECT_EQ(9, c->proof_number);
@@ -420,12 +420,12 @@ TEST(general, resort_test_up) {
 
   v.resize(0);
 
-  out = v.add_child();
+  out = v.add();
   out->proof_number = 5;
   
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 2;
-  v.add_child()->proof_number = 8;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 2;
+  v.add()->proof_number = 8;
 
   c = resort_children(v, out, boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
   EXPECT_EQ(5, c->proof_number);
@@ -436,31 +436,31 @@ TEST(general, resort_test_down) {
   vertex v;
   v.reserve(8);
 
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 2;
-  v.add_child()->proof_number = 3;
-  v.add_child()->proof_number = 4;
-  v.add_child()->proof_number = 5;
-  vertex::children_iterator out = v.add_child();
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 2;
+  v.add()->proof_number = 3;
+  v.add()->proof_number = 4;
+  v.add()->proof_number = 5;
+  vertex::iterator out = v.add();
   out->proof_number = 2;
-  v.add_child()->proof_number = 7;
-  v.add_child()->proof_number = 8;
+  v.add()->proof_number = 7;
+  v.add()->proof_number = 8;
 
-  vertex::children_iterator c = resort_children(v, out, boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
+  vertex::iterator c = resort_children(v, out, boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
   EXPECT_EQ(2, c->proof_number);
   expect_sorted(v);
 
   v.resize(0);
 
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 2;
-  v.add_child()->proof_number = 3;
-  v.add_child()->proof_number = 4;
-  v.add_child()->proof_number = 5;
-  out = v.add_child();
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 2;
+  v.add()->proof_number = 3;
+  v.add()->proof_number = 4;
+  v.add()->proof_number = 5;
+  out = v.add();
   out->proof_number = 0;
-  v.add_child()->proof_number = 7;
-  v.add_child()->proof_number = 8;
+  v.add()->proof_number = 7;
+  v.add()->proof_number = 8;
 
   c = resort_children(v, out, boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
   EXPECT_EQ(0, c->proof_number);
@@ -468,11 +468,11 @@ TEST(general, resort_test_down) {
 
   v.resize(0);
 
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 5;
-  out = v.add_child();
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 5;
+  out = v.add();
   out->proof_number = 2;
-  v.add_child()->proof_number = 8;
+  v.add()->proof_number = 8;
 
   c = resort_children(v, out, boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
   EXPECT_EQ(2, c->proof_number);
@@ -481,56 +481,56 @@ TEST(general, resort_test_down) {
 
 TEST(general, resort_test_up_eq_range) {
   vertex v;
-  v.add_child()->proof_number = 7;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 4;
-  v.add_child()->proof_number = 8;
+  v.add()->proof_number = 7;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 4;
+  v.add()->proof_number = 8;
 
-  resort_children(v, v.children_begin(), boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
+  resort_children(v, v.begin(), boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
   expect_sorted(v);
 
   v.resize(0);
-  v.add_child()->proof_number = 7;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 1;
+  v.add()->proof_number = 7;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 1;
 
-  resort_children(v, v.children_begin(), boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
+  resort_children(v, v.begin(), boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
   expect_sorted(v);
 }
 
 TEST(general, resort_test_down_eq_range) {
   vertex v;
 
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 3;
-  v.add_child()->proof_number = 4;
-  v.add_child()->proof_number = 4;
-  v.add_child()->proof_number = 4;
-  v.add_child()->proof_number = 4;
-  v.add_child()->proof_number = 4;
-  v.add_child()->proof_number = 2;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 3;
+  v.add()->proof_number = 4;
+  v.add()->proof_number = 4;
+  v.add()->proof_number = 4;
+  v.add()->proof_number = 4;
+  v.add()->proof_number = 4;
+  v.add()->proof_number = 2;
   
-  resort_children(v, boost::prior(v.children_end()),
+  resort_children(v, boost::prior(v.end()),
                   boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
   expect_sorted(v);
 
   v.resize(0);
 
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 1;
-  v.add_child()->proof_number = 0;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 1;
+  v.add()->proof_number = 0;
   
-  resort_children(v, boost::prior(v.children_end()),
+  resort_children(v, boost::prior(v.end()),
                   boost::bind(&vertex::proof_number, _1) < boost::bind(&vertex::proof_number, _2));
   expect_sorted(v);
 }

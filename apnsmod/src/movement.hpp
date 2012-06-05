@@ -210,7 +210,7 @@ public:
     { }
   };
 
-  typedef boost::reverse_iterator<iterator> reverse_el_steps_iterator;
+  typedef boost::reverse_iterator<iterator> reverse_iterator;
 
   //! Validate and possibly construct an ordinary step.
   //! \param board The board which is to be affected by this step.
@@ -244,23 +244,17 @@ public:
   //!   describe a valid step.
   static step_holder from_string(std::string const& string);
 
-  //! Revalidate this step for a new board.
-  //!
-  //! \param board New board to use for this validation.
-  //! \param player Player to move in this step.
-  bool revalidate(board const& board, piece::color_t player) const;
-
   //! Does this step cause a capture on the board?
   bool capture() const;
 
   //! Get the beginning of the full sequence of elementary steps that
   //! represent this one step. Elementary steps in this sequence are
   //! guaranteed to have a non-empty value for the elementary_step::what member.
-  iterator step_sequence_begin() const;
-  iterator step_sequence_end() const;
+  iterator begin() const;
+  iterator end() const;
 
-  reverse_el_steps_iterator step_sequence_rbegin() const;
-  reverse_el_steps_iterator step_sequence_rend() const;
+  reverse_iterator rbegin() const;
+  reverse_iterator rend() const;
 
   //! How many steps does this step use? For ordinary moves, it is 1; for push 
   //! and pull it's 2. Captures do not count as used steps.
@@ -412,6 +406,17 @@ void unapply(step const& step, board& board);
 //! the step can't be undone, returns false and leaves the original board
 //! unmodified.
 bool try_unapply(step const& step, board& board);
+
+//! Revalidate a step for a new board.
+//!
+//! \param step The step to revalidate.
+//! \param board New board to use for this validation.
+//! \param player Player to move in this step.
+//! \return Revalidated step (possibly with different sets of captures),
+//!         or none.
+step_holder revalidate(
+  step const& step, board const& board, piece::color_t player
+);
 
 //! Is given piece frozen on the given board?
 bool frozen(position position, board const& board);

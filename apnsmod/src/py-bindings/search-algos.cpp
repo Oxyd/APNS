@@ -160,10 +160,8 @@ private:
 };
 
 killer_ply_iterator killer_db_killers(apns::killer_db const& db,
-                                      std::size_t ply,
-                                      apns::vertex::e_type type) {
-  return killer_ply_iterator(db.level_begin(ply, type),
-                             db.level_end(ply, type));
+                                      std::size_t ply) {
+  return killer_ply_iterator(db.level_begin(ply), db.level_end(ply));
 }
 
 } // anonymous namespace

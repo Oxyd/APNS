@@ -163,8 +163,8 @@ void export_movement() {
                   "not counted.")
 
     .add_property("elementarySteps",
-                  range(&apns::step::step_sequence_begin,
-                        &apns::step::step_sequence_end),
+                  range(&apns::step::begin,
+                        &apns::step::end),
                   "Elementary steps that make up this whole step.")
 
     .def("__str__", &apns::step::to_string)

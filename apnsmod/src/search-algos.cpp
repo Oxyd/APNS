@@ -9,9 +9,9 @@
 
 #include <cassert>
 #include <vector>
-
 #include <set>
 #include <iostream>
+#include <algorithm>
 
 namespace {
 
@@ -161,12 +161,12 @@ vertex* best_successor(vertex& parent) {
 }
 
 vertex const* best_successor(vertex const& parent) {
-  if (parent.children_count() > 0) {
-    vertex::const_children_iterator best = parent.children_begin();
+  if (parent.size() > 0) {
+    vertex::const_iterator best = parent.begin();
     vertex_comparator better(parent);
 
-    for (vertex::const_children_iterator child = boost::next(best);
-         child != parent.children_end(); ++child) {
+    for (vertex::const_iterator child = boost::next(best);
+         child != parent.end(); ++child) {
       if (better(*child, *best)) {
         best = child;
       }
@@ -180,17 +180,17 @@ vertex const* best_successor(vertex const& parent) {
 
 std::pair<vertex*, vertex*>
 two_best_successors(vertex& parent) {
-  if (parent.children_count() >= 2) {
-    vertex::children_iterator best = parent.children_begin();
-    vertex::children_iterator second_best =
-      boost::next(parent.children_begin());
+  if (parent.size() >= 2) {
+    vertex::iterator best = parent.begin();
+    vertex::iterator second_best =
+      boost::next(parent.begin());
     vertex_comparator better(parent);
 
     if (better(*second_best, *best))
       std::swap(best, second_best);
 
-    for (vertex::children_iterator child = boost::next(second_best);
-         child != parent.children_end(); ++child) {
+    for (vertex::iterator child = boost::next(second_best);
+         child != parent.end(); ++child) {
       if (better(*child, *best)) {
         second_best = best;
         best = child;
@@ -208,28 +208,27 @@ two_best_successors(vertex& parent) {
   }
 }
 
-void killer_db::add(std::size_t ply, vertex::e_type type, step const& step) {
-  plys& p = get_plys(type);
-  if (ply >= p.size())
-    p.resize(ply + 1, ply_killers_t(killer_count_));
+void killer_db::add(std::size_t ply, step const& step) {
+  if (ply >= killers_.size())
+    killers_.resize(ply + 1, ply_killers_t(killer_count_));
 
-  if (std::find(p[ply].begin(), p[ply].end(), step) == p[ply].end()) {
-    if (!p[ply].full())
-      ++size_;  // Otherwise this replace an existing record.
+  if (std::find(killers_[ply].begin(), killers_[ply].end(), step) ==
+      killers_[ply].end()) {
+    if (!killers_[ply].full())
+      ++size_;  // Otherwise this replaces an existing record.
 
-    p[ply].push_back(step);
+    killers_[ply].push_back(step);
   }
 }
 
 bool killer_db::is_killer(
-  std::size_t ply, vertex::e_type type, step const& step
+  std::size_t ply, step const& step
 ) const {
-  for (level_iterator killer = level_begin(ply, type);
-       killer != level_end(ply, type); ++killer)
-    if (*killer == step)
-      return true;
-
-  return false;
+  if (killers_.size() > ply)
+    return
+      std::find(killers_[ply].begin(), killers_[ply].end(), step) !=
+      killers_[ply].end();
+  else return false;
 }
 
 void history_table::insert(step const& step, std::size_t depth) {
@@ -238,26 +237,29 @@ void history_table::insert(step const& step, std::size_t depth) {
 }
 
 void history_table::sort(vertex& v) const {
-  vertex::children_iterator sorted_end = v.children_begin();
+  stable_sort_children(v, compare(table_));
 
-  while (sorted_end != v.children_end()) {
-    vertex::children_iterator max = v.children_end();
+#if 0
+  vertex::iterator sorted_end = v.begin();
+
+  while (sorted_end != v.end()) {
+    vertex::iterator max = v.end();
     table_t::mapped_type max_value = 0;
 
-    for (vertex::children_iterator child = sorted_end; 
-         child != v.children_end(); ++child) {
+    for (vertex::iterator child = sorted_end; 
+         child != v.end(); ++child) {
       if (child->step) {
         history_table::table_t::const_iterator value =
           table_.find(*child->step);
         if (value != table_.end() &&
-            (value->second > max_value || max == v.children_end())) {
+            (value->second > max_value || max == v.end())) {
           max = child;
           max_value = value->second;
         }
       }
     }
 
-    if (max != v.children_end()) {
+    if (max != v.end()) {
       if (max != sorted_end) {
         v.swap_children(sorted_end, max);
       }
@@ -270,6 +272,7 @@ void history_table::sort(vertex& v) const {
       break;
     }
   }
+#endif
 }
 
 bool history_table::compare::operator () (
@@ -279,8 +282,8 @@ bool history_table::compare::operator () (
   // require that resort_children doesn't destroy the secondary sort order,
   // which it currently does.
 
-  history_table::table_t::iterator l = table_->find(*lhs.step);
-  history_table::table_t::iterator r = table_->find(*rhs.step);
+  history_table::table_t::const_iterator l = table_->find(*lhs.step);
+  history_table::table_t::const_iterator r = table_->find(*rhs.step);
 
   boost::uint64_t const left  = l != table_->end() ? l->second : 0;
   boost::uint64_t const right = r != table_->end() ? r->second : 0;
@@ -307,8 +310,8 @@ void update_numbers(vertex& v) {
   vertex::number_t  min = vertex::infty;
   sum_num_t         sum = 0;
 
-  for (vertex::children_iterator child = v.children_begin();
-       child != v.children_end(); ++child) {
+  for (vertex::iterator child = v.begin();
+       child != v.end(); ++child) {
     if (child->*minimise_num < min)
       min = child->*minimise_num;
 
@@ -363,7 +366,7 @@ void search_stack::push(vertex* v) {
     v->step
       ? hasher_->update(
           parent_hash,
-          v->step->step_sequence_begin(), v->step->step_sequence_end(),
+          v->step->begin(), v->step->end(),
           parent_player, v_player, parent->steps_remaining
         )
       : parent_hash;
@@ -516,15 +519,15 @@ void history_order(history_table const& history, vertex& v) {
 }
 
 void killer_order(killer_db const& killers, std::size_t level, vertex& v) {
-  vertex::children_iterator killers_end = v.children_begin();
+  vertex::iterator killers_end = v.begin();
 
   for (
-    vertex::children_iterator child = v.children_begin();
-    child != v.children_end();
+    vertex::iterator child = v.begin();
+    child != v.end();
     ++child
   ) {
     if (child != killers_end && child->step &&
-        killers.is_killer(level, v.type, *child->step))
+        killers.is_killer(level, *child->step))
       v.swap_children(child, killers_end++);
   }
 }
@@ -551,7 +554,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
     if (remaining >= 1) {
       zobrist_hasher::hash_t child_hash = hasher.update(
         last(move_hist),
-        new_step->step_sequence_begin(), new_step->step_sequence_end(),
+        new_step->begin(), new_step->end(),
         player, player, leaf.steps_remaining
       );
       if (std::find(move_hist.begin(), move_hist.end(), child_hash) ==
@@ -564,7 +567,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
   bool const make_lambda = leaf.steps_remaining > 1;
 
   leaf.resize(steps.size() + (make_lambda ? 1 : 0));
-  vertex::children_iterator child = leaf.children_begin();
+  vertex::iterator child = leaf.begin();
 
   for (
     steps_seq::const_iterator step = steps.begin();
@@ -581,13 +584,13 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
   }
 
   if (make_lambda) {
-    assert(child != leaf.children_end());
+    assert(child != leaf.end());
     child->proof_number = child->disproof_number = 1;
     child->type = leaf.type;
     child->steps_remaining = leaf.steps_remaining - 1;
   }
 
-  return leaf.children_count();
+  return leaf.size();
 }
 
 void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
@@ -712,16 +715,16 @@ std::size_t garbage_collect(std::size_t how_many, search_stack stack) {
     vertex& current = *stack.path_top();
     if (!current.leaf()) {
       vertex_comparator worse(current, false);
-      vertex::children_iterator worst = current.children_end();
+      vertex::iterator worst = current.end();
 
-      for (vertex::children_iterator child = current.children_begin();
-           child != current.children_end(); ++child) {
+      for (vertex::iterator child = current.begin();
+           child != current.end(); ++child) {
         if (!child->leaf() && &*child != avoid &&
-            (worst == current.children_end() || worse(*child, *worst)))
+            (worst == current.end() || worse(*child, *worst)))
           worst = child;
       }
 
-      if (worst != current.children_end()) {
+      if (worst != current.end()) {
         stack.push(&*worst);
       } else if (!stack.at_root()) {
         assert(stack.path_top() != avoid);
@@ -747,8 +750,8 @@ std::size_t garbage_collect(std::size_t how_many, search_stack stack) {
 std::size_t collect_proved(vertex& parent) {
   std::size_t removed = 0;
 
-  for (vertex::children_iterator child = parent.children_begin();
-       child != parent.children_end(); ++child) {
+  for (vertex::iterator child = parent.begin();
+       child != parent.end(); ++child) {
     if (child->type != parent.type &&
         ((parent.type == vertex::type_or && child->disproof_number == 0) ||
          (parent.type == vertex::type_and && child->proof_number == 0))) {
@@ -772,8 +775,8 @@ std::size_t cut(vertex& parent) {
 namespace {
 
 void undo_add_child(vertex& parent, std::size_t& size) {
-  assert(parent.children_count() == 1);
-  parent.remove_child(parent.children_begin());
+  assert(parent.size() == 1);
+  parent.remove(parent.begin());
   --size;
 }
 
@@ -790,12 +793,12 @@ bool simulate(search_stack& stack, piece::color_t attacker,
   piece::color_t const player = vertex_player(parent, attacker);
 
   for (
-    killer_db::level_iterator killer = killers.level_begin(level, parent.type);
-    killer != killers.level_end(level, parent.type);
+    killer_db::level_iterator killer = killers.level_begin(level);
+    killer != killers.level_end(level);
     ++killer
   ) {
-    if (killer->revalidate(position, player) &&
-        parent.steps_remaining - killer->steps_used() >= 0) {
+    step_holder step = revalidate(*killer, position, player);
+    if (step && parent.steps_remaining - step->steps_used() >= 0) {
       assert(parent.leaf());
 
       // First append the step as a new child of opposite type (so that it makes
@@ -806,7 +809,7 @@ bool simulate(search_stack& stack, piece::color_t attacker,
       // This uses built-in recursion. It should be okay, since the recursion
       // is at most four calls deep.
 
-      vertex::children_iterator child = parent.add_child();
+      vertex::iterator child = parent.add();
       ++size;
 
       transaction child_added(boost::bind(
@@ -815,7 +818,7 @@ bool simulate(search_stack& stack, piece::color_t attacker,
         boost::ref(size)
       ));
 
-      child->step = *killer;
+      child->step = *step;
       child->proof_number = child->disproof_number = 1;
       child->steps_remaining = MAX_STEPS;
       child->type = opposite_type(parent.type);
@@ -836,25 +839,6 @@ bool simulate(search_stack& stack, piece::color_t attacker,
         child_added.commit();
 
         return true;
-      } else {
-        // No proof -- flip the type, set the apropriate number of remaining
-        // steps and recurse.
-
-        int const child_remains = parent.steps_remaining - killer->steps_used();
-        if (child_remains >= 1) {
-          child->type = parent.type;
-          child->steps_remaining = child_remains;
-
-          bool const success = simulate(stack, attacker, size,
-                                        killers, proof_tbl, log);
-          if (success) {
-            update_numbers(parent);
-            assert(parent.proof_number == 0 || parent.disproof_number == 0);
-
-            child_added.commit();
-            return true;
-          }
-        }
       }
     }
   }

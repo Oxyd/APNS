@@ -50,12 +50,12 @@ vertex::~vertex() {
   alloc_ -= sizeof *this;
 }
 
-vertex::children_iterator vertex::add_child() {
+vertex::iterator vertex::add() {
   resize(children_.size()  + 1);
-  return boost::prior(children_end());
+  return boost::prior(end());
 }
 
-vertex::children_iterator vertex::remove_child(children_iterator child) {
+vertex::iterator vertex::remove(iterator child) {
   return children_.erase(child.base());
 }
 
@@ -119,7 +119,7 @@ struct printer {
         << ' '   << (v.disproof_number < vertex::infty ?
                      boost::lexical_cast<std::string>(v.disproof_number) :
                      "infty")
-        << ' '   << v.children_count()
+        << ' '   << v.size()
         << '\n'
         ;
   }

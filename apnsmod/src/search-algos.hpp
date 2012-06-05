@@ -112,8 +112,7 @@ public:
   //! stored in this db.
   void resize_plys(std::size_t new_killer_count) {
     if (new_killer_count != killer_count_) {
-      killers_or_.resize(0);
-      killers_and_.resize(0);
+      killers_.resize(0);
       killer_count_ = new_killer_count;
       size_ = 0;
     }
@@ -126,22 +125,21 @@ public:
   std::size_t total_size() const { return size_; }
 
   //! Add a step to the list of killers for given level and given parent type.
-  void add(std::size_t level, vertex::e_type type, step const& step);
+  void add(std::size_t level, step const& step);
 
   //! Is the given step a killer for the given level?
-  bool is_killer(std::size_t level, vertex::e_type type,
-                 step const& step) const;
+  bool is_killer(std::size_t level, step const& step) const;
 
-  level_iterator level_begin(std::size_t level, vertex::e_type type) const {
-    if (level < get_plys(type).size())
-      return get_plys(type)[level].begin();
+  level_iterator level_begin(std::size_t level) const {
+    if (level < killers_.size())
+      return killers_[level].begin();
     else
       return level_iterator();
   }
 
-  level_iterator level_end(std::size_t level, vertex::e_type type) const {
-    if (level < get_plys(type).size())
-      return get_plys(type)[level].end();
+  level_iterator level_end(std::size_t level) const {
+    if (level < killers_.size())
+      return killers_[level].end();
     else
       return level_iterator();
   };
@@ -151,28 +149,7 @@ private:
 
   std::size_t killer_count_;       //!< How many killers at most per ply.
   std::size_t size_;
-  plys killers_or_;
-  plys killers_and_;
-
-  plys& get_plys(vertex::e_type type) {
-    switch (type) {
-    case vertex::type_or:   return killers_or_;
-    case vertex::type_and:  return killers_and_;
-    }
-
-    assert(!"Won't get here");
-    return killers_or_;
-  }
-
-  plys const& get_plys(vertex::e_type type) const {
-    switch (type) {
-    case vertex::type_or:   return killers_or_;
-    case vertex::type_and:  return killers_and_;
-    }
-
-    assert(!"Won't get here");
-    return killers_or_;
-  }
+  plys        killers_;
 };
 
 //! History table serves for step-ordering within a vertex.
@@ -191,14 +168,14 @@ private:
   typedef boost::unordered_map<step, boost::uint64_t> table_t;
 
   struct compare {
-    explicit compare(table_t& t) 
+    explicit compare(table_t const& t)
       : table_(&t) 
     { }
 
     bool operator () (vertex const& lhs, vertex const& rhs);
 
   private:
-    table_t* table_;
+    table_t const* table_;
   };
 
   boost::unordered_map<step, boost::uint64_t> table_;
@@ -481,8 +458,8 @@ public:
   }
   
   //! Make the algorithm use a history table.
-  void use_history_tbl(boost::shared_ptr<history_table> const& ht) {
-    history_tbl_ = ht;
+  void use_history_tbl(boost::shared_ptr<history_table> const& /*ht*/) {
+    //history_tbl_ = ht;
   }
 
   //! Get the history table, if any, used by this algorithm.
@@ -614,7 +591,7 @@ protected:
   void store_in_killer_db(std::size_t level, vertex::e_type parent_type,
                           vertex const& v) {
     if (killer_db_ && v.step) {
-      killer_db_->add(level, parent_type, *v.step);
+      killer_db_->add(level, *v.step);
 
       *log_ << v.step->to_string()
             << " is a killer for type "
@@ -691,8 +668,8 @@ protected:
 
   void evaluate_children() {
     vertex& current = *stack_.path_top();
-    for (vertex::children_iterator child = current.children_begin();
-         child != current.children_end(); ++child) {
+    for (vertex::iterator child = current.begin();
+         child != current.end(); ++child) {
       if (!is_lambda(*child)) {
         search_stack_checkpoint checkpoint(stack_);
         stack_.push(&*child);

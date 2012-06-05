@@ -47,15 +47,15 @@ class vertex : boost::noncopyable {
   //! This is to provide the op ->* that is for some reason missing in 
   //! ptr_vector's iterator...
   template <typename Iter>
-  struct children_iterator_base : boost::iterator_adaptor<
-    children_iterator_base<Iter>,
+  struct iterator_base : boost::iterator_adaptor<
+    iterator_base<Iter>,
     Iter
   > {
-    children_iterator_base() { }
+    iterator_base() { }
 
     // Intentionally implicit.
-    children_iterator_base(Iter i) 
-      : children_iterator_base::iterator_adaptor_(i) 
+    iterator_base(Iter i)
+      : iterator_base::iterator_adaptor_(i)
     { }
 
     template <typename T>
@@ -66,14 +66,11 @@ public:
   //! Type of the proof and disproof numbers.
   typedef boost::uint32_t number_t;  
   
-  typedef children_iterator_base<children_container::iterator> 
-    children_iterator;
-  typedef children_iterator_base<children_container::const_iterator> 
-    const_children_iterator;
-  typedef boost::reverse_iterator<children_iterator> 
-    reverse_children_iterator;
-  typedef boost::reverse_iterator<const_children_iterator>
-    const_reverse_children_iterator;
+  typedef iterator_base<children_container::iterator>       iterator;
+  typedef iterator_base<children_container::const_iterator> const_iterator;
+  typedef boost::reverse_iterator<iterator>                 reverse_iterator;
+  typedef boost::reverse_iterator<const_iterator>
+    const_reverse_iterator;
 
   //! Maximum value of a proof- or disproof number.
   static number_t const max_num = boost::integer_traits<number_t>::const_max;
@@ -98,36 +95,31 @@ public:
 
   //! Add a child at the end of the children list and return an iterator to it.
   //! May invalidate all existing iterators to children of this vertex.
-  children_iterator add_child();
+  iterator add();
 
   //! Remove child specified by an iterator into this vertex. May invalidate 
   //! all existing iterators to children of this vertex.
   //! \returns Iterator to the child following the removed one.
-  children_iterator remove_child(children_iterator child);
+  iterator remove(iterator child);
   
-  children_iterator       children_begin()        { return children_.begin(); }
-  children_iterator       children_end()          { return children_.end(); }
-  const_children_iterator children_begin() const  { return children_.begin(); }
-  const_children_iterator children_end() const    { return children_.end(); }
+  iterator       begin()        { return children_.begin(); }
+  iterator       end()          { return children_.end(); }
+  const_iterator begin() const  { return children_.begin(); }
+  const_iterator end() const    { return children_.end(); }
 
-  reverse_children_iterator children_rbegin() {
-    return reverse_children_iterator(children_end());
+  reverse_iterator rbegin()     { return reverse_iterator(end()); }
+  reverse_iterator rend()       { return reverse_iterator(begin()); }
+
+  const_reverse_iterator rbegin() const {
+    return const_reverse_iterator(end());
   }
 
-  reverse_children_iterator children_rend() {
-    return reverse_children_iterator(children_begin());
+  const_reverse_iterator rend() const {
+    return const_reverse_iterator(begin());
   }
 
-  const_reverse_children_iterator children_rbegin() const {
-    return const_reverse_children_iterator(children_end());
-  }
-
-  const_reverse_children_iterator children_rend() const {
-    return const_reverse_children_iterator(children_begin());
-  }
-
-  std::size_t children_count() const { return children_.size(); }
-  bool leaf() const { return children_.empty(); }
+  std::size_t size() const { return children_.size(); }
+  bool        leaf() const { return children_.empty(); }
 
   //! Construct an iterator to a child from a pointer to a child of this 
   //! vertex. The behaviour is undefined if child does not point to a child of 
@@ -135,7 +127,7 @@ public:
   //!
   //! \note This is surprisingly ineffective (O(n) instead of O(1)) -- could
   //!   it be improved or removed?
-  children_iterator iter_from_ptr(vertex* child) {
+  iterator iter_from_ptr(vertex* child) {
     using namespace boost::lambda;
     return std::find_if(children_.begin(), children_.end(),
                         &_1 == child);
@@ -143,15 +135,22 @@ public:
 
   //! Sort the children of this vertex according to a comparator.
   template <typename Compare>
-  void sort_children(Compare comp) {
+  void sort(Compare comp) {
     std::sort(children_.base().begin(), children_.base().end(),
               ptr_compare<Compare>(comp));
   }
 
+  //! Stable sort the children of this vertex according to a comparator.
+  template <typename Compare>
+  void stable_sort(Compare comp) {
+    std::stable_sort(children_.base().begin(), children_.base().end(),
+                     ptr_compare<Compare>(comp));
+  }
+
   //! Swap two children of this vertex.
-  void swap_children(children_iterator first, children_iterator second) {
-    assert(first != children_end());
-    assert(second != children_end());
+  void swap_children(iterator first, iterator second) {
+    assert(first != end());
+    assert(second != end());
 
     if (first != second)
       std::swap(*first.base().base(), *second.base().base());
@@ -163,13 +162,13 @@ public:
   //!
   //! \note As the source vertex's size is reduced, it may be advantageous to 
   //!   .pack() it after this operation.
-  void transfer_child(vertex& other, vertex::children_iterator child,
-                      vertex::children_iterator before) {
+  void transfer_child(vertex& other, vertex::iterator child,
+                      vertex::iterator before) {
     children_.transfer(before.base(), child.base(), other.children_);
   }
 
-  void transfer_child(vertex& other, vertex::children_iterator child) {
-    transfer_child(other, child, children_end());
+  void transfer_child(vertex& other, vertex::iterator child) {
+    transfer_child(other, child, end());
   }
 
   //! Make this vertex allocate enough memory to hold new_size children, but 
@@ -239,7 +238,12 @@ private:
 //! Sort the children of a vertex according to a comparator.
 template <typename Compare>
 void sort_children(vertex& parent, Compare comp = Compare()) {
-  parent.sort_children(comp);
+  parent.sort(comp);
+}
+
+template <typename Compare>
+void stable_sort_children(vertex& parent, Compare comp = Compare()) {
+  parent.stable_sort(comp);
 }
 
 //! Update the order of children of a vertex assuming it was sorted previously 
@@ -247,18 +251,18 @@ void sort_children(vertex& parent, Compare comp = Compare()) {
 //!
 //! \returns Iterator to the given child in its new position.
 template <typename Compare>
-vertex::children_iterator
-resort_children(vertex& parent, vertex::children_iterator child, 
+vertex::iterator
+resort_children(vertex& parent, vertex::iterator child,
                 Compare comp = Compare()) {
-  assert(child != parent.children_end());
+  assert(child != parent.end());
 
   // So long as the child is greater than its sibling to the right, bubble it 
   // right.
-  while (boost::next(child) != parent.children_end() && 
+  while (boost::next(child) != parent.end() && 
          comp(*boost::next(child), *child)) {
-    vertex::children_iterator equal_range_end = boost::next(child);
-    while (equal_range_end != parent.children_end() &&
-           boost::next(equal_range_end) != parent.children_end() &&
+    vertex::iterator equal_range_end = boost::next(child);
+    while (equal_range_end != parent.end() &&
+           boost::next(equal_range_end) != parent.end() &&
            !comp(*equal_range_end, *boost::next(equal_range_end)))
       ++equal_range_end;
 
@@ -269,10 +273,10 @@ resort_children(vertex& parent, vertex::children_iterator child,
   // And conversly, so long as the sibling to the left is greater or equal than 
   // the child, bubble left. Note that this won't do anything if the previous 
   // loop already re-sorted the children.
-  while (child != parent.children_begin() && 
+  while (child != parent.begin() && 
          !comp(*boost::prior(child), *child)) {
-    vertex::children_iterator equal_range_begin = boost::prior(child);
-    while (equal_range_begin != parent.children_begin() &&
+    vertex::iterator equal_range_begin = boost::prior(child);
+    while (equal_range_begin != parent.begin() &&
            !comp(*boost::prior(equal_range_begin), *equal_range_begin))
       --equal_range_begin;
 
@@ -289,12 +293,12 @@ resort_children(vertex& parent, vertex::children_iterator child,
 //! \param dest Destination vertex.
 //! \param before Iterator into dest specifying before which position is the 
 //!   insertion to take place.
-inline void transfer_child(vertex& source, vertex::children_iterator child,
-                           vertex& dest, vertex::children_iterator before) {
+inline void transfer_child(vertex& source, vertex::iterator child,
+                           vertex& dest, vertex::iterator before) {
   dest.transfer_child(source, child, before);
 }
 
-inline void transfer_child(vertex& source, vertex::children_iterator child,
+inline void transfer_child(vertex& source, vertex::iterator child,
                            vertex& dest) {
   dest.transfer_child(source, child);
 }
@@ -464,25 +468,25 @@ class backtrack {
   // A stack of (current vertex on a level, end iterator for that level).
   typedef std::stack<
     std::pair<
-      vertex::const_children_iterator,
-      vertex::const_children_iterator
+      vertex::const_iterator,
+      vertex::const_iterator
     >
   > stack_t;
 
 public:
   vertex const* operator () (vertex const& current) {
-    if (current.children_count() > 0) {
+    if (current.size() > 0) {
       // This vertex has any children? Good, go to the first one. Also push 
       // this level onto the stack.
       stack_.push(
-        std::make_pair(current.children_begin(), current.children_end())
+        std::make_pair(current.begin(), current.end())
       );
-      return &*current.children_begin();
+      return &*current.begin();
 
     } else while (!stack_.empty()) {
         // A leaf? Okay, does it have an unvisited sibling?
-        vertex::const_children_iterator& cur = stack_.top().first;
-        vertex::const_children_iterator& end = stack_.top().second;
+        vertex::const_iterator& cur = stack_.top().first;
+        vertex::const_iterator& end = stack_.top().second;
 
         ++cur;
         if (cur != end)
@@ -504,8 +508,8 @@ private:
 class postorder {
   typedef std::stack<
     std::pair<
-      apns::vertex::const_children_iterator,
-      apns::vertex::const_children_iterator
+      apns::vertex::const_iterator,
+      apns::vertex::const_iterator
     >
   > stack_t;
 
@@ -514,8 +518,8 @@ public:
     using namespace apns;
 
     if (stack_.empty()) {
-      if (v.children_count() > 0) {
-        stack_.push(std::make_pair(v.children_begin(), v.children_end()));
+      if (v.size() > 0) {
+        stack_.push(std::make_pair(v.begin(), v.end()));
         return inc(recurse(stack_.top().first));
       } else {
         return 0;
@@ -540,21 +544,21 @@ private:
 
   //! If an iterator is given, increments it and returns pointer to the 
   //! originally pointed-to vertex. Otherwise, it returns 0.
-  vertex const* inc(boost::optional<vertex::const_children_iterator&> i) {
+  vertex const* inc(boost::optional<vertex::const_iterator&> i) {
     if (i)
       return &*((*i)++);
     else
       return 0;
   }
 
-  boost::optional<vertex::const_children_iterator&>
-  recurse(vertex::const_children_iterator from) {
-    vertex::const_children_iterator current = from;
-    while (current->children_count() > 0) {
+  boost::optional<vertex::const_iterator&>
+  recurse(vertex::const_iterator from) {
+    vertex::const_iterator current = from;
+    while (current->size() > 0) {
       stack_.push(
-        std::make_pair(current->children_begin(), current->children_end())
+        std::make_pair(current->begin(), current->end())
       );
-      current = current->children_begin();
+      current = current->begin();
     }
 
     if (!stack_.empty())

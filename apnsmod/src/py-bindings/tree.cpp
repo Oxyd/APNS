@@ -89,11 +89,11 @@ std::ptrdiff_t vertex_hash(apns::vertex& v) {
 }
 
 apns::vertex* vertex_add_child(apns::vertex& parent) {
-  return &*parent.add_child();
+  return &*parent.add();
 }
 
 void vertex_remove_child(apns::vertex& parent, apns::vertex* child) {
-  parent.remove_child(parent.iter_from_ptr(child));
+  parent.remove(parent.iter_from_ptr(child));
 }
 
 apns::vertex* game_get_root(apns::game& g) {
@@ -124,9 +124,9 @@ void export_tree() {
       .def_readwrite("type_", &apns::vertex::type, "The type of this vertex; either AND, or OR")
 
       .add_property("children", range<return_internal_reference<> >(
-          static_cast<apns::vertex::children_iterator (apns::vertex::*)()>(&apns::vertex::children_begin),
-          static_cast<apns::vertex::children_iterator (apns::vertex::*)()>(&apns::vertex::children_end)))
-      .add_property("childrenCount", &apns::vertex::children_count)
+          static_cast<apns::vertex::iterator (apns::vertex::*)()>(&apns::vertex::begin),
+          static_cast<apns::vertex::iterator (apns::vertex::*)()>(&apns::vertex::end)))
+      .add_property("childrenCount", &apns::vertex::size)
       .add_property("leaf", &apns::vertex::leaf)
       
       .def("addChild", &vertex_add_child,

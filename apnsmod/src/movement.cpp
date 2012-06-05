@@ -425,61 +425,9 @@ step_holder step::from_string(std::string const& string) {
   return step_holder::none;
 }
 
-bool step::revalidate(board const& board, piece::color_t player) const {
-  iterator second_noncapture = std::find_if(
-    boost::next(step_sequence_begin()), step_sequence_end(),
-    !boost::bind(&elementary_step::capture, _1)
-  );
-
-  step_holder new_step;
-
-  if (board.get(step_sequence_begin()->from())) {  
-    switch (step_kind(*this, player, board)) {
-    case ordinary: {
-      new_step = step::validate_ordinary_step(board, *step_sequence_begin());
-      if (new_step) {
-        iterator first = new_step->step_sequence_begin();
-        assert(first->what());
-
-        if (first->what()->color() != player)
-          return false;
-      }
-    } break;
-
-    case push: {
-      assert(second_noncapture != step_sequence_end());
-      new_step = step::validate_push(board, *step_sequence_begin(), 
-                                     *second_noncapture);
-    } break;
-
-    case pull: {
-      assert(second_noncapture != step_sequence_end());
-      new_step = step::validate_pull(board, *step_sequence_begin(), 
-                                     *second_noncapture);
-    } break;
-    }
-
-    if (new_step) {
-      std::size_t const old_size = 
-        std::distance(step_sequence_begin(), step_sequence_end());
-      std::size_t const new_size =
-        std::distance(new_step->step_sequence_begin(),
-                      new_step->step_sequence_end());
-
-      return old_size == new_size && 
-        std::equal(
-          step_sequence_begin(), step_sequence_end(), 
-          new_step->step_sequence_begin()
-        );
-    }
-  }
-
-  return false;
-}
-
 bool step::capture() const {
-  for (iterator el_step = step_sequence_begin();
-       el_step != step_sequence_end(); ++el_step)
+  for (iterator el_step = begin();
+       el_step != end(); ++el_step)
     if (el_step->capture())
       return true;
   return false;
@@ -489,27 +437,27 @@ std::string step::to_string() const {
   return representation_;
 }
 
-step::iterator step::step_sequence_begin() const {
+step::iterator step::begin() const {
   return iterator(representation_.get().begin(), 
                            representation_.get().end());
 }
 
-step::iterator step::step_sequence_end() const {
+step::iterator step::end() const {
   return iterator(representation_.get().end(),
                            representation_.get().end());
 }
 
-step::reverse_el_steps_iterator step::step_sequence_rbegin() const {
-  return reverse_el_steps_iterator(step_sequence_end());
+step::reverse_iterator step::rbegin() const {
+  return reverse_iterator(end());
 }
 
-step::reverse_el_steps_iterator step::step_sequence_rend() const {
-  return reverse_el_steps_iterator(step_sequence_begin());
+step::reverse_iterator step::rend() const {
+  return reverse_iterator(begin());
 }
 
 int step::steps_used() const {
   return
-    std::count_if(step_sequence_begin(), step_sequence_end(),
+    std::count_if(begin(), end(),
                   !boost::bind(&elementary_step::capture, _1));
 }
 
@@ -554,15 +502,15 @@ step step::make_push_pull(board const& board, elementary_step first_step,
 step_holder step_holder::none;
 
 bool operator == (step const& lhs, step const& rhs) {
-  step::iterator left = lhs.step_sequence_begin();
-  step::iterator right = rhs.step_sequence_begin();
+  step::iterator left = lhs.begin();
+  step::iterator right = rhs.begin();
 
-  for (; left != lhs.step_sequence_end() && right != rhs.step_sequence_end(); 
+  for (; left != lhs.end() && right != rhs.end(); 
        ++left, ++right)
     if (*left != *right)
       return false;
 
-  return left == lhs.step_sequence_end() && right == rhs.step_sequence_end();
+  return left == lhs.end() && right == rhs.end();
 }
 
 bool operator != (step const& lhs, step const& rhs) {
@@ -573,7 +521,7 @@ e_step_kind step_kind(step const& step, piece::color_t player,
                       board const& board) {
   if (step.steps_used() == 1)
     return ordinary;
-  else if (board.get(step.step_sequence_begin()->from())->color() == player)
+  else if (board.get(step.begin()->from())->color() == player)
     return pull;
   else
     return push;
@@ -654,16 +602,16 @@ void apply(step const& step, board& board) {
 }
 
 bool try_apply(step const& step, board& board) {
-  for (apns::step::iterator es = step.step_sequence_begin();
-       es != step.step_sequence_end(); ++es) {
+  for (apns::step::iterator es = step.begin();
+       es != step.end(); ++es) {
     if (!apply_elementary(*es, board)) {
       // The application has failed. We now need to roll back everything 
       // that's been done.
-      if (es != step.step_sequence_begin()) {
+      if (es != step.begin()) {
         do {
           --es;
           unapply_elementary(*es, board);
-        } while (es != step.step_sequence_begin());
+        } while (es != step.begin());
       }
 
       return false;
@@ -681,17 +629,17 @@ void unapply(step const& step, board& board) {
 }
 
 bool try_unapply(step const& step, board& board) {
-  for (apns::step::reverse_el_steps_iterator es = step.step_sequence_rbegin();
-       es != step.step_sequence_rend(); ++es) {
+  for (apns::step::reverse_iterator es = step.rbegin();
+       es != step.rend(); ++es) {
     if (!unapply_elementary(*es, board)) {
       // It's failed. That means we need to turn back the board to its original 
       // state.
 
-      if (es != step.step_sequence_rbegin()) {
+      if (es != step.rbegin()) {
         do {
           --es;
           apply_elementary(*es, board);
-        } while (es != step.step_sequence_rbegin());
+        } while (es != step.rbegin());
       }
 
       return false;
@@ -699,6 +647,62 @@ bool try_unapply(step const& step, board& board) {
   }
 
   return true;
+}
+
+step_holder revalidate(
+  step const& step, board const& board, piece::color_t player
+) {
+  step::iterator second_noncapture = std::find_if(
+    boost::next(step.begin()), step.end(),
+    !boost::bind(&elementary_step::capture, _1)
+  );
+
+  step_holder new_step;
+
+  if (board.get(step.begin()->from())) {
+    switch (step_kind(step, player, board)) {
+    case ordinary: {
+      new_step = step::validate_ordinary_step(board, *step.begin());
+      if (new_step) {
+        step::iterator first = new_step->begin();
+        assert(first->what());
+
+        if (first->what()->color() != player)
+          return step_holder::none;
+      }
+    } break;
+
+    case push: {
+      assert(second_noncapture != step.end());
+      new_step = step::validate_push(board, *step.begin(),
+                                     *second_noncapture);
+    } break;
+
+    case pull: {
+      assert(second_noncapture != step.end());
+      new_step = step::validate_pull(board, *step.begin(),
+                                     *second_noncapture);
+    } break;
+    }
+
+    if (new_step) {
+      step::iterator new_second_noncapture = std::find_if(
+        boost::next(new_step->begin()), new_step->end(),
+        !boost::bind(&elementary_step::capture, _1)
+      );
+
+      if (new_step->begin()->what() == step.begin()->what()) {
+        if (second_noncapture != step.end()) {
+          if (new_second_noncapture != step.end() &&
+              second_noncapture->what() == new_second_noncapture->what())
+            return new_step;
+        } else
+          return new_step;
+      }
+    }
+  }
+
+  return step_holder::none;
 }
 
 bool frozen(position position, board const& board) {
