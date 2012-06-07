@@ -444,6 +444,8 @@ class apply_test : public testing::Test {
 protected:
   board b;
   board original;
+  board_masks m;
+  board_masks original_mask;
 
   void SetUp() {
     b.put(position(1, 'c'), piece(piece::gold, piece::cat));
@@ -464,6 +466,7 @@ protected:
     b.put(position(7, 'g'), piece(piece::gold, piece::dog));
 
     original = b;
+    m = original_mask = masks_from_board(b);
   }
 };
 
@@ -475,8 +478,15 @@ TEST_F(apply_test, ordinary_move) {
   EXPECT_EQ(b.get(position(1, 'd'))->type(), piece::cat);
   EXPECT_EQ(b.get(position(1, 'd'))->color(), piece::gold);
 
+  apply(s, m);
+  board_masks const correct = masks_from_board(b);
+  EXPECT_EQ(correct, m);
+
   unapply(s, b);
   EXPECT_TRUE(b == original);
+
+  unapply(s, m);
+  EXPECT_EQ(original_mask, m);
 }
 
 TEST_F(apply_test, ordinary_suicide) {
@@ -485,8 +495,14 @@ TEST_F(apply_test, ordinary_suicide) {
   EXPECT_FALSE(b.get(position(6, 'b')));
   EXPECT_FALSE(b.get(position(6, 'c')));
 
+  apply(s, m);
+  EXPECT_EQ(masks_from_board(b), m);
+
   unapply(s, b);
   EXPECT_TRUE(b == original);
+
+  unapply(s, m);
+  EXPECT_EQ(original_mask, m);
 }
 
 TEST_F(apply_test, pull) {
@@ -500,8 +516,14 @@ TEST_F(apply_test, pull) {
   ASSERT_TRUE(b.get(position(4, 'e')));
   EXPECT_EQ(b.get(position(4, 'e'))->type(), piece::horse);
 
+  apply(s, m);
+  EXPECT_EQ(masks_from_board(b), m);
+
   unapply(s, b);
   EXPECT_TRUE(b == original);
+
+  unapply(s, m);
+  EXPECT_EQ(original_mask, m);
 }
 
 TEST_F(apply_test, push) {
@@ -515,8 +537,14 @@ TEST_F(apply_test, push) {
   ASSERT_TRUE(b.get(position(7, 'g')));
   EXPECT_EQ(b.get(position(7, 'g'))->type(), piece::elephant);
 
+  apply(s, m);
+  EXPECT_EQ(masks_from_board(b), m);
+
   unapply(s, b);
   EXPECT_TRUE(b == original);
+
+  unapply(s, m);
+  EXPECT_EQ(original_mask, m);
 }
 
 TEST_F(apply_test, push_capture) {
@@ -529,8 +557,14 @@ TEST_F(apply_test, push_capture) {
   ASSERT_TRUE(b.get(position(3, 'g')));
   EXPECT_EQ(b.get(position(3, 'g'))->type(), piece::horse);
 
+  apply(s, m);
+  EXPECT_EQ(masks_from_board(b), m);
+
   unapply(s, b);
   EXPECT_TRUE(b == original);
+
+  unapply(s, m);
+  EXPECT_EQ(original_mask, m);
 }
 
 TEST_F(apply_test, pull_capture) {
@@ -542,8 +576,14 @@ TEST_F(apply_test, pull_capture) {
   ASSERT_TRUE(b.get(position(3, 'b')));
   EXPECT_EQ(b.get(position(3, 'b'))->type(), piece::horse);
 
+  apply(s, m);
+  EXPECT_EQ(masks_from_board(b), m);
+
   unapply(s, b);
   EXPECT_TRUE(b == original);
+
+  unapply(s, m);
+  EXPECT_EQ(original_mask, m);
 }
 
 

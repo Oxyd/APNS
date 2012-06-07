@@ -423,6 +423,14 @@ inline std::size_t level(search_stack const& stack) {
   return stack.path().size();
 }
 
+//! Check whether the game would be lost due to a repetition if the
+//! given player made the given step from the given position assuming the
+//! passed-in game history.
+bool repetition(search_stack const& stack);
+
+/// Who plays from vertex v?
+piece::color_t vertex_player(vertex const& v, piece::color_t attacker);
+
 //! A CRTP base class for search algorithms.
 template <typename Algo>
 class search_algo : private boost::noncopyable {
@@ -588,14 +596,11 @@ protected:
     }
   }
 
-  void store_in_killer_db(std::size_t level, vertex::e_type parent_type,
-                          vertex const& v) {
+  void store_in_killer_db(std::size_t level, vertex const& v) {
     if (killer_db_ && v.step) {
       killer_db_->add(level, *v.step);
 
       *log_ << v.step->to_string()
-            << " is a killer for type "
-            << (parent_type == vertex::type_or ? "OR" : "AND")
             << " at level " << level << '\n';
     }
   }
@@ -644,7 +649,7 @@ protected:
       if (cutoff) {
         store_in_ht(current, level);
         if (parent)
-          store_in_killer_db(level, parent->type, current);
+          store_in_killer_db(level, current);
       }
 
       if (proved)
@@ -674,11 +679,11 @@ protected:
         search_stack_checkpoint checkpoint(stack_);
         stack_.push(&*child);
 
-        bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_);
+        bool const found_in_pt =
+          proof_tbl_ && pt_lookup(*proof_tbl_, stack_);
         if (!found_in_pt) {
-          bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_,
-                                                           stack_.hashes_top(),
-                                                           *child);
+          bool const found_in_tt =
+            trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), *child);
 
           if (!found_in_tt)
             evaluate(stack_, game_->attacker, *log_);
@@ -691,7 +696,7 @@ protected:
 
         if (cutoff) {
           store_in_ht(*child, stack_.size());
-          store_in_killer_db(stack_.size(), current.type, *child);
+          store_in_killer_db(stack_.size(), *child);
         }
       }
     }

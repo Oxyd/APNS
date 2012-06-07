@@ -240,6 +240,9 @@ TEST_F(board_test, iteration) {
 
   unsigned gold_count = 0;
   unsigned silver_count = 0;
+  unsigned total = 0;
+
+  EXPECT_TRUE(b.begin() != b.end());
 
   for (board::iterator piece = b.begin(); piece != b.end(); ++piece) {
     if (piece->second.color() == piece::silver) {
@@ -247,6 +250,8 @@ TEST_F(board_test, iteration) {
     } else {
       ++gold_count;
     }
+
+    ++total;
 
     switch (piece->second.type()) {
     case piece::horse:
@@ -259,6 +264,7 @@ TEST_F(board_test, iteration) {
     }
   }
 
+  EXPECT_EQ(4, total);
   EXPECT_EQ(3, gold_count);
   EXPECT_EQ(1, silver_count);
 }

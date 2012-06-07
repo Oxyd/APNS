@@ -290,6 +290,25 @@ bool adjacent_valid(position original, direction dir);
 /// Are two positions adjacent to each other?
 bool adjacent(position first, position second);
 
+/// Get the direction in which #to is adjacent from #from. The two positions
+/// must be adjacent.
+/// \throw std::logic_error If !adjacent(from, to).
+inline direction adjacent_dir(position from, position to) {
+  if (from.row() == to.row()) {
+    if (to.column() < from.column() && to.column() == from.column() - 1)
+      return west;
+    else if (to.column() > from.column() && to.column() == from.column() + 1)
+      return east;
+  } else {
+    if (to.row() < from.row() && to.row() == from.row() - 1)
+      return south;
+    else if (to.row() > from.row() && to.row() == from.row() + 1)
+      return north;
+  }
+
+  throw std::invalid_argument("adjacent_dir");
+}
+
 /**
  * Convert an int to #piece::type_t.
  * \throws std::domain_error if the value could not be converted.
@@ -298,8 +317,6 @@ piece::type_t type_from_int(int value);
 
 /**
  * The board itself.
- *
- * Do note that board itself is large and copying may be expensive.
  */
 class board {
 public:
@@ -321,6 +338,10 @@ public:
 
     typedef boost::uint64_t bits_t;
 
+    // Safe bool idiom.
+    typedef void (mask::* bool_type)() const;
+    void true_() const { }
+
   public:
     /// Forward iterator over the set positions of a mask.
     class iterator : public boost::iterator_facade<
@@ -332,22 +353,9 @@ public:
     public:
       /// Constructs a singular iterator. This is equal to the end iterator of
       /// any mask.
-      iterator() { }
+      iterator() : mask_(0), offset_(0) { }
 
     private:
-      position dereference() const { return pos_ + offset_; }
-
-      bool equal(iterator other) const {
-        return mask_ == other.mask_;
-      }
-
-      void increment() {
-        pos_ += offset_ + 1;
-        mask_ >>= offset_ + 1;
-        if (mask_ > 0)
-          offset_ = bitscan();
-      }
-
       friend class board::mask;
       friend class boost::iterator_core_access;
 
@@ -355,15 +363,11 @@ public:
       position    pos_;
       std::size_t offset_;
 
-      explicit iterator(mask::bits_t m)
-        : mask_(m)
-        , pos_(position(position::MIN_ROW, position::MIN_COLUMN)) {
-        if (mask_ > 0)
-          offset_ = bitscan();
-      }
+      explicit iterator(mask::bits_t m);
 
-      /// Get the index of least-significant set bit.
-      std::size_t bitscan() const;
+      position  dereference() const         { return pos_ + offset_; }
+      bool      equal(iterator other) const { return mask_ == other.mask_; }
+      void      increment();
     };
     typedef iterator const_iterator;
 
@@ -389,15 +393,21 @@ public:
       reference(bits_t& b, std::size_t order) : bits_(b), order_(order) { }
     };
 
-    ///@{ Pre-defined masks
+    /// \name Pre-defined masks
+    ///@{
     static mask const ROW[];
     static mask const COLUMN[];
     static mask const TRAPS;
     ///@}
 
-    ///@{ Constructors
+    /// \name Constructors
+    ///@{
+
     /// Create an empty mask.
     mask() : bits_(0) { }
+
+    /// Create a mask with one bit set.
+    explicit mask(position p) : bits_(bits_t(1) << p.order()) { }
 
     /// Create mask with true's on given row, and false's everywhere else.
     static mask row(position::row_t r) {
@@ -408,21 +418,37 @@ public:
     static mask column(position::col_t c) {
       return COLUMN[c - position::MIN_COLUMN];
     }
+
     ///@}
 
-    ///@{ Observers.
+    /// \name Observers
+    ///@{
     bool get(position p) const  { return bits_ & (bits_t(1) << p.order()); }
     bool empty() const          { return bits_ == 0; }
     bool equals(mask other)     { return bits_ == other.bits_; }
     bool less(mask other)       { return bits_ < other.bits_; }
+
+    /// Lowest position (as defined by op < (position, position)) that is set.
+    /// \throw std::logic_error If .empty().
+    position first_set() const;
     ///@}
 
-    ///@{ Iteration
+    /// \name Conversion
+    ///@{
+
+    /// A mask evaluates to true iff it is not .empty().
+    operator bool_type () const { return !empty() ? &mask::true_ : 0; }
+
+    ///@}
+
+    /// \name Iteration
+    ///@{
     iterator begin() const      { return iterator(bits_); }
     iterator end() const        { return iterator(); }
     ///@}
 
-    ///@{ Modifiers
+    /// \name Modifiers
+    ///@{
     void set(position p, bool value) {
       if (value)
         bits_ |= bits_t(1) << p.order();
@@ -434,10 +460,11 @@ public:
     mask shift(direction dir) const;
     ///@}
 
-    ///@{ Operators
+    /// Operators
+    ///@{
     reference operator [] (position p) { return reference(bits_, p.order()); }
     bool operator [] (position p) const { return get(p); }
-    mask operator ~ () { return mask(~bits_); }
+    mask operator ~ () const { return mask(~bits_); }
 
     mask& operator &= (mask other) { bits_ &= other.bits_; return *this; }
     mask& operator |= (mask other) { bits_ |= other.bits_; return *this; }
@@ -451,117 +478,89 @@ public:
   };
 
 private:
-  /// Pieces are stored in a container of this type.
-  typedef boost::array<
-    char,
-    ROWS * COLUMNS
-  > pieces_cont;
-
-  static char const NONE = ' ';
+  typedef boost::array<mask, colors_array_t::static_size> players_masks;
+  typedef boost::array<mask, types_array_t::static_size>  types_masks;
 
 public:
-  /// Bidirectional iterator type over elements of type pair<position, piece>.
+  /// Forward iterator type over elements of type pair<position, piece>.
   class iterator : public boost::iterator_adaptor<
     iterator,
-    pieces_cont::const_iterator,
+    mask::const_iterator,
     std::pair<position, piece> const,
-    boost::bidirectional_traversal_tag,
+    boost::forward_traversal_tag,
     std::pair<position, piece> const
   > {
   public:
     /// Construct a singular iterator.
-    iterator() : iterator::iterator_adaptor_(0) { }
+    iterator()
+      : iterator::iterator_adaptor_(mask::const_iterator())
+      , board_(0) { }
 
   private:
     friend class boost::iterator_core_access;
     friend class board;
 
-    explicit iterator(
-      pieces_cont const& pieces,
-      position p = position(position::MIN_ROW, position::MIN_COLUMN)
-    )
-      : iterator::iterator_adaptor_(pieces.begin() + p.order())
-      , pos_(p)
-    {
-      if (pos_ != position() && *base() == NONE)
-        increment();
+    board const*  board_;
 
-      assert(pos_ != position() || base() == pieces.end());
-    }
-
-    reference dereference() const {
-      assert(pos_ != position());
-      assert(*base() != NONE);
-      return std::make_pair(pos_, piece_from_letter_unsafe(*base()));
-    }
-
-    void increment() {
-      do
-        ++pos_, ++base_reference();
-      while (pos_ != position() && *base() == NONE);
-    }
-
-    void decrement() {
-      // --'ing a .begin() iterator is undefined behaviour.
-      do --pos_, --base_reference(); while (*base() == NONE);
-    }
-
-    position pos_;
+    iterator(board const& board, mask::const_iterator b);
+    std::pair<position, piece>  dereference() const;
   };
 
   board() { clear(); }
 
-  ///@{ Modifiers
-  /**
-   * Put a piece on a given position.
-   * \throws std::logic_error #where already contains a piece.
-   */
-  void put(position where, piece what) {
-    if (pieces_[where.order()] == NONE)
-      pieces_[where.order()] = letter_from_piece(what);
-    else throw std::logic_error(
-        "board: Attempted to put a piece at an occupied position");
-  }
+  /// \name Modifiers
+  ///@{
 
-  /**
-   * Remove the piece from the given position.
-   * \throws std::logic_error #where is empty.
-   */
-  void remove(position where) {
-    if (pieces_[where.order()] != NONE)
-      pieces_[where.order()] = NONE;
-    else throw std::logic_error(
-        "board: Attempted to remove a piece from a vacant position");
-  }
+  /// Put a piece on a given position.
+  /// \throws std::logic_error #where already contains a piece.
+  void put(position where, piece what);
+
+  /// Remove the piece from the given position.
+  /// \throws std::logic_error #where is empty.
+  void remove(position where);
 
   /// Remove all pieces from the board.
-  void clear() { std::fill(pieces_.begin(), pieces_.end(), NONE); }
+  void clear();
   ///@}
 
-  ///@{ Observers
-  /**
-   * Get a piece from the given position.
-   *
-   * \return The piece retreived from the position #from, or the empty value if 
-   * there is no piece at that position.
-   */
-  boost::optional<piece> get(position from) const {
-    char const p = pieces_[from.order()];
-    if (p != NONE) return piece_from_letter_unsafe(p); else return boost::none;
-  }
+  /// \name Observers
+  ///@{
 
-  /// Compare boards;
-  bool equal(board const& other) const  { return pieces_ == other.pieces_; }
-  bool less(board const& other) const   { return pieces_ < other.pieces_; }
+  /// Get a piece from the given position.
+  ///
+  /// \return The piece retreived from the position #from, or the empty value if
+  /// there is no piece at that position.
+  boost::optional<piece> get(position from) const;
+
+  /// Mask of positions that are occupied.
+  mask                  occupied() const  { return occupied_; }
+
+  /// A mask for each player with positions occupied by the respective player.
+  players_masks const&  players() const   { return players_; }
+
+  /// A mask for each type with positions occupied by the respective type.
+  types_masks const&    types() const     { return types_; }
+
   ///@}
 
-  ///@{ Iterators
-  iterator begin() const  { return iterator(pieces_); }
-  iterator end() const    { return iterator(pieces_, position()); }
+  /// \name Comparison
+  ///@{
+  bool equal(board const& other) const;
+  bool less(board const& other) const;
+  ///@}
+
+  /// \name Iteration
+  ///@{
+  iterator begin() const;
+  iterator end() const;
   ///@}
 
 private:
-  pieces_cont pieces_;
+  players_masks players_;
+  types_masks   types_;
+  mask          occupied_;
+
+  //pieces_cont pieces_;
 };
 
 ///@{ board::mask operators
@@ -637,7 +636,15 @@ struct board_masks {
   board::mask       occupied;
   player_masks_cont players;
   type_masks_cont   types;
+
 };
+
+inline bool operator == (board_masks const& lhs, board_masks const& rhs) {
+  return
+    lhs.occupied == rhs.occupied &&
+    lhs.players == rhs.players &&
+    lhs.types == rhs.types;
+}
 
 /// Convert board to bitmasks.
 board_masks masks_from_board(board const& b);

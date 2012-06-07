@@ -171,11 +171,13 @@ void export_movement() {
     .def("__repr__", &apns::step::to_string)
     ;
 
-  def("apply", &apns::apply,
+  def("apply",
+      static_cast<void (*)(apns::step const&, apns::board&)>(&apns::apply),
       "apply(Step, Board) -> None\n\n"
       "Apply given step to given board.");
 
-  def("unapply", &apns::unapply,
+  def("unapply",
+      static_cast<void (*)(apns::step const&, apns::board&)>(&apns::unapply),
       "unapply(Step, Board) -> None\n\n"
       "Undo the application of the step on the board");
 

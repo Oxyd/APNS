@@ -15,39 +15,6 @@
 
 namespace {
 
-//! Check whether the game would be lost if the given player made the given
-//! step from the given position assuming the passed-in ! game history.
-bool repetition(apns::search_stack const& stack) {
-  using namespace apns;
-
-  if (stack.history().size() >= 2) {
-    if (stack.hasher().opponent_hash(stack.history().back()) == 
-        *(stack.history().end() - 2))
-      return true;  // Loss because the last player's move has not resulted in 
-                    // a net change in game position.
-
-    // Check for third-time repetitions. Only check against the last element
-    // in .history() as the previous ones should have been checked by previous
-    // calls to this function.
-
-    unsigned rep_count = 0;
-    for (search_stack::history_sequence::const_iterator h =
-         stack.history().begin(); h != stack.history().end() - 1; ++h) {
-      if (*h == stack.history().back())
-        if (++rep_count == 3)
-          return true;
-    }
-  }
-
-  return false;
-}
-
-apns::piece::color_t vertex_player(apns::vertex const& v, 
-                                   apns::piece::color_t attacker) {
-  return v.type == apns::vertex::type_or ? 
-    attacker : apns::opponent_color(attacker);
-}
-
 bool histories_compatible(apns::search_stack const& stack,
                           apns::history_t const& history) {
   using namespace apns;
@@ -845,6 +812,36 @@ bool simulate(search_stack& stack, piece::color_t attacker,
 
   assert(parent.leaf());
   return false;
+}
+
+//! Check whether the game would be lost due to a repetition if the
+//! given player made the given step from the given position assuming the
+//! passed-in game history.
+bool repetition(search_stack const& stack) {
+  if (stack.history().size() >= 2) {
+    // Check for null moves.
+    if (stack.hasher().opponent_hash(stack.history().back()) ==
+        *(stack.history().end() - 2))
+      return true;
+
+    // Check for third-time repetitions.
+    // Only check against the last element in .history() as the previous ones
+    // should have been checked by previous calls to this function.
+
+    unsigned rep_count = 0;
+    for (search_stack::history_sequence::const_iterator h =
+         stack.history().begin(); h != stack.history().end() - 1; ++h) {
+      if (*h == stack.history().back())
+        if (++rep_count == 3)
+          return true;
+    }
+  }
+
+  return false;
+}
+
+piece::color_t vertex_player(vertex const& v, piece::color_t attacker) {
+  return v.type == vertex::type_or ? attacker : opponent_color(attacker);
 }
 
 void proof_number_search::do_iterate() {

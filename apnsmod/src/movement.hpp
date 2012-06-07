@@ -21,7 +21,7 @@
 
 namespace apns {
 
-//! Maximum allowed number of steps in a move.
+/// Maximum allowed number of steps in a move.
 unsigned const MAX_STEPS = 4;
 
 struct elementary_step;
@@ -63,13 +63,13 @@ struct elementary_step {
 
   bool equal(elementary_step const& other) const;
 
-  //! Construct a displacement-kind elementary step.
+  /// Construct a displacement-kind elementary step.
   static elementary_step displacement(
     position from, direction where,
     boost::optional<piece> what = boost::optional<piece>()
   );
 
-  //! Construct a capture-kind elementary step.
+  /// Construct a capture-kind elementary step.
   static elementary_step make_capture(
     position from, boost::optional<piece> what = boost::optional<piece>()
   );
@@ -79,13 +79,13 @@ private:
     std::string::const_iterator, std::string::const_iterator
   );
 
-  //! A displacement.
+  /// A displacement.
   elementary_step(position from, direction where, boost::optional<piece> what);
 
-  //! A capture.
+  /// A capture.
   explicit elementary_step(position which, boost::optional<piece> what);
 
-  //! Construct from string.
+  /// Construct from string.
   explicit elementary_step(std::string::const_iterator begin, 
                            std::string::const_iterator end) {
     assert(end - begin == 4);
@@ -100,8 +100,8 @@ private:
     std::copy(begin, end, representation_.begin());
   }
 
-  //! Four-character representation of the elementary step. This is a string 
-  //! like "Rc7n" or " d3e" if the piece is not known.
+  /// Four-character representation of the elementary step. This is a string
+  /// like "Rc7n" or " d3e" if the piece is not known.
   boost::array<char, 4> representation_;
 };
 
@@ -135,6 +135,13 @@ std::string string_from_el_steps(Iter begin, Iter end) {
 
 class step_holder;
 
+/// Kind of a step.
+enum e_step_kind {
+  ordinary,
+  push,
+  pull
+};
+
 /**
  * A complete, valid Arimaa step.
  *
@@ -151,7 +158,7 @@ class step_holder;
  * A full step also includes information about captures of pieces. Thus a full
  * step is a complete representation of the change of the game board.
  *
- * Construction of a step is done only through provided three static member
+ * Construction of a step may be done through provided three static member
  * functions. These functions first check if such a step would be valid on the
  * given Arimaa board and, if so, check for any captures that would result
  * from such step, store them and return the resulting step. If such a step
@@ -165,12 +172,19 @@ class step_holder;
  * Note, however, that these constructor functions have no way of checking for
  * repetition of steps and as such users of this class are expected to check
  * for repetition themselves via other means.
+ *
+ * Direct construction of a step through its constructor doesn't guarantee
+ * validity of the step, and should only be used where the validity can be
+ * guaranteed by some other means.
  */
 class step {
   typedef std::vector<elementary_step> elementary_step_seq;
 
 public:
-  //! Iterator over the sequence of elementary steps.
+  /// \name Iteration
+  /// @{
+
+  /// Iterator over the sequence of elementary steps.
   struct iterator : boost::iterator_facade<
     iterator, 
     elementary_step const, 
@@ -212,58 +226,77 @@ public:
 
   typedef boost::reverse_iterator<iterator> reverse_iterator;
 
-  //! Validate and possibly construct an ordinary step.
-  //! \param board The board which is to be affected by this step.
-  //! \param step Movement of the single piece.
+  ///@}
+
+  /// \name Construction
+  /// @{
+
+  template <typename Iter>
+  step(Iter el_steps_begin, Iter el_steps_end)
+    : representation_(detail::string_from_el_steps(el_steps_begin,
+                                                   el_steps_end))
+  { }
+
+  /// Validate and possibly construct an ordinary step.
+  /// \param board The board which is to be affected by this step.
+  /// \param step Movement of the single piece.
   static step_holder validate_ordinary_step(board const& board,
                                             elementary_step step);
 
-  //! Validate and possibly construct a push kind of step.
-  //! \param board The board which is to be affected by this step.
-  //! \param first_step Movement of the pushed piece.
-  //! \param second_step Movement of the pushing piece.
+  /// Validate and possibly construct a push kind of step.
+  /// \param board The board which is to be affected by this step.
+  /// \param first_step Movement of the pushed piece.
+  /// \param second_step Movement of the pushing piece.
   static step_holder validate_push(board const& board,
                                    elementary_step const& first_step,
                                    elementary_step const& second_step);
 
-  //! Validate and possibly construct a pull kind of step.
-  //! \param board The board which is to be affected by this step.
-  //! \param first_step Movement of the pulling piece.
-  //! \param second_step Movement of the pulled piece.
+  /// Validate and possibly construct a pull kind of step.
+  /// \param board The board which is to be affected by this step.
+  /// \param first_step Movement of the pulling piece.
+  /// \param second_step Movement of the pulled piece.
   static step_holder validate_pull(board const& board,
                                    elementary_step const& first_step,
                                    elementary_step const& second_step);
 
-  //! Construct a step from a string.
-  //! \note This function does not check for the validity of the step itself.
-  //! It merely checks the syntax of the input string ! and, if the input is
-  //! syntactically valid, creates the step. This function is meant to be used
-  //! primarily from the ! restore-search-from-disk part of the program.
-  //!
-  //! \returns Either the corresponding step, or nothing, if the input doesn't 
-  //!   describe a valid step.
+  /// Construct a step from a string.
+  /// \note This function does not check for the validity of the step itself.
+  /// It merely checks the syntax of the input string ! and, if the input is
+  /// syntactically valid, creates the step. This function is meant to be used
+  /// primarily from the ! restore-search-from-disk part of the program.
+  ///
+  /// \returns Either the corresponding step, or nothing, if the input doesn't
+  ///   describe a valid step.
   static step_holder from_string(std::string const& string);
 
-  //! Does this step cause a capture on the board?
-  bool capture() const;
+  ///@}
 
-  //! Get the beginning of the full sequence of elementary steps that
-  //! represent this one step. Elementary steps in this sequence are
-  //! guaranteed to have a non-empty value for the elementary_step::what member.
+  /// \name Iteration
+  /// @{
+
   iterator begin() const;
   iterator end() const;
 
   reverse_iterator rbegin() const;
   reverse_iterator rend() const;
 
-  //! How many steps does this step use? For ordinary moves, it is 1; for push 
-  //! and pull it's 2. Captures do not count as used steps.
+  ///@}
+
+  /// \name Observers
+  ///@{
+
+  /// Does this step cause a capture on the board?
+  bool capture() const;
+
+  /// How many steps does this step use? For ordinary moves, it is 1; for push
+  /// and pull it's 2. Captures do not count as used steps.
   int steps_used() const;
 
-  //! Does this step involve rabbits in any way?
+  /// Does this step involve rabbits in any way?
   bool moves_rabbit() const;
 
   std::string to_string() const;
+  ///@}
 
   void swap(step& other) { representation_.swap(other.representation_); }
 
@@ -281,38 +314,34 @@ private:
   step() { }
   bool empty() const { return representation_.get().empty(); }
 
-  template <typename Iter>
-  step(Iter el_steps_begin, Iter el_steps_end)
-    : representation_(detail::string_from_el_steps(el_steps_begin, 
-                                                   el_steps_end))
-  { }
-
-  //! Make a push/pull move assuming that the move is valid.
+  /// Make a push/pull move assuming that the move is valid.
   static step make_push_pull(board const& board,
                              elementary_step first_step, 
                              elementary_step second_step);
 };
 
+///@{ Step operators
 bool operator == (step const& lhs, step const& rhs);
 bool operator != (step const& lhs, step const& rhs);
+///@}
 
-//! Holder for a step. This mimicks boost::optional, except it doesn't require
-//! the extra bool and instead cooperates with step to tell if it holds value
-//! or not.
+/// Holder for a step. This mimicks boost::optional, except it doesn't require
+/// the extra bool and instead cooperates with step to tell if it holds value
+/// or not.
 class step_holder {
   typedef void (step_holder::* bool_type)() const;
   void this_type_does_not_support_comparisons() const { }
 
 public:
-  //! Construct an empty holder.
+  /// Construct an empty holder.
   step_holder() { }
 
-  //! Implicit conversion from step, mimicking boost::optional.
+  /// Implicit conversion from step, mimicking boost::optional.
   step_holder(apns::step const& step) : step_(step) { }
   
   static step_holder none;
 
-  //! Is this holder empty?
+  /// Is this holder empty?
   bool empty() { return step_.empty(); }
   bool empty() const { return step_.empty(); }
   operator bool_type() {
@@ -322,8 +351,8 @@ public:
     return !empty() ? &step_holder::this_type_does_not_support_comparisons : 0; 
   }
 
-  //! For compatibility with old code, provide an implicit conversion to 
-  //! optional<step>.
+  /// For compatibility with old code, provide an implicit conversion to
+  /// optional<step>.
   operator boost::optional<apns::step> () const {
     if (!step_.empty())
       return step_;
@@ -363,14 +392,7 @@ inline std::size_t hash_value(step const& s) {
   return boost::hash<std::string>()(s.to_string()); 
 }
 
-//! Kind of a step.
-enum e_step_kind {
-  ordinary,
-  push,
-  pull
-};
-
-//! Get the kind of a step assuming it's a given player's turn.
+/// Get the kind of a step assuming it's a given player's turn.
 e_step_kind step_kind(step const& step, piece::color_t player,
                       board const& board);
 
@@ -386,9 +408,9 @@ e_step_kind step_kind(step const& step, piece::color_t player,
  */
 void apply(step const& step, board& board);
 
-//! Tro to apply the step to the given board. If the step is not applicable,
-//! returns false and doesn't modify the board. Returns true if the step was 
-//! applied successfuly.
+/// Tro to apply the step to the given board. If the step is not applicable,
+/// returns false and doesn't modify the board. Returns true if the step was
+/// applied successfuly.
 bool try_apply(step const& step, board& board);
 
 /**
@@ -402,27 +424,37 @@ bool try_apply(step const& step, board& board);
  */
 void unapply(step const& step, board& board);
 
-//! Try to unapply the step from the board. If successful, returns true. If
-//! the step can't be undone, returns false and leaves the original board
-//! unmodified.
+/// Try to unapply the step from the board. If successful, returns true. If
+/// the step can't be undone, returns false and leaves the original board
+/// unmodified.
 bool try_unapply(step const& step, board& board);
 
-//! Revalidate a step for a new board.
-//!
-//! \param step The step to revalidate.
-//! \param board New board to use for this validation.
-//! \param player Player to move in this step.
-//! \return Revalidated step (possibly with different sets of captures),
-//!         or none.
+/// Revalidate a step for a new board.
+///
+/// \param step The step to revalidate.
+/// \param board New board to use for this validation.
+/// \param player Player to move in this step.
+/// \return Revalidated step (possibly with different sets of captures),
+///         or none.
 step_holder revalidate(
   step const& step, board const& board, piece::color_t player
 );
 
-//! Is given piece frozen on the given board?
+/// Is given piece frozen on the given board?
 bool frozen(position position, board const& board);
 
-//! Is the given piece mobile on the given board?
+/// Is the given piece mobile on the given board?
 bool mobile(position position, board const& board);
+
+/// Apply a step to the board masks.
+void apply(step const& step, board_masks& masks);
+
+/// Undo the application of a step to board masks.
+void unapply(step const& step, board_masks& masks);
+
+typedef std::vector<step> steps_cont;
+
+steps_cont generate_steps(board_masks const& masks, piece::color_t player);
 
 /**
  * Iterator over an abstract sequence of all possible steps. Given a position
@@ -448,7 +480,7 @@ class steps_iter : public boost::iterator_facade<
 >
 {
 public:
-  steps_iter();  //!< Construct the singular iterator.
+  steps_iter();  ///< Construct the singular iterator.
 
   /**
    * Construct an iterator generating possible steps for the given piece on
@@ -465,47 +497,47 @@ private:
   friend class boost::iterator_core_access;
 
   apns::board const* board_;
-  position piece_pos_;           //!< The specified position of the piece.
-  directions_iter first_dir_;    //!< Where to move the piece (possibly pushing 
-                                 //!< something else away).
-  directions_iter second_dir_;   //!< Where to push the second piece (if 
-                                 //!< pushing) or which of the neighbours to 
-                                 //!< pull.
-  step_holder result_;           //!< Resulting step.
+  position piece_pos_;           ///< The specified position of the piece.
+  directions_iter first_dir_;    ///< Where to move the piece (possibly pushing
+                                 ///< something else away).
+  directions_iter second_dir_;   ///< Where to push the second piece (if
+                                 ///< pushing) or which of the neighbours to
+                                 ///< pull.
+  step_holder result_;           ///< Resulting step.
 
   enum {
-    ordinary,  //!< Generating ordinary steps.
-    push,      //!< Generating push steps.
-    pull       //!< Generating pull steps.
-  } state;     //!< Current state of this iterator.
+    ordinary,  ///< Generating ordinary steps.
+    push,      ///< Generating push steps.
+    pull       ///< Generating pull steps.
+  } state;     ///< Current state of this iterator.
 
-  step dereference() const;  //!< Get the resulting step.
-  bool equal(steps_iter const& other) const;  //!< Compare two iterators.
+  step dereference() const;  ///< Get the resulting step.
+  bool equal(steps_iter const& other) const;  ///< Compare two iterators.
 
-  void increment();     //!< Generate next step.
-  void do_increment();  //!< Try to generate a next step -- possibly letting 
-                        //!< result be empty.
+  void increment();     ///< Generate next step.
+  void do_increment();  ///< Try to generate a next step -- possibly letting
+                        ///< result be empty.
 
-  void advance_first();  //!< Advance first_dir.
+  void advance_first();  ///< Advance first_dir.
 
-  void advance_second_to_empty();   //!< Make #second_dir point to a nonempty 
-                                    //!< position at or after current value of 
-                                    //!< #second_dir
-  void advance_second_to_weaker();  //!< Make #second_dir point to a weaker 
-                                    //!< opponent piece at or after the current 
-                                    //!< value
+  void advance_second_to_empty();   ///< Make #second_dir point to a nonempty
+                                    ///< position at or after current value of
+                                    ///< #second_dir
+  void advance_second_to_weaker();  ///< Make #second_dir point to a weaker
+                                    ///< opponent piece at or after the current
+                                    ///< value
 
-  void generate_ordinary();         //!< Generate an ordinary step.
-  void generate_push();             //!< Generate a push step.
-  void generate_ordinary_or_push(); //!< Generate either a push or ordinary 
-                                    //!< step.
+  void generate_ordinary();         ///< Generate an ordinary step.
+  void generate_push();             ///< Generate a push step.
+  void generate_ordinary_or_push(); ///< Generate either a push or ordinary
+                                    ///< step.
 };
 
-//! Return the start of the abstract sequence of all possible steps for the 
-//! given piece.
+/// Return the start of the abstract sequence of all possible steps for the
+/// given piece.
 steps_iter steps_begin(position what, board const& board);
-steps_iter steps_end();  //!< Return the end of the sequence returned by 
-                         //!< steps_begin.
+steps_iter steps_end();  ///< Return the end of the sequence returned by
+                         ///< steps_begin.
 
 /**
  * An iterator generating all possible steps for a given player. This iterator

@@ -719,6 +719,106 @@ bool mobile(position position, board const& board) {
   return !frozen(position, board);
 }
 
+namespace {
+
+template <typename Iter>
+void apply(Iter begin, Iter end, board_masks& masks) {
+  for (Iter s = begin; s != end; ++s) {
+    board::mask const from(s->from());
+    piece const what = *s->what();
+    board::mask const update =
+      !s->capture()
+        ? from ^ from.shift(s->where())
+        : from;
+
+    masks.occupied ^= update;
+    masks.players[index_from_color(what.color())] ^= update;
+    masks.types[index_from_type(what.type())] ^= update;
+  }
+}
+
+}
+
+void apply(step const& step, board_masks& masks) {
+  apply(step.begin(), step.end(), masks);
+}
+
+void unapply(step const& step, board_masks& masks) {
+  apply(step.rbegin(), step.rend(), masks);
+}
+
+steps_cont generate_steps(board_masks const& masks, piece::color_t player) {
+  piece::color_t const opponent = opponent_color(player);
+  steps_cont result;
+
+  board::mask const have_friend =
+    masks.players[player] &
+    (masks.players[player].shift(north) |
+     masks.players[player].shift(south) |
+     masks.players[player].shift(east) |
+     masks.players[player].shift(west));
+
+  for (
+    types_array_t::const_iterator type = TYPES.begin();
+    type != TYPES.end();
+    ++type
+  ) {
+    board::mask opponent_stronger, opponent_weaker;
+    for (
+      types_array_t::const_iterator op_type = TYPES.begin();
+      op_type != TYPES.end();
+      ++op_type
+    )
+      if (op_type < type)
+        opponent_stronger |= masks.players[opponent] & masks.types[*op_type];
+      else if (op_type > type)
+        opponent_weaker |= masks.players[opponent] & masks.types[*op_type];
+
+    board::mask const stronger_opponent_adjacent =
+      masks.players[player] &
+        (opponent_stronger.shift(north) |
+         opponent_stronger.shift(south) |
+         opponent_stronger.shift(east) |
+         opponent_stronger.shift(west));
+
+    board::mask const unfrozen = ~(stronger_opponent_adjacent & ~have_friend);
+
+    for (
+      board::mask::iterator pos = unfrozen.begin();
+      pos != unfrozen.end();
+      ++pos
+    ) {
+      board::mask const vacant = neighbourhood(*pos) & ~masks.occupied;
+      board::mask const weaker_opponent_adjacent =
+        neighbourhood(*pos) & opponent_weaker;
+
+      for (
+        board::mask::iterator dir = vacant.begin();
+        dir != vacant.end();
+        ++dir
+      ) {
+        std::vector<elementary_step> es;
+
+        es.push_back(elementary_step::displacement(
+          *pos, adjacent_dir(*pos, *dir)
+        ));
+
+        if (trap(*dir) &&
+            (neighbourhood(*dir) & masks.players[player]).empty())
+          es.push_back(elementary_step::make_capture(
+            *dir, piece(player, *type)
+          ));
+
+        if (neighbourhood(*pos) & board::mask::TRAPS) {
+          position const trap =
+            (neighbourhood(*pos) & board::mask::TRAPS).first_set();
+
+        }
+      }
+    }
+  }
+}
+
 steps_iter::steps_iter()
   : board_(0)
   , piece_pos_(1, 'a')  // Need to init piece_pos somehow.
