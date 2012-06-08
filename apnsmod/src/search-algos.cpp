@@ -44,79 +44,48 @@ namespace apns {
  * Did any player win?
  *
  * \param board The game situation.
- * \param player Last player to have made a move.
+ * \param player Last player to have made a step.
  * \return If any player has won, return their color; otherwise return nothing.
  */
 boost::optional<piece::color_t> 
 winner(board const& board, piece::color_t player) {
   piece::color_t const opponent = opponent_color(player);
 
-  position::row_t const players_target_row =
-    player == piece::gold ? position::MAX_ROW : position::MIN_ROW;
-  position::row_t const opponents_target_row =
-    player == piece::gold ? position::MIN_ROW : position::MAX_ROW;
+  // Official rules state the following:
+  //
+  //   The order of checking for win/lose conditions is as follows assuming
+  //   player A just made the move and player B now needs to move:
+  //
+  //   1. Check if a rabbit of player A reached goal. If so player A wins.
+  //   2. Check if a rabbit of player B reached goal. If so player B wins.
+  //   3. Check if player B lost all rabbits. If so player A wins.
+  //   4. Check if player A lost all rabbits. If so player B wins.
 
-  bool player_has_rabbits = false;
-  bool opponent_has_rabbits = false;
+  board::mask const player_target =
+    player == piece::gold
+      ? board::mask::row(position::MAX_ROW)
+      : board::mask::row(position::MIN_ROW);
+  board::mask const opponent_target =
+    player == piece::gold
+      ? board::mask::row(position::MIN_ROW)
+      : board::mask::row(position::MAX_ROW);
 
-  for (position::col_t col = position::MIN_COLUMN; col <= position::MAX_COLUMN;
-       ++col) {
-    boost::optional<piece> const piece =
-      board.get(position(players_target_row, col));
-    if (piece && piece->type() == piece::rabbit) {
-      if (piece->color() == player) {
-        // Player has reached goal.
-        return player;
-      } else {
-        opponent_has_rabbits = true;
-      }
-    }
-  }
+  board::mask const rabbits = board.types()[index_from_type(piece::rabbit)];
+  board::mask const player_pieces = board.players()[index_from_color(player)];
+  board::mask const opponent_pieces =
+    board.players()[index_from_color(opponent)];
 
-  for (position::col_t col = position::MIN_COLUMN; col <= position::MAX_COLUMN;
-       ++col) {
-    boost::optional<piece> const piece =
-      board.get(position(opponents_target_row, col));
-    if (piece && piece->type() == piece::rabbit) {
-      if (piece->color() == opponent) {
-        // Opponent has reached goal.
-        return opponent;
-      } else {
-        player_has_rabbits = true;
-      }
-    }
-  }
+  if (rabbits & player_pieces & player_target)
+    return player;
 
-  // No goal.
+  if (rabbits & opponent_pieces & opponent_target)
+    return opponent;
 
-  if (!(player_has_rabbits && opponent_has_rabbits)) {
-    // It is possible for one player to lose due to loss of all rabbits.
+  if ((rabbits & opponent_pieces).empty())
+    return player;
 
-    for (
-      position::row_t row = position::MIN_ROW + 1;
-      row <= position::MAX_ROW - 1;
-      ++row
-    ) {  // We've already cheched first and last row.
-      for (
-        position::col_t col = position::MIN_COLUMN;
-        col <= position::MAX_COLUMN;
-        ++col
-      ) {
-        boost::optional<piece> const piece = board.get(position(row, col));
-        if (piece && piece->type() == piece::rabbit) {
-          if (piece->color() == player)
-            player_has_rabbits = true;
-          else
-            opponent_has_rabbits = true;
-        }
-      }
-    }
-
-    if (!opponent_has_rabbits)
-      return player;
-    if (!player_has_rabbits)
-      return opponent;
-  }
+  if ((rabbits & player_pieces).empty())
+    return opponent;
 
   return boost::none;
 }
