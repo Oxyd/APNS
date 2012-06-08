@@ -20,6 +20,8 @@ void translate_bad_alloc(std::bad_alloc const& e) {
 
 } // anonymous namespace
 
+void export_piece();
+void export_position();
 void export_board();
 void export_movement();
 void export_tree();
@@ -31,6 +33,8 @@ void export_search_algos();
 BOOST_PYTHON_MODULE(_apnsmod) {
   using namespace boost::python;
 
+  export_piece();
+  export_position();
   export_board();
   export_movement();
   export_tree();

@@ -75,6 +75,8 @@ testEnv.Append(LIBS=config['libs']['gtest'])
 test_sources = [
   'hash_test',
   'board_test',
+  'piece_test',
+  'position_test',
   'movement_test',
   'search-algos_test',
   'tree_test',

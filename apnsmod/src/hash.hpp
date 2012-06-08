@@ -7,7 +7,6 @@
 #ifndef HASH_HPP
 #define HASH_HPP
 
-#include "board.hpp"
 #include "tree.hpp"
 
 #include <boost/array.hpp>
@@ -29,6 +28,8 @@
 #endif
 
 namespace apns {
+
+class board;
 
 /**
  * Zobrist's algorithm to generate hashes for game positions. This hasher is 

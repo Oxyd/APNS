@@ -1,6 +1,7 @@
 #ifndef PY_BINDINGS_PY_UTILS
 #define PY_BINDINGS_PY_UTILS
 
+#include <boost/optional.hpp>
 #include <boost/python.hpp>
 
 //! Convert a C++ sequence into a Python list.

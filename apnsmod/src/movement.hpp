@@ -8,6 +8,8 @@
 #define MOVEMENT_HPP
 
 #include "board.hpp"
+#include "piece.hpp"
+#include "position.hpp"
 #include "util.hpp"
 
 #include <boost/iterator/iterator_facade.hpp>
@@ -491,12 +493,12 @@ public:
    *   contain a piece.
    * \param board The board.
    */
-  steps_iter(position what_piece, apns::board const& board);
+  steps_iter(position what_piece, board const& board);
 
 private:
   friend class boost::iterator_core_access;
 
-  apns::board const* board_;
+  board const* board_;
   position piece_pos_;           ///< The specified position of the piece.
   directions_iter first_dir_;    ///< Where to move the piece (possibly pushing
                                  ///< something else away).
@@ -553,15 +555,15 @@ class all_steps_iter : public boost::iterator_facade<
 {
 public:
   all_steps_iter();
-  all_steps_iter(apns::board const& board, piece::color_t player);
+  all_steps_iter(board const& board, piece::color_t player);
 
 private:
   friend class boost::iterator_core_access;
 
-  apns::board const*            board_;
-  apns::board::iterator  current_piece_;
-  steps_iter                    current_step_;
-  piece::color_t                player_;
+  board const*    board_;
+  board::iterator current_piece_;
+  steps_iter      current_step_;
+  piece::color_t  player_;
 
   void increment();
   reference dereference() const;
