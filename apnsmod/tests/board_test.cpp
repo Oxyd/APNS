@@ -363,6 +363,23 @@ TEST(mask, iteration) {
   EXPECT_TRUE(result.find(position(3, 'g')) != result.end());
   EXPECT_TRUE(result.find(position(8, 'a')) != result.end());
   EXPECT_TRUE(result.find(position(8, 'h')) != result.end());
+
+  m = board::mask();
+  m.set(position(8, 'h'), true);
+  result.clear();
+
+  for (board::mask::iterator it = m.begin(); it != m.end(); ++it)
+    result.insert(*it);
+
+  EXPECT_EQ(1, result.size());
+  EXPECT_TRUE(result.find(position(8, 'h')) != result.end());
+}
+
+TEST(mask, traps_test) {
+  EXPECT_TRUE(trap(position(3, 'c')));
+  EXPECT_TRUE(trap(position(3, 'f')));
+  EXPECT_TRUE(trap(position(6, 'c')));
+  EXPECT_TRUE(trap(position(6, 'f')));
 }
 
 int main(int argc, char** argv) {

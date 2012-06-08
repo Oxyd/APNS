@@ -510,9 +510,12 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
   steps_seq steps;
   piece::color_t player = vertex_player(leaf, attacker);
 
+  std::vector<step> s = generate_steps(state, player);
   for (
-    all_steps_iter new_step = all_steps_begin(state, player);
-    new_step != all_steps_end();
+    //all_steps_iter new_step = all_steps_begin(state, player);
+    //new_step != all_steps_end();
+    std::vector<step>::const_iterator new_step = s.begin();
+    new_step != s.end();
     ++new_step
   ) {
     int const remaining =

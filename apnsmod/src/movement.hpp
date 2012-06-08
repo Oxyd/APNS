@@ -325,6 +325,9 @@ private:
 ///@{ Step operators
 bool operator == (step const& lhs, step const& rhs);
 bool operator != (step const& lhs, step const& rhs);
+inline bool operator < (step const& lhs, step const& rhs) {
+  return lhs.to_string() < rhs.to_string();
+}
 ///@}
 
 /// Holder for a step. This mimicks boost::optional, except it doesn't require
@@ -456,7 +459,7 @@ void unapply(step const& step, board_masks& masks);
 
 typedef std::vector<step> steps_cont;
 
-steps_cont generate_steps(board_masks const& masks, piece::color_t player);
+steps_cont generate_steps(board const& board, piece::color_t player);
 
 /**
  * Iterator over an abstract sequence of all possible steps. Given a position

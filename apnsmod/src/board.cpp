@@ -60,14 +60,16 @@ std::size_t bitscan(boost::uint64_t mask) {
 
 board::mask::iterator::iterator(mask::bits_t m)
   : mask_(m)
-  , pos_(position(position::MIN_ROW, position::MIN_COLUMN)) {
+  , pos_(position(position::MIN_ROW, position::MIN_COLUMN))
+  , offset_(0) {
   if (mask_ > 0)
     offset_ = bitscan(mask_);
 }
 
 void board::mask::iterator::increment() {
   pos_ += offset_ + 1;
-  mask_ >>= offset_ + 1;
+  mask_ >>= offset_;
+  mask_ >>= 1;
   if (mask_ > 0)
     offset_ = bitscan(mask_);
 }
@@ -179,8 +181,8 @@ void board::clear() {
 
 boost::optional<piece> board::get(position from) const {
   if (occupied_[from]) {
-    piece::color_t color;
-    piece::type_t  type;
+    piece::color_t color = piece::color_t();
+    piece::type_t  type  = piece::type_t();
 
     for (players_masks::const_iterator p = players_.begin();
          p != players_.end(); ++p)

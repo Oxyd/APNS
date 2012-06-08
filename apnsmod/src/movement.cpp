@@ -247,6 +247,39 @@ std::size_t const DIR_INDEX = 3;
 
 namespace apns {
 
+/// Check for captures resulting from what moving from src to dst.
+template <typename OutIter>
+void check_captures(position src, position dst, board const& board,
+                    piece what, OutIter out) {
+  std::size_t const player_index = index_from_color(what.color());
+  board::mask supporters;
+
+  if (trap(dst)) {
+    supporters = neighbourhood(dst) & board.players()[player_index];
+    supporters[src] = false;
+
+    // Check for piece stepping into a trap.
+    if (supporters.empty())
+      *out++ = elementary_step::make_capture(dst, what);
+  }
+
+  // Check for piece abandoning another one standing on a trap.
+  if (neighbourhood(src) & board::mask::TRAPS && !trap(dst)) {
+    position const trap =
+      (neighbourhood(src) & board::mask::TRAPS).first_set();
+    boost::optional<piece> const trapped = board.get(trap);
+    if (trapped) {
+      std::size_t trapped_player_index = index_from_color(trapped->color());
+      supporters = neighbourhood(trap) & board.players()[trapped_player_index];
+      supporters[src] = false;
+
+      if (supporters.empty())
+        *out++ = elementary_step::make_capture(trap, *trapped);
+    }
+  }
+
+}
+
 position elementary_step::from() const {
   return position(representation_[ROW_INDEX] - '0', 
                   representation_[COLUMN_INDEX]);
@@ -747,76 +780,151 @@ void unapply(step const& step, board_masks& masks) {
   apply(step.rbegin(), step.rend(), masks);
 }
 
-steps_cont generate_steps(board_masks const& masks, piece::color_t player) {
+steps_cont generate_steps(board const& board, piece::color_t player) {
   piece::color_t const opponent = opponent_color(player);
   steps_cont result;
 
+  std::size_t const player_index = index_from_color(player);
+  std::size_t const opponent_index = index_from_color(opponent);
+
   board::mask const have_friend =
-    masks.players[player] &
-    (masks.players[player].shift(north) |
-     masks.players[player].shift(south) |
-     masks.players[player].shift(east) |
-     masks.players[player].shift(west));
+    board.players()[player_index] &
+    (board.players()[player_index].shift(north) |
+     board.players()[player_index].shift(south) |
+     board.players()[player_index].shift(east) |
+     board.players()[player_index].shift(west));
 
   for (
     types_array_t::const_iterator type = TYPES.begin();
     type != TYPES.end();
     ++type
   ) {
+    std::size_t const type_index = index_from_type(*type);
     board::mask opponent_stronger, opponent_weaker;
+
     for (
       types_array_t::const_iterator op_type = TYPES.begin();
       op_type != TYPES.end();
       ++op_type
-    )
+    ) {
+      std::size_t const op_type_index = index_from_type(*op_type);
+
       if (op_type < type)
-        opponent_stronger |= masks.players[opponent] & masks.types[*op_type];
+        opponent_stronger |=
+          board.players()[opponent_index] & board.types()[op_type_index];
       else if (op_type > type)
-        opponent_weaker |= masks.players[opponent] & masks.types[*op_type];
+        opponent_weaker |=
+          board.players()[opponent_index] & board.types()[op_type_index];
+    }
+
+    board::mask const pieces =
+      board.players()[player_index] & board.types()[type_index];
 
     board::mask const stronger_opponent_adjacent =
-      masks.players[player] &
+      pieces &
         (opponent_stronger.shift(north) |
          opponent_stronger.shift(south) |
          opponent_stronger.shift(east) |
          opponent_stronger.shift(west));
 
-    board::mask const unfrozen = ~(stronger_opponent_adjacent & ~have_friend);
+    board::mask const unfrozen =
+      pieces & (~stronger_opponent_adjacent | have_friend);
 
     for (
       board::mask::iterator pos = unfrozen.begin();
       pos != unfrozen.end();
       ++pos
     ) {
-      board::mask const vacant = neighbourhood(*pos) & ~masks.occupied;
-      board::mask const weaker_opponent_adjacent =
+      board::mask const vacant = neighbourhood(*pos) & ~board.occupied();
+      board::mask const pullable =
         neighbourhood(*pos) & opponent_weaker;
+      board::mask const forbidden =
+        *type == piece::rabbit
+          ? board::mask::row(pos->row()).shift(
+              player == piece::gold ? south : north
+            )
+          : board::mask();
+      board::mask const targets = vacant & ~forbidden;
+
+      // Ordinary steps and pulls:
 
       for (
-        board::mask::iterator dir = vacant.begin();
-        dir != vacant.end();
+        board::mask::iterator dir = targets.begin();
+        dir != targets.end();
         ++dir
       ) {
-        std::vector<elementary_step> es;
+        std::vector<elementary_step> ordinary;
 
-        es.push_back(elementary_step::displacement(
-          *pos, adjacent_dir(*pos, *dir)
+        ordinary.push_back(elementary_step::displacement(
+          *pos, adjacent_dir(*pos, *dir), piece(player, *type)
         ));
 
-        if (trap(*dir) &&
-            (neighbourhood(*dir) & masks.players[player]).empty())
-          es.push_back(elementary_step::make_capture(
-            *dir, piece(player, *type)
+        check_captures(*pos, *dir, board, piece(player, *type),
+                       std::back_inserter(ordinary));
+
+        result.push_back(step(ordinary.begin(), ordinary.end()));
+
+        for (
+          board::mask::iterator pullee = pullable.begin();
+          pullee != pullable.end();
+          ++pullee
+        ) {
+          boost::optional<piece> const p = board.get(*pullee);
+          assert(p);
+
+          std::vector<elementary_step> pull(ordinary);
+          pull.push_back(elementary_step::displacement(
+            *pullee, adjacent_dir(*pullee, *pos), *p
           ));
 
-        if (neighbourhood(*pos) & board::mask::TRAPS) {
-          position const trap =
-            (neighbourhood(*pos) & board::mask::TRAPS).first_set();
+          check_captures(*pullee, *pos, board, *p,
+                         std::back_inserter(pull));
 
+          result.push_back(step(pull.begin(), pull.end()));
+        }
+      }
+
+      // Pushes:
+
+      board::mask const& pushable = pullable;
+
+      for (
+        board::mask::iterator pushee = pushable.begin();
+        pushee != pushable.end();
+        ++pushee
+      ) {
+        board::mask const pushee_tgts =
+          neighbourhood(*pushee) & ~board.occupied();
+        for (
+          board::mask::iterator push_tgt = pushee_tgts.begin();
+          push_tgt != pushee_tgts.end();
+          ++push_tgt
+        ) {
+          std::vector<elementary_step> push;
+          boost::optional<piece> const p = board.get(*pushee);
+          assert(p);
+
+          push.push_back(elementary_step::displacement(
+            *pushee, adjacent_dir(*pushee, *push_tgt), *p
+          ));
+
+          check_captures(*pushee, *push_tgt, board, *p,
+                         std::back_inserter(push));
+
+          push.push_back(elementary_step::displacement(
+            *pos, adjacent_dir(*pos, *pushee), piece(player, *type)
+          ));
+
+          check_captures(*pos, *pushee, board, piece(player, *type),
+                         std::back_inserter(push));
+
+          result.push_back(step(push.begin(), push.end()));
         }
       }
     }
   }
+
+  return result;
 }
 
 steps_iter::steps_iter()

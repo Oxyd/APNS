@@ -4,6 +4,9 @@
 #include <gtest/gtest.h>
 
 #include <utility>
+#include <vector>
+#include <set>
+#include <string>
 
 using namespace apns;
 
@@ -363,7 +366,7 @@ protected:
 void expect_counts(board const& b, std::vector<step> const& steps,
     std::size_t expected_total, std::size_t expected_ordinary,
     std::size_t expected_push, std::size_t expected_pull) {
-  EXPECT_EQ(steps.size(), expected_total);
+  EXPECT_EQ(expected_total, steps.size());
 
   std::size_t ordinary_count = 0;
   std::size_t pull_count = 0;
@@ -377,9 +380,9 @@ void expect_counts(board const& b, std::vector<step> const& steps,
     }
   }
 
-  EXPECT_EQ(ordinary_count, expected_ordinary);
-  EXPECT_EQ(push_count, expected_push);
-  EXPECT_EQ(pull_count, expected_pull);
+  EXPECT_EQ(expected_ordinary, ordinary_count);
+  EXPECT_EQ(expected_push, push_count);
+  EXPECT_EQ(expected_pull, pull_count);
 }
 
 TEST_F(move_generation, ordinary_step_generation) {
@@ -418,6 +421,11 @@ TEST_F(move_generation, all_steps) {
   expect_counts(b, steps, 27, 11, 10, 6);
 }
 
+TEST_F(move_generation, new_generator) {
+  std::vector<step> steps = generate_steps(b, piece::gold);
+  expect_counts(b, steps, 27, 11, 10, 6);
+}
+
 class move_generation2 : public testing::Test {
 protected:
   void SetUp() {
@@ -438,6 +446,240 @@ TEST_F(move_generation2, all_steps) {
   std::vector<step> steps;
   steps.insert(steps.end(), all_steps_begin(b, piece::gold), all_steps_end());
   expect_counts(b, steps, 3, 3, 0, 0);
+}
+
+struct expect_steps {
+  std::set<step> expected;
+
+  bool check(std::vector<step> const& result) {
+    EXPECT_EQ(expected.size(), result.size());
+    EXPECT_EQ(expected, std::set<step>(result.begin(), result.end()));
+    return
+      result.size() == expected.size() &&
+      std::set<step>(result.begin(), result.end()) == expected;
+  }
+};
+
+expect_steps& operator , (expect_steps& e, std::string const& step) {
+  e.expected.insert(e.expected.end(), *step::from_string(step));
+  return e;
+}
+
+TEST(bit_step_generation, ordinary) {
+  board b;
+  b.put(position(4, 'd'), piece(piece::gold, piece::cat));
+  expect_steps s;
+  s, "Cd4n", "Cd4e", "Cd4w", "Cd4s";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
+}
+
+TEST(bit_step_generation, correct_player) {
+  board b;
+  b.put(position(7, 'g'), piece(piece::silver, piece::camel));
+  b.put(position(4, 'd'), piece(piece::gold, piece::cat));
+  expect_steps s;
+  s, "Cd4n", "Cd4e", "Cd4w", "Cd4s";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
+
+  s.expected.clear();
+  s, "mg7n", "mg7e", "mg7s", "mg7w";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::silver)));
+}
+
+TEST(bit_step_generation, rabbit_movement) {
+  board b;
+  b.put(position(4, 'e'), piece(piece::gold, piece::rabbit));
+  b.put(position(5, 'g'), piece(piece::silver, piece::rabbit));
+
+  expect_steps s;
+  s, "Re4n", "Re4e", "Re4w";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
+
+  s.expected.clear();
+  s, "rg5s", "rg5e", "rg5w";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::silver)));
+}
+
+TEST(bit_step_generation, walls) {
+  board b;
+  b.put(position(1, 'c'), piece(piece::gold, piece::cat));
+  b.put(position(8, 'c'), piece(piece::gold, piece::cat));
+  b.put(position(6, 'h'), piece(piece::gold, piece::dog));
+  b.put(position(6, 'a'), piece(piece::gold, piece::dog));
+  b.put(position(1, 'a'), piece(piece::gold, piece::horse));
+  b.put(position(1, 'h'), piece(piece::gold, piece::horse));
+  b.put(position(8, 'a'), piece(piece::gold, piece::camel));
+  b.put(position(8, 'h'), piece(piece::gold, piece::elephant));
+
+  expect_steps s;
+  s,
+    "Ha1n", "Ha1e",
+    "Cc1e", "Cc1w", "Cc1n",
+    "Hh1n", "Hh1w",
+    "Da6n", "Da6e", "Da6s",
+    "Dh6n", "Dh6w", "Dh6s",
+    "Ma8e", "Ma8s",
+    "Cc8e", "Cc8w", "Cc8s",
+    "Eh8w", "Eh8s";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
+}
+
+TEST(bit_step_generation, block) {
+  board b;
+  b.put(position(1, 'g'), piece(piece::silver, piece::horse));
+  b.put(position(1, 'h'), piece(piece::silver, piece::elephant));
+  b.put(position(2, 'h'), piece(piece::silver, piece::horse));
+  b.put(position(3, 'h'), piece(piece::silver, piece::dog));
+  b.put(position(4, 'd'), piece(piece::silver, piece::cat));
+  b.put(position(5, 'd'), piece(piece::silver, piece::cat));
+  b.put(position(5, 'e'), piece(piece::silver, piece::dog));
+
+  expect_steps s;
+  s,
+    "hg1w", "hg1n",
+    "hh2w",
+    "dh3w", "dh3n",
+    "cd4e", "cd4w", "cd4s",
+    "cd5w", "cd5n",
+    "de5n", "de5s", "de5e";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::silver)));
+}
+
+TEST(bit_step_generation, freeze) {
+  board b;
+  b.put(position(1, 'g'), piece(piece::gold, piece::rabbit));
+  b.put(position(2, 'g'), piece(piece::gold, piece::dog));
+  b.put(position(2, 'h'), piece(piece::silver, piece::camel));
+  b.put(position(4, 'd'), piece(piece::gold, piece::cat));
+  b.put(position(4, 'e'), piece(piece::silver, piece::elephant));
+
+  expect_steps s;
+  s,
+    "Rg1e", "Rg1w",
+    "Dg2n", "Dg2w";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
+}
+
+TEST(bit_step_generation, suicide) {
+  board b;
+  b.put(position(5, 'c'), piece(piece::gold, piece::cat));
+
+  expect_steps s;
+  s, "Cc5n Cc6x", "Cc5e", "Cc5w", "Cc5s";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
+}
+
+TEST(bit_step_generation, abandonment) {
+  board b;
+  b.put(position(2, 'f'), piece(piece::gold, piece::rabbit));
+  b.put(position(3, 'c'), piece(piece::gold, piece::cat));
+  b.put(position(3, 'd'), piece(piece::gold, piece::rabbit));
+  b.put(position(3, 'f'), piece(piece::gold, piece::elephant));
+  b.put(position(3, 'g'), piece(piece::gold, piece::dog));
+
+  expect_steps s;
+  s,
+    "Rf2e", "Rf2w",
+    "Cc3n", "Cc3w", "Cc3s",
+    "Rd3n Cc3x", "Rd3e Cc3x",
+    "Ef3n", "Ef3w",
+    "Dg3n", "Dg3e", "Dg3s";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
+}
+
+TEST(bit_step_generation, pull_push) {
+  board b;
+  b.put(position(4, 'd'), piece(piece::gold, piece::elephant));
+  b.put(position(4, 'e'), piece(piece::silver, piece::dog));
+
+  b.put(position(5, 'g'), piece(piece::gold, piece::camel));
+  b.put(position(5, 'h'), piece(piece::silver, piece::rabbit));
+
+  b.put(position(8, 'g'), piece(piece::gold, piece::horse));
+  b.put(position(8, 'h'), piece(piece::silver, piece::cat));
+
+  b.put(position(7, 'b'), piece(piece::gold, piece::dog));
+  b.put(position(5, 'b'), piece(piece::silver, piece::cat));
+  b.put(position(6, 'a'), piece(piece::silver, piece::rabbit));
+  b.put(position(6, 'b'), piece(piece::silver, piece::rabbit));
+  b.put(position(6, 'c'), piece(piece::silver, piece::rabbit));
+  b.put(position(7, 'a'), piece(piece::silver, piece::rabbit));
+  b.put(position(7, 'c'), piece(piece::silver, piece::rabbit));
+  b.put(position(8, 'a'), piece(piece::silver, piece::rabbit));
+  b.put(position(8, 'b'), piece(piece::silver, piece::rabbit));
+  b.put(position(8, 'c'), piece(piece::silver, piece::rabbit));
+
+  b.put(position(7, 'd'), piece(piece::gold, piece::dog));
+  b.put(position(7, 'e'), piece(piece::silver, piece::elephant));
+
+  expect_steps s;
+  s,
+    "Ed4n", "Ed4n de4w", "Ed4w", "Ed4w de4w", "Ed4s", "Ed4s de4w",
+    "de4n Ed4e", "de4e Ed4e", "de4s Ed4e",
+
+    "Mg5n", "Mg5n rh5w", "Mg5w", "Mg5w rh5w", "Mg5s", "Mg5s rh5w",
+    "rh5n Mg5e", "rh5s Mg5e",
+
+    "Hg8s", "Hg8s ch8w", "Hg8w", "Hg8w ch8w",
+    "ch8s Hg8e";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
+}
+
+TEST(bit_step_generation, push_pull_capture) {
+  board b;
+  b.put(position(3, 'c'), piece(piece::gold, piece::rabbit));
+  b.put(position(4, 'c'), piece(piece::gold, piece::elephant));
+  b.put(position(5, 'c'), piece(piece::silver, piece::dog));
+
+  b.put(position(3, 'f'), piece(piece::gold, piece::horse));
+  b.put(position(3, 'g'), piece(piece::silver, piece::dog));
+  b.put(position(4, 'f'), piece(piece::gold, piece::camel));
+  b.put(position(5, 'f'), piece(piece::silver, piece::cat));
+  b.put(position(6, 'g'), piece(piece::silver, piece::rabbit));
+
+  expect_steps s;
+  s,
+    "Ec4e Rc3x", "Ec4w Rc3x",
+    "dc5n dc6x Ec4n Rc3x", "dc5e Ec4n Rc3x", "dc5w Ec4n Rc3x",
+    "Ec4w Rc3x dc5s", "Ec4e Rc3x dc5s",
+
+    "Rc3e", "Rc3w",
+
+    "Hf3s", "Hf3w",
+    "Hf3s dg3w df3x", "Hf3w dg3w df3x",
+    "dg3n Hf3e", "dg3e Hf3e", "dg3s Hf3e",
+
+    "Mf4e Hf3x", "Mf4w Hf3x",
+    "cf5n Mf4n Hf3x", "cf5e Mf4n Hf3x", "cf5w Mf4n Hf3x",
+    "Mf4e Hf3x cf5s", "Mf4w Hf3x cf5s";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
+}
+
+TEST(bit_step_generation, forced_abandonment) {
+  board b;
+  b.put(position(5, 'g'), piece(piece::gold, piece::dog));
+  b.put(position(6, 'f'), piece(piece::silver, piece::cat));
+  b.put(position(6, 'g'), piece(piece::silver, piece::rabbit));
+
+  expect_steps s;
+  s,
+    "Dg5s", "Dg5e", "Dg5w",
+    "Dg5s rg6s cf6x", "Dg5e rg6s cf6x", "Dg5w rg6s cf6x",
+    "rg6n cf6x Dg5n", "rg6e cf6x Dg5n";
+
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
 }
 
 class apply_test : public testing::Test {
