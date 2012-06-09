@@ -317,8 +317,7 @@ class Controller(object):
       self._killerDb = apnsmod.KillerDB(kCount)
     elif kCount == 0:
       self._killerDb = None
-
-    #self._search.moveCacheSize = self.searchParameters.moveCacheSize
+      
     self._search.gcLow = int(self.searchParameters.gcLow)
     self._search.gcHigh = int(self.searchParameters.gcHigh)
     self._search.transpositionTable = self._transTbl

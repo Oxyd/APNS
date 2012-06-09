@@ -97,10 +97,10 @@ def main():
   #parser.add_argument('-M', '--move-cache-size', type=int, default=32,
   #                    metavar='move cache size', dest='moveCacheSize',
   #                    help='Size of the move cache')
-  parser.add_argument('-g', '--gc-low', type=int, default=5000000,
+  parser.add_argument('-g', '--gc-low', type=int, default=3000000,
                       metavar='gc low', dest='gcLow',
                       help='Garbage collector low threshold.')
-  parser.add_argument('-G', '--gc-high', type=int, default=3000000,
+  parser.add_argument('-G', '--gc-high', type=int, default=5000000,
                       metavar='gc high', dest='gcHigh',
                       help='Garbage collector high threshold.')
   parser.add_argument('-q', '--quiet', const=True, default=False,
@@ -246,8 +246,7 @@ def main():
       show('    -- Hits:   {0}'.format(progress.proofTblHits))
       show('    -- Misses: {0}'.format(progress.proofTblMisses))
     
-    if progress.killerCount:
-      show('  -- Total killer count: {0}'.format(progress.killerCount))
+    show('  -- Total killer count: {0}'.format(progress.killerCount))
 
   controller.searchProgressCallbacks.add(printProgress)
   show('Starting search. Pres Control-C to stop the search at any time.')
