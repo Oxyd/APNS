@@ -175,9 +175,6 @@ class SearchProgress:
     self.proofTblSize       = None
     self.proofTblHits       = None
     self.proofTblMisses     = None
-    #self.moveCacheHits      = None
-    #self.moveCacheMisses    = None
-    self.historyTblSize     = None
     self.killerCount        = None
 
 MB = 1024 * 1024
@@ -314,9 +311,6 @@ class Controller(object):
     elif ptElems == 0:
       self._proofTbl = None
     
-    if self._historyTbl is None:
-      self._historyTbl = apnsmod.HistoryTable()
-
     kCount = int(self.searchParameters.killerCount)    
     if kCount > 0 and (
         self._killerDb is None or self._killerDb.plysSize != kCount):
@@ -329,7 +323,6 @@ class Controller(object):
     self._search.gcHigh = int(self.searchParameters.gcHigh)
     self._search.transpositionTable = self._transTbl
     self._search.proofTable = self._proofTbl
-    self._search.historyTable = self._historyTbl
     self._search.killerDB = self._killerDb
 
     logFilename = self.searchParameters.logFilename
@@ -415,17 +408,6 @@ class Controller(object):
       progress.proofTblHits = pt.hits
       progress.proofTblMisses = pt.misses
 
-#    progress.moveCacheHits = self._search.moveCacheHits
-#    progress.moveCacheMisses = self._search.moveCacheMisses
-    #progress.moveCacheHits = 0
-    #progress.moveCacheMisses = 0
-
-    ht = self._search.historyTable
-    if ht:
-      progress.historyTblSize = self._search.historyTable.size
-    else:
-      progress.historyTblSize = 0
-    
     kDB = self._search.killerDB
     if kDB:
       progress.killerCount  = kDB.totalSize

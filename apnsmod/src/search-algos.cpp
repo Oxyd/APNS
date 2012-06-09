@@ -12,6 +12,7 @@
 #include <set>
 #include <iostream>
 #include <algorithm>
+#include <limits>
 
 namespace {
 
@@ -90,21 +91,31 @@ winner(board const& board, piece::color_t player) {
   return boost::none;
 }
 
-vertex* best_successor(vertex& parent) {
+vertex* best_successor(
+  vertex& parent,
+  boost::function<int (vertex const&)> const& value
+) {
   return const_cast<vertex*>(best_successor(
-    const_cast<vertex const&>(parent)
+    const_cast<vertex const&>(parent),
+    value
   ));
 }
 
-vertex const* best_successor(vertex const& parent) {
+vertex const* best_successor(
+  vertex const& parent,
+  boost::function<int (vertex const&)> const& value
+) {
   if (parent.size() > 0) {
     vertex::const_iterator best = parent.begin();
+    int best_value = std::numeric_limits<int>::min();
     vertex_comparator better(parent);
 
     for (vertex::const_iterator child = boost::next(best);
          child != parent.end(); ++child) {
-      if (better(*child, *best)) {
+      if (better(*child, *best) ||
+          (!better(*best, *child) && value(*child) > best_value)) {
         best = child;
+        best_value = value(*child);
       }
     }
 
@@ -463,8 +474,12 @@ void killer_order(killer_db const& killers, std::size_t level, vertex& v) {
     ++child
   ) {
     if (child != killers_end && child->step &&
-        killers.is_killer(level, *child->step))
-      v.swap_children(child, killers_end++);
+        killers.is_killer(level, *child->step)) {
+      // Need to bubble stuff around here, to preserve heuristic order.
+      vertex::iterator it = killers_end++;
+      while (it != child)
+        v.swap_children(it++, child);
+    }
   }
 }
 
@@ -823,9 +838,6 @@ void proof_number_search::do_iterate() {
   assert(stack_.at_root());
 
   while (!stack_.path_top()->leaf()) {
-    if (history_tbl_)
-      history_order(*history_tbl_, *stack_.path_top());
-
     if (killer_db_)
       killer_order(*killer_db_, stack_.size(), *stack_.path_top());
 
@@ -891,6 +903,9 @@ void depth_first_pns::do_iterate() {
 
   // And go back down until we reach a leaf.
   while (!current->leaf()) {
+    if (killer_db_)
+      killer_order(*killer_db_, stack_.size(), *stack_.path_top());
+
     std::pair<vertex*, vertex*> best_two = two_best_successors(*current);
 
     assert(best_two.first);

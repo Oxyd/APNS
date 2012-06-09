@@ -45,7 +45,7 @@ def config(conf, bits, debug, profile):
         'boost-random':     'boost_random',
         'boost-filesystem': 'boost_filesystem',
         'boost-system':     'boost_system',
-        'gtest':            'gtest'
+        'gtest':            'gtest',
       },
       'extra':            _setupPrefix
     },

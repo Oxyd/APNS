@@ -14,6 +14,7 @@
 #include <boost/lambda/lambda.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
+#include <boost/function.hpp>
 
 #include <vector>
 #include <stack>
@@ -83,12 +84,27 @@ private:
   vertex_comparator comp_;
 };
 
+inline int zero(vertex const&) { return 0; }
+
 //! Return the best successor of a vertex. Can be used as a traversal policy.
 //! If there are multiple "as good" children, this guarantees to select the
-//! first one of these. This is to preserve any relative heuristic order
-//! created on these chilren.
-vertex* best_successor(vertex& parent);
-vertex const* best_successor(vertex const& parent);
+//! one with highest value().
+vertex* best_successor(
+  vertex& parent,
+  boost::function<int (vertex const&)> const& value
+);
+vertex const* best_successor(
+  vertex const& parent,
+  boost::function<int (vertex const&)> const& value
+);
+
+inline vertex* best_successor(vertex& parent) {
+  return best_successor(parent, &zero);
+}
+
+inline vertex const* best_successor(vertex const& parent) {
+  return best_successor(parent, &zero);
+}
 
 //! Return the best successor of a vertex and, if any, the second-best
 //! successor.
@@ -465,16 +481,6 @@ public:
     return proof_tbl_;
   }
   
-  //! Make the algorithm use a history table.
-  void use_history_tbl(boost::shared_ptr<history_table> const& /*ht*/) {
-    //history_tbl_ = ht;
-  }
-
-  //! Get the history table, if any, used by this algorithm.
-  boost::shared_ptr<history_table> get_history_tbl() const {
-    return history_tbl_;
-  }
-
   //! Make the algorithm use a killers DB.
   void use_killer_db(boost::shared_ptr<killer_db> const& killers) {
     killer_db_ = killers;
@@ -484,22 +490,6 @@ public:
   boost::shared_ptr<killer_db> get_killer_db() const {
     return killer_db_;
   }
-
-  //! Change the number of moves stored in the move cache.
-#if 0
-  void move_cache_size(std::size_t new_size) {
-    tree_.cache_moves(new_size);
-  }
-
-  //! Get the number of moves stored in the move cache.
-  std::size_t move_cache_size() const { return tree_.cached_moves(); }
-
-  //! Get the number of hits into the move cache.
-  std::size_t move_cache_hits() const { return tree_.move_cache().hits(); }
-
-  //! Get the number of misses in the move cache.
-  std::size_t move_cache_misses() const { return tree_.move_cache().misses(); }
-#endif
 
   //! Get the total number of vertices currently held by this algorithm.
   std::size_t get_position_count() const {
@@ -549,7 +539,6 @@ protected:
   search_stack                            stack_;
   boost::shared_ptr<transposition_table>  trans_tbl_;
   boost::shared_ptr<proof_table>          proof_tbl_;
-  boost::shared_ptr<history_table>        history_tbl_;
   boost::shared_ptr<killer_db>            killer_db_;
   std::size_t                             size_;
   std::size_t                             gc_low_;
@@ -583,16 +572,6 @@ protected:
 
       out << " proved by children\n";
       *log_ << out.str();
-    }
-  }
-
-  void store_in_ht(vertex const& v, std::size_t level) {
-    if (history_tbl_ && v.step) {
-      history_tbl_->insert(*v.step, level);
-
-      *log_ << v.step->to_string()
-            << " inserted into the history table with value "
-            << level << '\n';
     }
   }
 
@@ -646,11 +625,8 @@ protected:
 
       std::size_t const level = std::distance(path_begin, path_end);
 
-      if (cutoff) {
-        store_in_ht(current, level);
-        if (parent)
-          store_in_killer_db(level, current);
-      }
+      if (cutoff && parent)
+        store_in_killer_db(level, current);
 
       if (proved)
         store_in_pt(history_begin, history_end, level, hash, current);
@@ -695,7 +671,6 @@ protected:
         bool const cutoff = apns::cutoff(current, *child);
 
         if (cutoff) {
-          store_in_ht(*child, stack_.size());
           store_in_killer_db(stack_.size(), *child);
         }
       }

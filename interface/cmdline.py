@@ -13,6 +13,11 @@ import signal
 KB = 1024         # One kilobyte
 MB = 1024 * 1024  # One megabyte
 
+EXIT_FINISHED = 0
+EXIT_LIMIT = 1
+EXIT_ERROR = 2
+EXIT_CANCEL = 3
+
 class SaveLoadProgress(apnsmod.OperationController):
   def __init__(self, quiet):
     '''If quiet is True, don't print any progress.'''
@@ -115,28 +120,27 @@ def main():
     print >> sys.stderr, \
         'Error: Either initial position or previous search must be specified'
     parser.print_usage()
-    raise SystemExit(1)
+    raise SystemExit(EXIT_ERROR)
 
   if args.searchFile is not None and args.position is not None:
     print >> sys.stderr, \
         'Error: Initial position and previous search can\'t be specified ' + \
         'at the same time.'
-    raise SystemExit(1)
+    raise SystemExit(EXIT_ERROR)
 
   if args.algo not in apnsmod.algos:
     print >> sys.stderr, \
         'Error: Algorithm must be one of', ', '.join(apnsmod.algos)
-    raise SystemExit(1)
+    raise SystemExit(EXIT_ERROR)
 
   def checkNum(value, name):
     if value < 0:
       print >> sys.stderr, \
           'Error: {0} must be a nonnegative integer'.format(name)
-      raise SystemExit(1)
+      raise SystemExit(EXIT_ERROR)
 
   checkNum(args.transTblSize, 'Size of transposition table')
   checkNum(args.proofTblSize, 'Size of proof table')
-  #checkNum(args.moveCacheSize, 'Size of move cache')
   checkNum(args.timeLimit, 'Time limit')
   checkNum(args.posLimit, 'Position limit')
   checkNum(args.memLimit, 'Memory limit')
@@ -150,7 +154,6 @@ def main():
   params.memoryLimit = args.memLimit
   params.transTblSize = args.transTblSize
   params.proofTblSize = args.proofTblSize
-  #params.moveCacheSize = args.moveCacheSize
   params.gcLow = args.gcLow
   params.gcHigh = args.gcHigh
   params.logFilename = args.logFilename
@@ -191,7 +194,7 @@ def main():
       print >> sys.stderr, \
           'Error loading specified initial position from specified ' + \
           'file: {0}'.format(e)
-      raise SystemExit(1)
+      raise SystemExit(EXIT_ERROR)
 
   else:
     show('Loading previous search tree from {0}:'.format(args.searchFile))
@@ -202,13 +205,13 @@ def main():
       print >> sys.stderr, \
         'Error loading specified search tree from specified ' + \
         'file: {0}'.format(e)
-      raise SystemExit(1)
+      raise SystemExit(EXIT_ERROR)
 
     if not interruptHandler.interrupted:
       show('Done')
     else:
       show('Cancelled')
-      raise SystemExit(0)
+      raise SystemExit(EXIT_CANCEL)
 
   def printProgress(ctrl, progress, summary=False):
     if summary:
@@ -243,13 +246,8 @@ def main():
       show('    -- Hits:   {0}'.format(progress.proofTblHits))
       show('    -- Misses: {0}'.format(progress.proofTblMisses))
     
-    if progress.historyTblSize:
-      show('  -- History table size: {0}'.format(progress.historyTblSize))
-    
     if progress.killerCount:
       show('  -- Total killer count: {0}'.format(progress.killerCount))
-
-    show('  -- History table size: {0}'.format(progress.historyTblSize))
 
   controller.searchProgressCallbacks.add(printProgress)
   show('Starting search. Pres Control-C to stop the search at any time.')
@@ -261,30 +259,40 @@ def main():
   except RuntimeError, e:
     print >> sys.stderr, \
       'Internal error has occured; this is likely a bug.\n\n' + str(e)
-    raise SystemExit(1)
+    raise SystemExit(EXIT_ERROR)
   except MemoryError:
     print >> sys.stderr, \
       'Error: The program ran out of memory while trying to expand the tree.'
-    raise SystemExit(1)
+    raise SystemExit(EXIT_ERROR)
 
   end = time.time()
+  
+  exitStatus = None
 
   if not args.quiet or args.noProgress:
     print 'Search finished:',
-    if controller.root.proofNumber == 0:       print 'Root vertex is proved'
-    elif controller.root.disproofNumber == 0:  print 'Root vertex is disproved'
+    if controller.root.proofNumber == 0:
+      print 'Root vertex is proved'
+      exitStatus = EXIT_FINISHED
+    elif controller.root.disproofNumber == 0:
+      print 'Root vertex is disproved'
+      exitStatus = EXIT_FINISHED
     elif params.timeLimit > 0 and \
         controller.stats.timeElapsed >= params.timeLimit:
       print 'Time limit exceeded'
+      exitStatus = EXIT_LIMIT
     elif params.positionLimit > 0 and \
         controller.stats.positionCount >= params.positionLimit:
       print 'Position limit exceeded'
+      exitStatus = EXIT_LIMIT
     elif params.memoryLimit > 0 and \
         (apnsmod.Vertex.allocSize / (1024 ** 2)) >= params.memoryLimit:
       print 'Memory limit exceeded'
+      exitStatus = EXIT_LIMIT
     elif interruptHandler.interrupted:
       print 'Interrupted'
       interruptHandler.reset()
+      exitStatus = EXIT_CANCEL
 
     if args.noProgress:
       args.quiet = False
@@ -301,6 +309,8 @@ def main():
       show('Done')
     else:
       show('Cancelled')
+  
+  sys.exit(exitStatus)
 
 if __name__ == '__main__':
   main()

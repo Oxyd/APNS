@@ -1,7 +1,9 @@
 #include "movement.hpp"
 #include "board.hpp"
+#include "piece.hpp"
 
 #include <boost/bind.hpp>
+#include <boost/array.hpp>
 
 #include <sstream>
 #include <stdexcept>
@@ -247,20 +249,59 @@ std::size_t const DIR_INDEX = 3;
 
 namespace apns {
 
+static boost::array<int, types_array_t::static_size> const TYPE_COST = {{
+  10,     // elephant
+  7,      // camel
+  5,      // horse
+  3,      // dog
+  2,      // cat
+  1       // rabbit
+}};
+
+static int const CAPTURE_COEF = 4;
+static int const PUSH_PULL_COEF = 2;
+static int const TRAP_ABANDONMENT_PENALTY = 1;
+
+static int rabbit_score(piece::color_t color, position pos) {
+  if (color == piece::gold) {
+    if (pos.row() >= 5)
+      return pos.row() - position::MIN_ROW;
+  } else {
+    if (pos.row() <= 4)
+      return position::MAX_ROW - pos.row();
+  }
+
+  return TYPE_COST[index_from_type(piece::rabbit)];
+}
+
+static int cost(piece what, position where) {
+  if (what.type() != piece::rabbit)
+    return TYPE_COST[index_from_type(what.type())];
+  else
+    return rabbit_score(what.color(), where);
+}
+
 /// Check for captures resulting from what moving from src to dst.
+/// \return Score of the captured pieces. Captured pieces of the player who
+///         owns the moving pieces are counted with negative sign, opponent's
+///         with positive sign.
 template <typename OutIter>
-void check_captures(position src, position dst, board const& board,
-                    piece what, OutIter out) {
+int check_captures(position src, position dst, board const& board,
+                   piece what, OutIter out) {
   std::size_t const player_index = index_from_color(what.color());
   board::mask supporters;
+
+  int score = 0;
 
   if (trap(dst)) {
     supporters = neighbourhood(dst) & board.players()[player_index];
     supporters[src] = false;
 
     // Check for piece stepping into a trap.
-    if (supporters.empty())
+    if (supporters.empty()) {
       *out++ = elementary_step::make_capture(dst, what);
+      score -= CAPTURE_COEF * cost(what, src);
+    }
   }
 
   // Check for piece abandoning another one standing on a trap.
@@ -273,11 +314,33 @@ void check_captures(position src, position dst, board const& board,
       supporters = neighbourhood(trap) & board.players()[trapped_player_index];
       supporters[src] = false;
 
-      if (supporters.empty())
+      if (supporters.empty()) {
         *out++ = elementary_step::make_capture(trap, *trapped);
+        score +=
+          (trapped->color() == what.color() ? -1 : +1) *
+          CAPTURE_COEF * cost(*trapped, trap);
+      }
     }
   }
 
+  return score;
+}
+
+template <typename OutIter>
+int make_displacement(board const& board, position src, position dst,
+                      piece what, OutIter out) {
+  int score = 0;
+
+  *out++ = elementary_step::displacement(
+    src, adjacent_dir(src, dst), what
+  );
+
+  if (what.type() == piece::rabbit)
+    score += rabbit_score(what.color(), dst);
+
+  score += check_captures(src, dst, board, what, out);
+
+  return score;
 }
 
 position elementary_step::from() const {
@@ -781,8 +844,9 @@ void unapply(step const& step, board_masks& masks) {
 }
 
 steps_cont generate_steps(board const& board, piece::color_t player) {
+  typedef std::pair<int, step> scored_step;
+  std::vector<scored_step> steps;
   piece::color_t const opponent = opponent_color(player);
-  steps_cont result;
 
   std::size_t const player_index = index_from_color(player);
   std::size_t const opponent_index = index_from_color(opponent);
@@ -854,15 +918,14 @@ steps_cont generate_steps(board const& board, piece::color_t player) {
         ++dir
       ) {
         std::vector<elementary_step> ordinary;
+        int score = make_displacement(
+          board, *pos, *dir, piece(player, *type),
+          std::back_inserter(ordinary)
+        );
 
-        ordinary.push_back(elementary_step::displacement(
-          *pos, adjacent_dir(*pos, *dir), piece(player, *type)
+        steps.push_back(std::make_pair(
+          score, step(ordinary.begin(), ordinary.end())
         ));
-
-        check_captures(*pos, *dir, board, piece(player, *type),
-                       std::back_inserter(ordinary));
-
-        result.push_back(step(ordinary.begin(), ordinary.end()));
 
         for (
           board::mask::iterator pullee = pullable.begin();
@@ -871,16 +934,19 @@ steps_cont generate_steps(board const& board, piece::color_t player) {
         ) {
           boost::optional<piece> const p = board.get(*pullee);
           assert(p);
+          assert(p->color() != player);
 
           std::vector<elementary_step> pull(ordinary);
-          pull.push_back(elementary_step::displacement(
-            *pullee, adjacent_dir(*pullee, *pos), *p
+          score -= make_displacement(
+            board, *pullee, *pos, *p,
+            std::back_inserter(pull)
+          );
+
+          score += cost(*p, *pos);
+
+          steps.push_back(std::make_pair(
+            score, step(pull.begin(), pull.end())
           ));
-
-          check_captures(*pullee, *pos, board, *p,
-                         std::back_inserter(pull));
-
-          result.push_back(step(pull.begin(), pull.end()));
         }
       }
 
@@ -901,28 +967,39 @@ steps_cont generate_steps(board const& board, piece::color_t player) {
           ++push_tgt
         ) {
           std::vector<elementary_step> push;
+          int score = 0;
           boost::optional<piece> const p = board.get(*pushee);
           assert(p);
+          assert(p->color() != player);
 
-          push.push_back(elementary_step::displacement(
-            *pushee, adjacent_dir(*pushee, *push_tgt), *p
+          score -= make_displacement(
+            board, *pushee, *push_tgt, *p,
+            std::back_inserter(push)
+          );
+          score += make_displacement(
+            board, *pos, *pushee, piece(player, *type),
+            std::back_inserter(push)
+          );
+          score += cost(*p, *push_tgt);
+
+          steps.push_back(std::make_pair(
+            score, step(push.begin(), push.end())
           ));
-
-          check_captures(*pushee, *push_tgt, board, *p,
-                         std::back_inserter(push));
-
-          push.push_back(elementary_step::displacement(
-            *pos, adjacent_dir(*pos, *pushee), piece(player, *type)
-          ));
-
-          check_captures(*pos, *pushee, board, piece(player, *type),
-                         std::back_inserter(push));
-
-          result.push_back(step(push.begin(), push.end()));
         }
       }
     }
   }
+
+  std::sort(
+    steps.begin(), steps.end(),
+    boost::bind(&scored_step::first, _1) > boost::bind(&scored_step::first, _2)
+  );
+
+  steps_cont result;
+  result.reserve(steps.size());
+  std::transform(steps.begin(), steps.end(),
+                 std::back_inserter(result),
+                 boost::bind(&scored_step::second, _1));
 
   return result;
 }

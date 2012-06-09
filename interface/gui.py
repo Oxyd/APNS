@@ -1540,10 +1540,7 @@ class SearchProgressDialog(Observable):
     proofTblSizeLbl     = ttk.Label(stats, text='Proof table size:')
     proofTblHitsLbl     = ttk.Label(stats, text='Proof table hits:')
     proofTblMissesLbl   = ttk.Label(stats, text='Proof table misses:')
-    historyTblSizeLbl   = ttk.Label(stats, text='History table size:')
     killerCountLbl      = ttk.Label(stats, text='Total killer count:')
-    #moveCacheHitsLbl    = ttk.Label(stats, text='Move cache hits:')
-    #moveCacheMissesLbl  = ttk.Label(stats, text='Move cache misses:')
     posCountLbl         = ttk.Label(stats, text='Vertex count:')
     posPerSecLbl        = ttk.Label(stats, text='New vertices per second:')
 
@@ -1554,10 +1551,7 @@ class SearchProgressDialog(Observable):
     self._proofTblSize    = ttk.Label(stats)
     self._proofTblHits    = ttk.Label(stats)
     self._proofTblMisses  = ttk.Label(stats)
-    self._historyTblSize  = ttk.Label(stats)
     self._killerCount     = ttk.Label(stats)
-    #self._moveCacheHits   = ttk.Label(stats)
-    #self._moveCacheMisses = ttk.Label(stats)
     self._posCount        = ttk.Label(stats)
     self._posPerSec       = ttk.Label(stats)
 
@@ -1607,12 +1601,9 @@ class SearchProgressDialog(Observable):
     proofTblSizeLbl.grid(row=4, column=0, sticky='E')
     proofTblHitsLbl.grid(row=5, column=0, sticky='E')
     proofTblMissesLbl.grid(row=6, column=0, sticky='E')
-    historyTblSizeLbl.grid(row=7, column=0, sticky='E')
-    killerCountLbl.grid(row=8, column=0, sticky='E')
-    #moveCacheHitsLbl.grid(row=7, column=0, sticky='E')
-    #moveCacheMissesLbl.grid(row=8, column=0, sticky='E')
-    posCountLbl.grid(row=9, column=0, sticky='E')
-    posPerSecLbl.grid(row=10, column=0, sticky='E')
+    killerCountLbl.grid(row=7, column=0, sticky='E')
+    posCountLbl.grid(row=8, column=0, sticky='E')
+    posPerSecLbl.grid(row=9, column=0, sticky='E')
 
     self._memoryAlloc.grid(row=0, column=1, sticky='W', padx=(5, 0))
     self._transTblSize.grid(row=1, column=1, sticky='W', padx=(5, 0))
@@ -1621,12 +1612,9 @@ class SearchProgressDialog(Observable):
     self._proofTblSize.grid(row=4, column=1, sticky='W', padx=(5, 0))
     self._proofTblHits.grid(row=5, column=1, sticky='W', padx=(5, 0))
     self._proofTblMisses.grid(row=6, column=1, sticky='W', padx=(5, 0))
-    self._historyTblSize.grid(row=7, column=1, sticky='W', padx=(5, 0))
-    self._killerCount.grid(row=8, column=1, sticky='W', padx=(5, 0))
-    #self._moveCacheHits.grid(row=7, column=1, sticky='W', padx=(5, 0))
-    #self._moveCacheMisses.grid(row=8, column=1, sticky='W', padx=(5, 0))
-    self._posCount.grid(row=9, column=1, sticky='W', padx=(5, 0))
-    self._posPerSec.grid(row=10, column=1, sticky='W', padx=(5, 0))
+    self._killerCount.grid(row=7, column=1, sticky='W', padx=(5, 0))
+    self._posCount.grid(row=8, column=1, sticky='W', padx=(5, 0))
+    self._posPerSec.grid(row=9, column=1, sticky='W', padx=(5, 0))
 
     stats.columnconfigure(1, weight=1)
 
@@ -1694,17 +1682,6 @@ class SearchProgressDialog(Observable):
     self._proofTblHits['text'] = '%s' % hits
     self._proofTblMisses['text'] = '%s' % misses
   
-  
-  def showMoveCacheStats(self, hits, misses):
-    '''Show statistics about the move cache.'''
-    
-    self._moveCacheHits['text'] = '%s' % hits
-    self._moveCacheMisses['text'] = '%s' % misses
-  
-  
-  def showHistoryTblStats(self, size):
-    self._historyTblSize['text'] = '%s' % size
-
 
   def showKillerCount(self, count):
     self._killerCount['text'] = '%s' % count
@@ -1794,9 +1771,6 @@ class SearchProgressController(object):
         else:
           dlg.showProofTblStats(memUsed='0 B', hits='0', misses='0')
 
-        #dlg.showMoveCacheStats(hits=progress.moveCacheHits,
-        #                       misses=progress.moveCacheMisses)
-        dlg.showHistoryTblStats(size=progress.historyTblSize)
         dlg.showKillerCount(count=progress.killerCount)
 
         dlg.showPosCount(posCount=progress.positionCount,
@@ -1849,9 +1823,6 @@ class SearchStatsController(object):
     else:
       searchProgressDlg.showProofTblStats('0 B', '0', '0')
       
-    #searchProgressDlg.showMoveCacheStats(hits=s.moveCacheHits,
-    #                                     misses=s.moveCacheMisses)
-    searchProgressDlg.showHistoryTblStats(size=s.historyTblSize)
     searchProgressDlg.showKillerCount(count=s.killerCount)
 
     searchProgressDlg.addObserver(self)

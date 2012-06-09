@@ -76,10 +76,6 @@ export_algo(char const* name, char const* description) {
                   &Base::get_proof_tbl, &Base::use_proof_tbl,
                   "The ProofTable instance associated with this algorithm or "
                   "None.")
-    .add_property("historyTable",
-                  &Base::get_history_tbl, &Base::use_history_tbl,
-                  "The HistoryTable instance associated with this algorithm or "
-                  "None.")
     .add_property("killerDB",
                   &Base::get_killer_db, &Base::use_killer_db,
                   "The KillerDB instance associated with this algorithm or "
@@ -87,20 +83,6 @@ export_algo(char const* name, char const* description) {
     .add_property("positionCount",
                   &Base::get_position_count,
                   "Total number of vertices currently held by this algorithm")
-#if 0
-    .add_property(
-      "moveCacheSize",
-      static_cast<std::size_t (Base::*)() const>(&Base::move_cache_size),
-      static_cast<void (Base::*)(std::size_t)>(&Base::move_cache_size),
-      "Size of the moves cache."
-    )
-    .add_property("moveCacheHits",
-                  &Base::move_cache_hits,
-                  "Number of hits in the move cache.")
-    .add_property("moveCacheMisses",
-                  &Base::move_cache_misses,
-                  "Number of misses in the move cache.")
-#endif
     .add_property("gcLow",
                   get_gc_low, set_gc_low,
                   "The low threshold for garbage collector.")
@@ -164,6 +146,17 @@ killer_ply_iterator killer_db_killers(apns::killer_db const& db,
   return killer_ply_iterator(db.level_begin(ply), db.level_end(ply));
 }
 
+apns::vertex* best_successor1(apns::vertex& v) {
+  return apns::best_successor(v);
+}
+
+apns::vertex* best_successor2(
+  apns::vertex& v,
+  boost::function<int (apns::vertex const&)> const& value
+) {
+  return apns::best_successor(v, value);
+}
+
 } // anonymous namespace
 
 //! Export types and functions declared in search-algos.hpp.
@@ -171,9 +164,15 @@ void export_search_algos() {
   using namespace boost::python;
 
   def("bestSuccessor",
-      static_cast<apns::vertex* (*)(apns::vertex&)>(&apns::best_successor),
+      &best_successor1,
       return_internal_reference<>(),
-      "bestSuccessor(Vertex) -> Vertex\n\n"
+      "bestSuccessor(Vertex [, value(Vertex) -> int]) -> Vertex\n\n"
+      "Returns the best of all vertex's successors, or None if the given "
+      "vertex is a leaf.");
+  def("bestSuccessor",
+      &best_successor2,
+      return_internal_reference<>(),
+      "bestSuccessor(Vertex [, value(Vertex) -> int]) -> Vertex\n\n"
       "Returns the best of all vertex's successors, or None if the given "
       "vertex is a leaf.");
 
