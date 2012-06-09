@@ -475,7 +475,7 @@ void killer_order(killer_db const& killers, std::size_t level, vertex& v) {
   ) {
     if (child != killers_end && child->step &&
         killers.is_killer(level, *child->step)) {
-      // Need to bubble stuff around here, to preserve heuristic order.
+      // Need to bubble stuff around here to preserve heuristic order.
       vertex::iterator it = killers_end++;
       while (it != child)
         v.swap_children(it++, child);
@@ -496,8 +496,6 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
 
   std::vector<step> s = generate_steps(state, player);
   for (
-    //all_steps_iter new_step = all_steps_begin(state, player);
-    //new_step != all_steps_end();
     std::vector<step>::const_iterator new_step = s.begin();
     new_step != s.end();
     ++new_step
@@ -927,9 +925,7 @@ void depth_first_pns::do_iterate() {
     assert(current->disproof_number <= limits_.back().dn_limit);
   }
 
-  size_ += expand(*current, stack_.state(), game_->attacker,
-                  move_history(stack_), hasher_);
-  evaluate_children();
+  expand_and_eval();
 
   search_stack::path_sequence::const_reverse_iterator
     current_path = stack_.path().rbegin();

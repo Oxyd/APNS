@@ -641,6 +641,8 @@ protected:
                              proof_tbl_, *log_);
 
     if (!simulated) {
+      assert(stack_.path_top()->leaf());
+
       size_ += expand(*stack_.path_top(), stack_.state(), game_->attacker,
                       move_history(stack_), hasher_);
       evaluate_children();
