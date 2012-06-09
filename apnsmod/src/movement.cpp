@@ -942,7 +942,7 @@ steps_cont generate_steps(board const& board, piece::color_t player) {
             std::back_inserter(pull)
           );
 
-          score += cost(*p, *pos);
+          score += PUSH_PULL_COEF * cost(*p, *pos);
 
           steps.push_back(std::make_pair(
             score, step(pull.begin(), pull.end())
@@ -980,7 +980,7 @@ steps_cont generate_steps(board const& board, piece::color_t player) {
             board, *pos, *pushee, piece(player, *type),
             std::back_inserter(push)
           );
-          score += cost(*p, *push_tgt);
+          score += PUSH_PULL_COEF * cost(*p, *push_tgt);
 
           steps.push_back(std::make_pair(
             score, step(push.begin(), push.end())
