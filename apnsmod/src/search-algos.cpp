@@ -815,11 +815,9 @@ bool repetition(search_stack const& stack) {
 
     unsigned rep_count = 0;
     for (search_stack::history_sequence::const_iterator h =
-         stack.history().begin(); h != stack.history().end() - 1; ++h) {
-      if (*h == stack.history().back())
-        if (++rep_count == 3)
-          return true;
-    }
+         stack.history().begin(); h != stack.history().end() - 1; ++h)
+      if (*h == stack.history().back() && ++rep_count)
+        return true;
   }
 
   return false;
@@ -970,7 +968,7 @@ depth_first_pns::make_limits(
   boost::optional<vertex const&> second_best,
   limits_t parent_limits
 ) {
-  double const EPSILON = 0.5;
+  double const EPSILON = 1.0;
 
   vertex::number_t vertex::* min_num = 
     v.type == vertex::type_or ? &vertex::proof_number
