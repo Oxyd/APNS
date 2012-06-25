@@ -270,8 +270,6 @@ private:
   players_masks players_;
   types_masks   types_;
   mask          occupied_;
-
-  //pieces_cont pieces_;
 };
 
 ///@{ board::mask operators
