@@ -110,7 +110,7 @@ struct printer {
   { }
 
   void operator () (vertex& v) {
-    out << (v.step ? v.step->to_string() : "root")
+    out << (v.step ? v.step->to_string() : "lambda")
         << " : " << (v.type == vertex::type_or ? "or" : "and")
         << ' '   << v.steps_remaining
         << ' '   << (v.proof_number < vertex::infty ?
@@ -143,7 +143,7 @@ struct reader {
       boost::optional<step> maybe_step = step::from_string(token);
       if (maybe_step)
         v.step = *maybe_step;
-      else if (token != "root") bad_format();
+      else if (token != "lambda" && token != "root") bad_format();
 
       if (!(in >> token)) bad_format();
       if (token == "or") v.type = vertex::type_or;
@@ -199,8 +199,7 @@ void save_game(boost::shared_ptr<game> const& game,
       out << "silver";
     out << '\n';
 
-    traverse(game->root, backtrack(), printer(out), 
-             op_ctrl_stop_cond(op_ctrl));
+    traverse(game->root, backtrack(), printer(out), op_ctrl_stop_cond(op_ctrl));
 
     if (op_ctrl.stop()) {
       // Cancelled -- the file has been only partially written -- so delete

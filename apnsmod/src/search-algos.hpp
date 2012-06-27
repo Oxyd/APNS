@@ -532,18 +532,17 @@ public:
 
 protected:
   boost::shared_ptr<apns::game>           game_;
-  //! Hasher to be used during the algorithm's execution.
-  zobrist_hasher                          hasher_; 
-  //! Hash corresponding to initial_state.
-  zobrist_hasher::hash_t                  initial_hash_;   
+  zobrist_hasher                          hasher_;        ///< Hasher to be used during the algorithm's execution.
+  zobrist_hasher::hash_t                  initial_hash_;  ///< Hash corresponding to initial_state.
   search_stack                            stack_;
   boost::shared_ptr<transposition_table>  trans_tbl_;
   boost::shared_ptr<proof_table>          proof_tbl_;
   boost::shared_ptr<killer_db>            killer_db_;
-  std::size_t                             size_;
-  std::size_t                             gc_low_;
-  std::size_t                             gc_high_;
-  boost::shared_ptr<log_sink>             log_;
+  std::size_t                             size_;          ///< Number of vertices in the tree.
+  std::size_t                             depth_;         ///< Max. depth of the search.
+  std::size_t                             gc_low_;        ///< Low GC threshold.
+  std::size_t                             gc_high_;       ///< High GC threshold.
+  boost::shared_ptr<log_sink>             log_;           ///< Logger to be used.
 
   search_algo(boost::shared_ptr<apns::game> const& game,
               std::size_t position_count = 1) 
@@ -585,17 +584,15 @@ protected:
   void store_in_pt(
     search_stack::history_sequence::const_iterator history_begin,
     search_stack::history_sequence::const_iterator history_end,
-    zobrist_hasher::hash_t hash, std::size_t ply,
-    vertex const& v
+    zobrist_hasher::hash_t hash, std::size_t level, vertex const& v
   ) {
     if (proof_tbl_ && v.step)
-      pt_store(*proof_tbl_, v, hash, ply, history_begin, history_end);
+      pt_store(*proof_tbl_, v, hash, level, history_begin, history_end);
   }
 
-  void store_in_tt(zobrist_hasher::hash_t hash, std::size_t ply,
-                   vertex const& v) {
+  void store_in_tt(zobrist_hasher::hash_t hash, std::size_t level, vertex const& v) {
     if (trans_tbl_ && v.step)
-      tt_store(*trans_tbl_, v, hash, ply);
+      tt_store(*trans_tbl_, v, hash, level);
   }
 
   void update_and_store(
