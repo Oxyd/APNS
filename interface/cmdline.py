@@ -285,7 +285,7 @@ def main():
       print 'Position limit exceeded'
       exitStatus = EXIT_LIMIT
     elif params.memoryLimit > 0 and \
-        (apnsmod.Vertex.allocSize / (1024 ** 2)) >= params.memoryLimit:
+        (controller.root.subtreeBytes() / (1024 ** 2)) >= params.memoryLimit:
       print 'Memory limit exceeded'
       exitStatus = EXIT_LIMIT
     elif interruptHandler.interrupted:
