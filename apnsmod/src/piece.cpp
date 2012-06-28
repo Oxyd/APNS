@@ -82,7 +82,7 @@ piece::color_t opponent_color(piece::color_t player) {
   switch (player) {
   case piece::gold:   return piece::silver;
   case piece::silver: return piece::gold;
-  default:            assert(!"Doesn't get here.");
+  default:            assert(!"Doesn't get here."); break;
   }
 
   return piece::silver;  // Shut up, compiler.

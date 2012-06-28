@@ -3,6 +3,8 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/bind.hpp>
+#include <boost/lambda/lambda.hpp>
+#include <boost/lambda/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/utility.hpp>
 
@@ -14,18 +16,8 @@
 #include <iostream>
 #include <stack>
 #include <utility>
-
+#include <numeric>
 #include <iostream>
-
-namespace {
-
-//! Get the storage size the container has allocated, in bytes.
-template <typename Container>
-std::size_t bytes(Container const& c) {
-  return c.capacity() * sizeof(typename Container::value_type);
-}
-
-}  // anonymous namespace
 
 namespace apns {
 
@@ -34,51 +26,31 @@ vertex::number_t const vertex::max_num;
 vertex::number_t const vertex::infty;
 #endif
 
-std::size_t vertex::alloc_ = 0;
-
-vertex::vertex() :
-  proof_number(0),
-  disproof_number(0),
-  steps_remaining(0),
-  type(vertex::type_or)
-{
-  alloc_ += sizeof *this;
-}
-
-vertex::~vertex() {
-  alloc_ -= bytes(children_);
-  alloc_ -= sizeof *this;
-}
-
-vertex::iterator vertex::add() {
-  resize(children_.size()  + 1);
-  return boost::prior(end());
-}
-
-vertex::iterator vertex::remove(iterator child) {
-  return children_.erase(child.base());
-}
-
-void vertex::reserve(std::size_t new_size) {
-  alloc_ -= bytes(children_);
-  children_.reserve(new_size);
-  alloc_ += bytes(children_);
-}
-
-void vertex::resize(std::size_t new_size) {
-  alloc_ -= bytes(children_);
-  children_.resize(new_size);
-  alloc_ += bytes(children_);
-}
-
 void vertex::pack() {
-  alloc_ -= bytes(children_);
-
   children_container new_children;
   new_children.transfer(new_children.begin(), children_);
   children_.swap(new_children);
+}
 
-  alloc_ += bytes(children_);
+namespace {
+
+/// Set the subtree size of a vertex, assuming the subtree sizes of its children are set correctly.
+void compute_size(vertex& v) {
+  namespace bl = boost::lambda;
+  v.subtree_size = std::accumulate(v.begin(), v.end(), 1, bl::_1 + bl::bind(&vertex::subtree_size, bl::_2));
+}
+
+}
+
+void calculate_sizes(vertex& root) {
+  traverse_postorder(root, postorder(), &compute_size);
+  compute_size(root);
+
+#ifndef NDEBUG
+  vertex_counter count;
+  traverse(root, backtrack(), boost::ref(count));
+  assert(root.subtree_size == count.count);
+#endif
 }
 
 namespace {
@@ -235,13 +207,11 @@ load_game(std::string const& filename, operation_controller& op_ctrl) {
   else bad_format();
 
   boost::shared_ptr<apns::game> game(new apns::game(initial_state, attacker));
-  vertex_counter counter;
-  traverse(game->root, backtrack(),
-           make_composite_visitor(reader(in), boost::ref(counter)),
-           op_ctrl_stop_cond(op_ctrl));
+  traverse(game->root, backtrack(), reader(in), op_ctrl_stop_cond(op_ctrl));
+  compute_size(game->root);
 
   if (!op_ctrl.stop())
-    return std::make_pair(game, counter.count);
+    return std::make_pair(game, game->root.subtree_size);
   else
     return std::make_pair(boost::shared_ptr<apns::game>(), 0);
 }

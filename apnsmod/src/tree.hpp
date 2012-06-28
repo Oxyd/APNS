@@ -53,8 +53,7 @@ class vertex : boost::noncopyable {
   > {
     iterator_base() { }
 
-    // Intentionally implicit.
-    iterator_base(Iter i)
+    /*implicit*/ iterator_base(Iter i)
       : iterator_base::iterator_adaptor_(i)
     { }
 
@@ -89,18 +88,28 @@ public:
   step_holder step;
   int         steps_remaining;
   e_type      type;
+  std::size_t subtree_size;
 
-  vertex();
-  ~vertex();
+  vertex()
+    : proof_number(0)
+    , disproof_number(0)
+    , steps_remaining(0)
+    , type(vertex::type_or)
+    , subtree_size(0) { }
 
   //! Add a child at the end of the children list and return an iterator to it.
   //! May invalidate all existing iterators to children of this vertex.
-  iterator add();
+  iterator add() {
+    resize(children_.size()  + 1);
+    return boost::prior(end());
+  }
 
   //! Remove child specified by an iterator into this vertex. May invalidate 
   //! all existing iterators to children of this vertex.
   //! \returns Iterator to the child following the removed one.
-  iterator remove(iterator child);
+  iterator remove(iterator child) {
+    return children_.erase(child.base());
+  }
   
   iterator       begin()        { return children_.begin(); }
   iterator       end()          { return children_.end(); }
@@ -118,8 +127,11 @@ public:
     return const_reverse_iterator(begin());
   }
 
-  std::size_t size() const { return children_.size(); }
-  bool        leaf() const { return children_.empty(); }
+  std::size_t size() const          { return children_.size(); }
+  bool        leaf() const          { return children_.empty(); }
+
+  /// Size of the tree rooted in this vertex in bytes.
+  std::size_t subtree_bytes() const { return subtree_size * sizeof(vertex); }
 
   //! Construct an iterator to a child from a pointer to a child of this 
   //! vertex. The behaviour is undefined if child does not point to a child of 
@@ -174,7 +186,7 @@ public:
   //! Make this vertex allocate enough memory to hold new_size children, but 
   //! don't really create the children yet. This may invalidate all existing 
   //! iterators to children of this vertex.
-  void reserve(std::size_t new_size);
+  void reserve(std::size_t new_size) { children_.reserve(new_size); }
 
   //! Make this vertex have new_size children. If new_size is more than the 
   //! current size, new children will be  default-constructed at the end of the 
@@ -186,19 +198,14 @@ public:
   //! vertex.
   //!
   //! \note This doesn't necessarily free up any memory if the size is reduced.
-  void resize(std::size_t new_size);
+  void resize(std::size_t new_size) { children_.resize(new_size); }
 
   //! Make this vertex use only as much memory as required to hold all its 
   //! children. This may invalidate all existing iterator
   //! to children of this vertex.
   void pack();
-
-  //! Get an aproximate total memory usage by all vertices of all trees.
-  static std::size_t alloc_size() { return alloc_; }
   
 private:
-  static std::size_t alloc_;
-
   //! Compare void*s that point to vertices according to a given comparator.
   template <typename Compare>
   struct ptr_compare {
@@ -303,6 +310,9 @@ inline void transfer_child(vertex& source, vertex::iterator child,
   dest.transfer_child(source, child);
 }
 
+/// Calculate proper values for the .subtree_size members in the whole tree.
+void calculate_sizes(vertex& root);
+
 //! A container for the game and its search tree.
 class game : boost::noncopyable {
 public:
@@ -318,6 +328,7 @@ public:
     root.proof_number     = 1;
     root.disproof_number  = 1;
     root.steps_remaining  = 4;
+    root.subtree_size     = 1;
   }
 };
 
@@ -392,7 +403,7 @@ template <
   typename StopCondition
 >
 CVVertex* traverse(CVVertex& root, TraversalPolicy traversal_policy,
-                 Visitor visitor, StopCondition stop_condition) {
+                   Visitor visitor, StopCondition stop_condition) {
   CVVertex* previous = 0;
   CVVertex* current = &root;
 
@@ -433,11 +444,14 @@ CVVertex* traverse(CVVertex& root, TraversalPolicy traversal_policy) {
 //! Generic tree traverser like traverse, except that this one applies 
 //! TraversalPolicy first and Visitor and StopCondition after that. Useful for 
 //! post-order traversals.
-template <typename TraversalPolicy, typename Visitor, typename StopCondition>
-vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy,
-                           Visitor visitor, StopCondition stop_condition) {
-  vertex* previous = &root;
-  vertex* current = &*boost::unwrap_ref(traversal_policy)(root);
+template <typename CVVertex, typename TraversalPolicy, typename Visitor, typename StopCondition>
+CVVertex* traverse_postorder(CVVertex& root, TraversalPolicy traversal_policy,
+                             Visitor visitor, StopCondition stop_condition) {
+  CVVertex* previous = &root;
+  CVVertex* current = const_cast<CVVertex*>(
+    &*boost::unwrap_ref(traversal_policy)(
+      const_cast<vertex const&>(root)
+  ));
 
   while (current) {
     boost::unwrap_ref(visitor)(*current);
@@ -445,23 +459,24 @@ vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy,
       return current;
 
     previous = current;
-    current = boost::unwrap_ref(traversal_policy)(*current);
+    current = const_cast<CVVertex*>(
+      boost::unwrap_ref(traversal_policy)(
+        *const_cast<vertex const*>(current)
+    ));
   }
 
   return previous;
 }
 
-template <typename TraversalPolicy, typename Visitor>
-vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy,
-                           Visitor visitor) {
-  return traverse_postorder(root, traversal_policy, visitor,
-                            null_stop_condition());
+template <typename CVVertex, typename TraversalPolicy, typename Visitor>
+CVVertex* traverse_postorder(CVVertex& root, TraversalPolicy traversal_policy,
+                             Visitor visitor) {
+  return traverse_postorder(root, traversal_policy, visitor, null_stop_condition());
 }
 
-template <typename TraversalPolicy>
-vertex* traverse_postorder(vertex& root, TraversalPolicy traversal_policy) {
-  return traverse_postorder(root, traversal_policy, null_visitor(),
-                            null_stop_condition());
+template <typename CVVertex, typename TraversalPolicy>
+CVVertex* traverse_postorder(CVVertex& root, TraversalPolicy traversal_policy) {
+  return traverse_postorder(root, traversal_policy, null_visitor(), null_stop_condition());
 }
 
 class backtrack {

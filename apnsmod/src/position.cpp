@@ -101,7 +101,7 @@ position make_adjacent(position original, direction direction) {
     case south:   --row;    break;
     case east:    ++column; break;
     case west:    --column; break;
-    default:      assert(!"Can't reach this.");
+    default:      assert(!"Can't reach this."); break;
   }
 
   return position(row, column);  // Will throw if the position is invalid.

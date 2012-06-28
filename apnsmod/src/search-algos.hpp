@@ -89,27 +89,12 @@ inline int zero(vertex const&) { return 0; }
 //! Return the best successor of a vertex. Can be used as a traversal policy.
 //! If there are multiple "as good" children, this guarantees to select the
 //! one with highest value().
-vertex* best_successor(
-  vertex& parent,
-  boost::function<int (vertex const&)> const& value
-);
-vertex const* best_successor(
-  vertex const& parent,
-  boost::function<int (vertex const&)> const& value
-);
-
-inline vertex* best_successor(vertex& parent) {
-  return best_successor(parent, &zero);
-}
-
-inline vertex const* best_successor(vertex const& parent) {
-  return best_successor(parent, &zero);
-}
+vertex* best_successor(vertex& parent);
+vertex const* best_successor(vertex const& parent);
 
 //! Return the best successor of a vertex and, if any, the second-best
 //! successor.
-std::pair<vertex*, vertex*>
-two_best_successors(vertex& parent);
+std::pair<vertex*, vertex*> two_best_successors(vertex& parent);
 
 //! Killer steps database.
 class killer_db {
@@ -388,8 +373,7 @@ void tt_store(transposition_table& tt, vertex const& v,
 //! \param how_many When to stop collecting.
 //! \param current_path Currently selected path -- vertices from it won't be
 //!        collected.
-//! \returns Number of vertices removed from the tree.
-std::size_t garbage_collect(std::size_t how_many, search_stack current_path);
+void garbage_collect(std::size_t how_many, search_stack current_path);
 
 //! Cut all negative dis/proved children of a vertex -- that is, children
 //! that are dis/proved but don't constitute a dis/proof of their parent.
@@ -451,7 +435,7 @@ piece::color_t vertex_player(vertex const& v, piece::color_t attacker);
 template <typename Algo>
 class search_algo : private boost::noncopyable {
 public:
-  boost::shared_ptr<apns::game> get_game() const {
+  boost::shared_ptr<game> get_game() const {
     return game_;
   }
 
@@ -493,7 +477,7 @@ public:
 
   //! Get the total number of vertices currently held by this algorithm.
   std::size_t get_position_count() const {
-    return size_;
+    return game_->root.subtree_size;
   }
 
   std::size_t gc_low() const  { return gc_low_; }
@@ -527,6 +511,12 @@ public:
   void iterate() {
     if (!finished()) {
       static_cast<Algo*>(this)->do_iterate();
+
+      std::size_t const size = get_position_count();
+      if (gc_enabled() && size > gc_high_ && gc_low_ < size) {
+        garbage_collect(size - gc_low_, stack_);
+        assert(game_->root.subtree_size <= gc_low_);
+      }
     }
   }
 
@@ -538,26 +528,25 @@ protected:
   boost::shared_ptr<transposition_table>  trans_tbl_;
   boost::shared_ptr<proof_table>          proof_tbl_;
   boost::shared_ptr<killer_db>            killer_db_;
-  std::size_t                             size_;          ///< Number of vertices in the tree.
-  std::size_t                             depth_;         ///< Max. depth of the search.
   std::size_t                             gc_low_;        ///< Low GC threshold.
   std::size_t                             gc_high_;       ///< High GC threshold.
   boost::shared_ptr<log_sink>             log_;           ///< Logger to be used.
 
-  search_algo(boost::shared_ptr<apns::game> const& game,
-              std::size_t position_count = 1) 
+  search_algo(boost::shared_ptr<apns::game> const& game)
     : game_(game)
     , initial_hash_(
-        hasher_.generate_initial(game->initial_state, game->attacker,
-                                 MAX_STEPS)
+        hasher_.generate_initial(game->initial_state, game->attacker, MAX_STEPS)
       )
-    , stack_(hasher_, initial_hash_, &game_->root, game_->attacker,
-             game_->initial_state)
-    , size_(position_count)
+    , stack_(hasher_, initial_hash_, &game_->root, game_->attacker, game_->initial_state)
     , gc_low_(0)
     , gc_high_(0)
-    , log_(new null_sink)
-  { }
+    , log_(new null_sink) {
+#ifndef NDEBUG
+    vertex_counter counter;
+    traverse(game_->root, backtrack(), boost::ref(counter));
+    assert(counter.count == game_->root.subtree_size);
+#endif
+  }
 
   bool gc_enabled() const { return gc_high_ > 0; }
 
@@ -601,12 +590,13 @@ protected:
     search_stack::path_sequence::const_iterator path_end,
     search_stack::history_sequence::const_iterator history_begin,
     search_stack::history_sequence::const_iterator history_end,
-    zobrist_hasher::hash_t hash
+    zobrist_hasher::hash_t hash, std::size_t size_increment
   ) {
     vertex::number_t const old_pn = current.proof_number;
     vertex::number_t const old_dn = current.disproof_number;
 
     update_numbers(current);
+    current.subtree_size += size_increment;
 
     if (!is_lambda(current)) {
       bool const numbers_changed = current.proof_number != old_pn ||
@@ -630,33 +620,33 @@ protected:
     }
   }
 
-  void expand_and_eval() {
-    bool const simulated =
-      killer_db_ && simulate(stack_, game_->attacker, size_, *killer_db_,
-                             proof_tbl_, *log_);
+  std::size_t expand_and_eval() {
+    std::size_t size = 0;
+    bool const simulated = killer_db_ && simulate(stack_, game_->attacker, size, *killer_db_, proof_tbl_, *log_);
 
     if (!simulated) {
       assert(stack_.path_top()->leaf());
 
-      size_ += expand(*stack_.path_top(), stack_.state(), game_->attacker,
-                      move_history(stack_), hasher_);
+      size = expand(
+        *stack_.path_top(), stack_.state(), game_->attacker,
+        move_history(stack_), hasher_
+      );
       evaluate_children();
     }
+
+    return size;
   }
 
   void evaluate_children() {
     vertex& current = *stack_.path_top();
-    for (vertex::iterator child = current.begin();
-         child != current.end(); ++child) {
+    for (vertex::iterator child = current.begin(); child != current.end(); ++child) {
       if (!is_lambda(*child)) {
         search_stack_checkpoint checkpoint(stack_);
         stack_.push(&*child);
 
-        bool const found_in_pt =
-          proof_tbl_ && pt_lookup(*proof_tbl_, stack_);
+        bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_);
         if (!found_in_pt) {
-          bool const found_in_tt =
-            trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), *child);
+          bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), *child);
 
           if (!found_in_tt)
             evaluate(stack_, game_->attacker, *log_);
@@ -681,10 +671,8 @@ public:
   //! Make an algorithm instance for the given game instance. 
   //!
   //! \param position_count Number of positions in the passed-in game.
-  explicit proof_number_search(boost::shared_ptr<apns::game> const& game,
-                               std::size_t position_count = 1) :
-    search_algo(game, position_count)
-  { }
+  explicit proof_number_search(boost::shared_ptr<apns::game> const& game)
+    : search_algo(game) { }
 
   //! Perform an iteration of the algorithm.
   void do_iterate();
@@ -692,11 +680,9 @@ public:
 
 //! Depth-first variant of the Proof-Number Search algorithm.
 struct depth_first_pns : public search_algo<depth_first_pns> {
-  explicit depth_first_pns(boost::shared_ptr<apns::game> const& game,
-                           std::size_t position_count = 1) :
-    search_algo(game, position_count),
-    limits_(1, limits_t(vertex::infty, vertex::infty))
-  { }
+  explicit depth_first_pns(boost::shared_ptr<apns::game> const& game)
+    : search_algo(game)
+    , limits_(1, limits_t(vertex::infty, vertex::infty)) { }
 
   void do_iterate();
   
@@ -723,10 +709,8 @@ private:
 
 //! A virtual algorithm -- to allow defining algos in Python.
 struct virtual_algo : public search_algo<virtual_algo> {
-  explicit virtual_algo(boost::shared_ptr<apns::game> const& game,
-                        std::size_t position_count = 1) 
-    : search_algo(game, position_count)
-  { }
+  explicit virtual_algo(boost::shared_ptr<apns::game> const& game)
+    : search_algo(game) { }
 
   virtual ~virtual_algo() { }
 

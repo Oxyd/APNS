@@ -5,35 +5,21 @@
 namespace {
 
 struct proof_number_search_wrap : public apns::proof_number_search {
-  proof_number_search_wrap(
-    PyObject*, boost::shared_ptr<apns::game> const& game,
-    unsigned position_count = 1
-  ) :
-    proof_number_search(game, position_count)
-  { }
+  proof_number_search_wrap(PyObject*, boost::shared_ptr<apns::game> const& game)
+    : proof_number_search(game) { }
 };
 
 struct depth_first_pns_wrap : public apns::depth_first_pns {
-  depth_first_pns_wrap(
-    PyObject*, boost::shared_ptr<apns::game> const& game,
-    unsigned position_count = 1
-  ) :
-    depth_first_pns(game, position_count)
-  { }
+  depth_first_pns_wrap(PyObject*, boost::shared_ptr<apns::game> const& game)
+    : depth_first_pns(game) { }
 };
 
-struct virtual_algo_wrap 
-  : public apns::virtual_algo, boost::python::wrapper<apns::virtual_algo> 
-{
-  virtual_algo_wrap(boost::shared_ptr<apns::game> const& game,
-                    unsigned position_count = 1) :
-    virtual_algo(game, position_count)
-  { }
+struct virtual_algo_wrap : public apns::virtual_algo, boost::python::wrapper<apns::virtual_algo> {
+  virtual_algo_wrap(boost::shared_ptr<apns::game> const& game)
+    : virtual_algo(game) { }
 
-  virtual_algo_wrap(PyObject*, boost::shared_ptr<apns::game> const& game,
-                    unsigned position_count = 1) :
-    virtual_algo(game, position_count)
-    { }
+  virtual_algo_wrap(PyObject*, boost::shared_ptr<apns::game> const& game)
+    : virtual_algo(game) { }
 
   virtual void really_do_iterate() {
     this->get_override("doIterate")();
@@ -100,7 +86,7 @@ export_algo(char const* name, char const* description) {
   return class_<Algo, bases<Base>, boost::noncopyable>(
     name, description,
     init<boost::shared_ptr<apns::game> const&>()
-  ) .def(init<boost::shared_ptr<apns::game> const&, unsigned>())
+  ) .def(init<boost::shared_ptr<apns::game> const&>())
     ;
 }
 
@@ -146,17 +132,6 @@ killer_ply_iterator killer_db_killers(apns::killer_db const& db,
   return killer_ply_iterator(db.level_begin(ply), db.level_end(ply));
 }
 
-apns::vertex* best_successor1(apns::vertex& v) {
-  return apns::best_successor(v);
-}
-
-apns::vertex* best_successor2(
-  apns::vertex& v,
-  boost::function<int (apns::vertex const&)> const& value
-) {
-  return apns::best_successor(v, value);
-}
-
 } // anonymous namespace
 
 //! Export types and functions declared in search-algos.hpp.
@@ -164,15 +139,9 @@ void export_search_algos() {
   using namespace boost::python;
 
   def("bestSuccessor",
-      &best_successor1,
+      static_cast<apns::vertex* (*)(apns::vertex&)>(&apns::best_successor),
       return_internal_reference<>(),
-      "bestSuccessor(Vertex [, value(Vertex) -> int]) -> Vertex\n\n"
-      "Returns the best of all vertex's successors, or None if the given "
-      "vertex is a leaf.");
-  def("bestSuccessor",
-      &best_successor2,
-      return_internal_reference<>(),
-      "bestSuccessor(Vertex [, value(Vertex) -> int]) -> Vertex\n\n"
+      "bestSuccessor(Vertex) -> Vertex\n\n"
       "Returns the best of all vertex's successors, or None if the given "
       "vertex is a leaf.");
 

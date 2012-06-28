@@ -6,6 +6,8 @@
 
 #include <boost/integer.hpp>
 #include <boost/bind.hpp>
+#include <boost/lambda/lambda.hpp>
+#include <boost/lambda/bind.hpp>
 
 #include <cassert>
 #include <vector>
@@ -91,32 +93,18 @@ winner(board const& board, piece::color_t player) {
   return boost::none;
 }
 
-vertex* best_successor(
-  vertex& parent,
-  boost::function<int (vertex const&)> const& value
-) {
-  return const_cast<vertex*>(best_successor(
-    const_cast<vertex const&>(parent),
-    value
-  ));
+vertex* best_successor(vertex& parent) {
+  return const_cast<vertex*>(best_successor(const_cast<vertex const&>(parent)));
 }
 
-vertex const* best_successor(
-  vertex const& parent,
-  boost::function<int (vertex const&)> const& value
-) {
+vertex const* best_successor(vertex const& parent) {
   if (parent.size() > 0) {
     vertex::const_iterator best = parent.begin();
-    int best_value = std::numeric_limits<int>::min();
     vertex_comparator better(parent);
 
-    for (vertex::const_iterator child = boost::next(best);
-         child != parent.end(); ++child) {
-      if (better(*child, *best) ||
-          (!better(*best, *child) && value(*child) > best_value)) {
+    for (vertex::const_iterator child = boost::next(best); child != parent.end(); ++child) {
+      if (better(*child, *best))
         best = child;
-        best_value = value(*child);
-      }
     }
 
     return &*best;
@@ -129,15 +117,13 @@ std::pair<vertex*, vertex*>
 two_best_successors(vertex& parent) {
   if (parent.size() >= 2) {
     vertex::iterator best = parent.begin();
-    vertex::iterator second_best =
-      boost::next(parent.begin());
+    vertex::iterator second_best = boost::next(parent.begin());
     vertex_comparator better(parent);
 
     if (better(*second_best, *best))
       std::swap(best, second_best);
 
-    for (vertex::iterator child = boost::next(second_best);
-         child != parent.end(); ++child) {
+    for (vertex::iterator child = boost::next(second_best); child != parent.end(); ++child) {
       if (better(*child, *best)) {
         second_best = best;
         best = child;
@@ -146,12 +132,10 @@ two_best_successors(vertex& parent) {
     }
 
     assert(best != second_best);
-
     assert(&*best == best_successor(parent));
     return std::make_pair(&*best, &*second_best);
   } else {
-    return std::make_pair(best_successor(parent),
-                          static_cast<vertex*>(0));
+    return std::make_pair(best_successor(parent), static_cast<vertex*>(0));
   }
 }
 
@@ -509,8 +493,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
         new_step->begin(), new_step->end(),
         player, player, leaf.steps_remaining
       );
-      if (std::find(move_hist.begin(), move_hist.end(), child_hash) ==
-          move_hist.end())
+      if (std::find(move_hist.begin(), move_hist.end(), child_hash) == move_hist.end())
         steps.push_back(std::make_pair(*new_step, leaf.type));
     } else if (remaining == 0)
       steps.push_back(std::make_pair(*new_step, opposite_type(leaf.type)));
@@ -533,6 +516,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
       child->steps_remaining = leaf.steps_remaining - child->step->steps_used();
     else
       child->steps_remaining = MAX_STEPS;
+    child->subtree_size = 1;
   }
 
   if (make_lambda) {
@@ -540,6 +524,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
     child->proof_number = child->disproof_number = 1;
     child->type = leaf.type;
     child->steps_remaining = leaf.steps_remaining - 1;
+    child->subtree_size = 1;
   }
 
   return leaf.size();
@@ -646,7 +631,7 @@ void tt_store(transposition_table& tt, vertex const& v,
             transposition_entry(v.proof_number, v.disproof_number));
 }
 
-std::size_t garbage_collect(std::size_t how_many, search_stack stack) {
+void garbage_collect(std::size_t how_many, search_stack stack) {
   // NB: This function destroys the passed-in stack, so it's accepted by copy.
 
   vertex* avoid = 0;
@@ -654,13 +639,12 @@ std::size_t garbage_collect(std::size_t how_many, search_stack stack) {
     avoid = *boost::next(stack.path().begin());
 
   stack.reset_to_root();
+  vertex* const root = stack.path_top();
 
-  if (stack.path_top()->proof_number == 0 ||
-      stack.path_top()->disproof_number == 0)
-    return 0;
+  if (root->proof_number == 0 || root->disproof_number == 0)
+    return;
 
   std::size_t removed = 0;
-
   while (removed < how_many) {
     removed += collect_proved(*stack.path_top());
     
@@ -669,41 +653,41 @@ std::size_t garbage_collect(std::size_t how_many, search_stack stack) {
       vertex_comparator worse(current, false);
       vertex::iterator worst = current.end();
 
-      for (vertex::iterator child = current.begin();
-           child != current.end(); ++child) {
-        if (!child->leaf() && &*child != avoid &&
-            (worst == current.end() || worse(*child, *worst)))
+      for (vertex::iterator child = current.begin(); child != current.end(); ++child)
+        if (!child->leaf() && &*child != avoid && (worst == current.end() || worse(*child, *worst)))
           worst = child;
-      }
 
-      if (worst != current.end()) {
+      if (worst != current.end())
         stack.push(&*worst);
-      } else if (!stack.at_root()) {
+      else if (!stack.at_root()) {
         assert(stack.path_top() != avoid);
 
-        removed += cut(*stack.path_top());
+        std::size_t const removed_here = cut(*stack.path_top());
+        for (
+          search_stack::path_sequence::const_reverse_iterator v = stack.path().rbegin();
+          v != stack.path().rend();
+          ++v
+        )
+          (**v).subtree_size -= removed_here;
+
+        removed += removed_here;
         stack.pop();
-      } else {
+      } else
         break;
-      }
 
     } else {
-      if (!stack.at_root()) {
+      if (!stack.at_root())
         stack.pop();
-      } else {
+      else
         break;
-      }
     }
   }
-
-  return removed;
 }
 
 std::size_t collect_proved(vertex& parent) {
   std::size_t removed = 0;
 
-  for (vertex::iterator child = parent.begin();
-       child != parent.end(); ++child) {
+  for (vertex::iterator child = parent.begin(); child != parent.end(); ++child) {
     if (child->type != parent.type &&
         ((parent.type == vertex::type_or && child->disproof_number == 0) ||
          (parent.type == vertex::type_and && child->proof_number == 0))) {
@@ -715,13 +699,14 @@ std::size_t collect_proved(vertex& parent) {
 }
 
 std::size_t cut(vertex& parent) {
-  vertex_counter cut_counter;
-  traverse(parent, backtrack(), boost::ref(cut_counter));
+  namespace bl = boost::lambda;
+  std::size_t const count = std::accumulate(parent.begin(), parent.end(), 0,
+                                            bl::_1 + bl::bind(&vertex::subtree_size, bl::_2));
 
   parent.resize(0);
   parent.pack();
 
-  return cut_counter.count - 1;  // parent has been counted but not removed.
+  return count;
 }
 
 namespace {
@@ -840,7 +825,7 @@ void proof_number_search::do_iterate() {
     push_best(stack_);
   }
 
-  expand_and_eval();
+  std::size_t const increment = expand_and_eval();
 
   while (true) {
     vertex& current = *stack_.path_top();
@@ -853,7 +838,7 @@ void proof_number_search::do_iterate() {
       current, parent,
       stack_.path().begin(), stack_.path().end(),
       stack_.history().begin(), stack_.history().end(),
-      stack_.hashes_top()
+      stack_.hashes_top(), increment
     );
 
     if (parent)
@@ -861,9 +846,6 @@ void proof_number_search::do_iterate() {
     else
       break;
   }
-
-  if (gc_enabled() && size_ > gc_high_ && gc_low_ <= size_)
-    size_ -= garbage_collect(size_ - gc_low_, stack_);
 }
 
 void depth_first_pns::do_iterate() {
@@ -875,23 +857,28 @@ void depth_first_pns::do_iterate() {
 
   // Go up while we're at a vertex whose numbers are off-limits.
   vertex* current = stack_.path_top();
+  std::size_t cut_count = 0;
   while (!stack_.at_root() &&
          (current->proof_number == 0 || 
           current->proof_number > limits_.back().pn_limit ||
           current->disproof_number == 0 || 
           current->disproof_number > limits_.back().dn_limit)) {
     bool const cut = !gc_enabled() && current->type != parent(stack_)->type;
+    if (cut)
+      cut_count += apns::cut(*current);
+    assert(cut_count < current->subtree_size);
+    current->subtree_size -= cut_count;
 
     stack_.pop();
     limits_.pop_back();
-
-    if (cut)
-      size_ -= apns::cut(*current);
-
     current = stack_.path_top();
 
     assert(!limits_.empty());
   }
+
+  // Finish iterating until root to update .subtree_size's.
+  for (search_stack::path_sequence::const_reverse_iterator v = stack_.path().rbegin(); v != stack_.path().rend(); ++v)
+    (**v).subtree_size -= cut_count;
 
   assert(current->proof_number > 0 && current->disproof_number > 0);
   assert(current->proof_number <= limits_.back().pn_limit &&
@@ -923,7 +910,7 @@ void depth_first_pns::do_iterate() {
     assert(current->disproof_number <= limits_.back().dn_limit);
   }
 
-  expand_and_eval();
+  std::size_t const increment = expand_and_eval();
 
   search_stack::path_sequence::const_reverse_iterator
     current_path = stack_.path().rbegin();
@@ -942,7 +929,7 @@ void depth_first_pns::do_iterate() {
       *current, parent,
       stack_.path().begin(), current_path.base(),
       stack_.history().begin(), current_history.base(),
-      *current_hash
+      *current_hash, increment
     );
 
     if (parent) {
@@ -958,8 +945,11 @@ void depth_first_pns::do_iterate() {
     }
   }
 
-  if (gc_enabled() && size_ > gc_high_ && gc_low_ <= size_)
-    size_ -= garbage_collect(size_ - gc_low_, stack_);
+#ifndef NDEBUG
+  vertex_counter counter;
+  traverse(game_->root, postorder(), boost::ref(counter));
+  assert(counter.count == game_->root.subtree_size);
+#endif
 }
 
 depth_first_pns::limits_t 

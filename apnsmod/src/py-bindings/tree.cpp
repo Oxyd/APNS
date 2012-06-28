@@ -111,8 +111,6 @@ void export_tree() {
       "Vertex", "A single vertex of a search tree")
       .def_readonly("maxNum", &apns::vertex::max_num, "Maximum possible value of proof- and disproof-numbers")
       .def_readonly("infty", &apns::vertex::infty, "Infinity value for proof- and disproof-numbers")
-      .add_static_property("allocSize", &apns::vertex::alloc_size,
-                           "Total number of bytes allocated by all Vertices in the program")
 
       .def_readwrite("proofNumber", &apns::vertex::proof_number, "The proof number associated with this vertex")
       .def_readwrite("disproofNumber", &apns::vertex::disproof_number, "The disproof number associated with this vertex")
@@ -128,6 +126,7 @@ void export_tree() {
           static_cast<apns::vertex::iterator (apns::vertex::*)()>(&apns::vertex::end)))
       .add_property("childrenCount", &apns::vertex::size)
       .add_property("leaf", &apns::vertex::leaf)
+      .add_property("subtreeBytes", &apns::vertex::subtree_bytes)
       
       .def("addChild", &vertex_add_child,
            return_internal_reference<>(),
@@ -137,8 +136,8 @@ void export_tree() {
       .def("resize", &apns::vertex::resize,
            "v.resize(n) -> None\n\nResize this vertex to have exactly n children. If that means to shrink this vertex, the "
            "children at the end are removed.")
-      .def("reserve", &apns::vertex::reserve,
-           "v.reserve(n) -> None\n\nReserve enough memory for this vertex to hold n children")
+      //.def("reserve", &apns::vertex::reserve,
+      //     "v.reserve(n) -> None\n\nReserve enough memory for this vertex to hold n children")
       .def("pack", &apns::vertex::pack,
            "v.pack() -> None\n\nMake this vertex only use as much memory as it needs to")
 

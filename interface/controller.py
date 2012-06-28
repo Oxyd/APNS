@@ -277,43 +277,35 @@ class Controller(object):
     if self._game is None:
       raise RuntimeError('Create or load a game first')
 
-    if self._search is None or \
-        type(self._search) != self._algoType(self.searchParameters.algo):
-      self._search = self._algoType(self.searchParameters.algo)(
-        self._game, self._posCount
-      )
+    if self._search is None or type(self._search) != self._algoType(self.searchParameters.algo):
+      self._search = self._algoType(self.searchParameters.algo)(self._game)
 
     def numElementsFromMbSize(mbSize, tableType):
       bSize = mbSize * MB
       return bSize / (tableType.sizeOfElement)
     
     if self.searchParameters.transTblSize is not None:
-      ttElems = numElementsFromMbSize(self.searchParameters.transTblSize, 
-                                      apnsmod.TranspositionTable)
+      ttElems = numElementsFromMbSize(self.searchParameters.transTblSize, apnsmod.TranspositionTable)
     else:
       ttElems = 0
     
     if self.searchParameters.proofTblSize is not None:
-      ptElems = numElementsFromMbSize(self.searchParameters.proofTblSize, 
-                                      apnsmod.ProofTable)
+      ptElems = numElementsFromMbSize(self.searchParameters.proofTblSize, apnsmod.ProofTable)
     else:
       ptElems = 0
 
-    if ttElems > 0 and (
-          self._transTbl is None or self._transTbl.size != ttElems):
+    if ttElems > 0 and (self._transTbl is None or self._transTbl.size != ttElems):
       self._transTbl = apnsmod.TranspositionTable(ttElems)
     elif ttElems == 0:
       self._transTbl = None
 
-    if ptElems > 0 and (
-        self._proofTbl is None or self._proofTbl.size != ptElems):
+    if ptElems > 0 and (self._proofTbl is None or self._proofTbl.size != ptElems):
       self._proofTbl = apnsmod.ProofTable(ptElems)
     elif ptElems == 0:
       self._proofTbl = None
     
     kCount = int(self.searchParameters.killerCount)    
-    if kCount > 0 and (
-        self._killerDb is None or self._killerDb.plysSize != kCount):
+    if kCount > 0 and (self._killerDb is None or self._killerDb.plysSize != kCount):
       self._killerDb = apnsmod.KillerDB(kCount)
     elif kCount == 0:
       self._killerDb = None
@@ -339,9 +331,7 @@ class Controller(object):
     self._lastPosPerSec = 0
 
     try:
-      while not self._search.finished and \
-          not self._limitsExceeded() and \
-          not self._cancel:
+      while not self._search.finished and not self._limitsExceeded() and not self._cancel:
         self._search.run(burst)
         self._updateProgress()
     except MemoryError:
@@ -383,7 +373,7 @@ class Controller(object):
     progress.timeElapsed = now - self._searchStart
     if self.searchParameters.timeLimit:
       progress.timeLeft = self.searchParameters.timeLimit - progress.timeElapsed
-    progress.memUsed = apnsmod.Vertex.allocSize
+    progress.memUsed = self._game.root.subtreeBytes
     progress.rootPN = self._game.root.proofNumber
     progress.rootDN = self._game.root.disproofNumber
     self._posCount = progress.positionCount = self._search.positionCount
