@@ -363,7 +363,7 @@ class Controller(object):
     posExceeded = self.searchParameters.positionLimit and \
         self._search.positionCount >= self.searchParameters.positionLimit
     memExceeded = self.searchParameters.memoryLimit and \
-        self._game.root.subtreeBytes() / float(MB) >= \
+        self._game.root.subtreeBytes / float(MB) >= \
           self.searchParameters.memoryLimit
     return timeExceeded or memExceeded or posExceeded
 
