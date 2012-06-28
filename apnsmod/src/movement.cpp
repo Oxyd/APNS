@@ -327,8 +327,7 @@ int check_captures(position src, position dst, board const& board,
 }
 
 template <typename OutIter>
-int make_displacement(board const& board, position src, position dst,
-                      piece what, OutIter out) {
+int make_displacement(board const& board, position src, position dst, piece what, OutIter out) {
   int score = 0;
 
   *out++ = elementary_step::displacement(
@@ -344,8 +343,7 @@ int make_displacement(board const& board, position src, position dst,
 }
 
 position elementary_step::from() const {
-  return position(representation_[ROW_INDEX] - '0', 
-                  representation_[COLUMN_INDEX]);
+  return position(representation_[ROW_INDEX] - '0', representation_[COLUMN_INDEX]);
 }
 
 direction elementary_step::where() const {
@@ -357,7 +355,11 @@ bool elementary_step::capture() const {
 }
 
 boost::optional<piece> elementary_step::what() const {
-  return piece_from_letter_unsafe(representation_[PIECE_INDEX]);
+  assert(representation_[PIECE_INDEX] != 0);
+  if (representation_[PIECE_INDEX] != ' ')
+    return piece_from_letter_unsafe(representation_[PIECE_INDEX]);
+  else
+    return boost::none;
 }
 
 std::string elementary_step::to_string() const {
@@ -370,6 +372,8 @@ void elementary_step::set_what(boost::optional<piece> new_what) {
   } else {
     representation_[PIECE_INDEX] = ' ';
   }
+
+  assert(representation_[PIECE_INDEX] != 0);
 }
 
 bool elementary_step::equal(elementary_step const& other) const {
@@ -377,22 +381,21 @@ bool elementary_step::equal(elementary_step const& other) const {
                     other.representation_.begin());
 }
 
-elementary_step elementary_step::displacement(position from, direction where,
-                                              boost::optional<piece> what) {
+elementary_step elementary_step::displacement(position from, direction where, boost::optional<piece> what) {
   return elementary_step(from, where, what);
 }
 
-elementary_step elementary_step::make_capture(position from,
-                                              boost::optional<piece> what) {
+elementary_step elementary_step::make_capture(position from, boost::optional<piece> what) {
   return elementary_step(from, what);
 }
 
-elementary_step::elementary_step(position from, direction where,
-                                 boost::optional<piece> what) {
+elementary_step::elementary_step(position from, direction where, boost::optional<piece> what) {
   representation_[ROW_INDEX] = '0' + from.row();
   representation_[COLUMN_INDEX] = from.column();
   representation_[DIR_INDEX] = letter_from_direction(where);
   set_what(what);
+
+  assert(!invalid());
 }
 
 elementary_step::elementary_step(position which, boost::optional<piece> what) {
@@ -400,6 +403,8 @@ elementary_step::elementary_step(position which, boost::optional<piece> what) {
   representation_[COLUMN_INDEX] = which.column();
   representation_[DIR_INDEX] = 'x';
   set_what(what);
+
+  assert(!invalid());
 }
 
 bool operator == (elementary_step const& lhs, elementary_step const& rhs) {
@@ -410,8 +415,7 @@ bool operator != (elementary_step const& lhs, elementary_step const& rhs) {
   return !operator == (lhs, rhs);
 }
 
-step_holder step::validate_ordinary_step(board const& board, 
-                                         elementary_step step) {
+step_holder step::validate_ordinary_step(board const& board, elementary_step step) {
   position const from    = step.from();
   direction const where  = step.where();
 
@@ -498,8 +502,6 @@ step_holder step::from_string(std::string const& string) {
   // Split the input up into elementary steps separated by spaces. Convert each 
   // elementary step separately.
 
-  std::size_t const MAX_ELEMENTARY_STEPS_POSSIBLE = 4;
-
   elementary_step_seq elementary_steps;
   std::string el_step_description;
   std::istringstream input(string);
@@ -514,7 +516,7 @@ step_holder step::from_string(std::string const& string) {
     }
   }
 
-  if (elementary_steps.size() <= MAX_ELEMENTARY_STEPS_POSSIBLE) {
+  if (elementary_steps.size() <= MAX_EL_STEPS) {
     return step_holder(step(elementary_steps.begin(), elementary_steps.end()));
   }
 
@@ -522,25 +524,30 @@ step_holder step::from_string(std::string const& string) {
 }
 
 bool step::capture() const {
-  for (iterator el_step = begin();
-       el_step != end(); ++el_step)
+  for (iterator el_step = begin(); el_step != end(); ++el_step)
     if (el_step->capture())
       return true;
   return false;
 }
 
 std::string step::to_string() const {
-  return representation_;
+  std::string result;
+  for (iterator es = begin(); es != end(); ++es) {
+    if (es != begin())
+      result += ' ';
+    result += es->to_string();
+  }
+
+  return result;
 }
 
 step::iterator step::begin() const {
-  return iterator(representation_.get().begin(), 
-                           representation_.get().end());
+  return representation_.begin();
 }
 
 step::iterator step::end() const {
-  return iterator(representation_.get().end(),
-                           representation_.get().end());
+  return std::find_if(representation_.begin(), representation_.end(),
+                      boost::bind(&elementary_step::invalid, _1));
 }
 
 step::reverse_iterator step::rbegin() const {
@@ -552,21 +559,23 @@ step::reverse_iterator step::rend() const {
 }
 
 int step::steps_used() const {
-  return
-    std::count_if(begin(), end(),
-                  !boost::bind(&elementary_step::capture, _1));
+  return std::count_if(begin(), end(), !boost::bind(&elementary_step::capture, _1));
 }
 
 bool step::moves_rabbit() const {
-  std::string::size_type i = 0;
-  while (i < representation_.get().length()) {
-    if (representation_.get()[i] == 'r' || representation_.get()[i] == 'R')
-      return true;
-    else
-      i += 5;
-  }
-
-  return false;
+  return
+    std::find_if(
+      begin(), end(),
+      boost::bind(
+        &piece::type,
+        boost::bind(
+          static_cast<piece const& (boost::optional<piece>::*)() const>(&boost::optional<piece>::get),
+          boost::bind(
+            &elementary_step::what, _1
+          )
+        )
+      ) == piece::rabbit
+    ) != end();
 }
 
 step step::make_push_pull(board const& board, elementary_step first_step,
@@ -576,21 +585,17 @@ step step::make_push_pull(board const& board, elementary_step first_step,
   first_step.set_what(first_piece);
   sequence.insert(sequence.begin(), first_step);
 
-  position const first_destination =
-    make_adjacent(first_step.from(), first_step.where());
+  position const first_destination = make_adjacent(first_step.from(), first_step.where());
 
-  check_for_captures(first_piece, first_step.from(), first_destination, board, 
-                     sequence);
+  check_for_captures(first_piece, first_step.from(), first_destination, board, sequence);
 
   piece const second_piece = *board.get(second_step.from());
   second_step.set_what(second_piece);
   sequence.insert(sequence.end(), second_step);
 
-  position const second_destination =
-    make_adjacent(second_step.from(), second_step.where());
+  position const second_destination = make_adjacent(second_step.from(), second_step.where());
 
-  check_for_captures(second_piece, second_step.from(), second_destination,
-                     board, sequence);
+  check_for_captures(second_piece, second_step.from(), second_destination, board, sequence);
 
   return step(sequence.begin(), sequence.end());
 }
@@ -601,8 +606,7 @@ bool operator == (step const& lhs, step const& rhs) {
   step::iterator left = lhs.begin();
   step::iterator right = rhs.begin();
 
-  for (; left != lhs.end() && right != rhs.end(); 
-       ++left, ++right)
+  for (; left != lhs.end() && right != rhs.end(); ++left, ++right)
     if (*left != *right)
       return false;
 

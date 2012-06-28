@@ -54,16 +54,14 @@ elementary_step el_step_from_string(std::string::const_iterator begin,
  * value.
  */
 struct elementary_step {
-  position from() const;
-  direction where() const;
-  bool capture() const;
-  boost::optional<piece> what() const;
+  /// \name Construction
+  ///@{
 
-  std::string to_string() const;
-
-  void set_what(boost::optional<piece> new_what);
-
-  bool equal(elementary_step const& other) const;
+  /// Construct an invalid step.
+  elementary_step() {
+    std::fill(representation_.begin(), representation_.end(), 0);
+    assert(invalid());
+  }
 
   /// Construct a displacement-kind elementary step.
   static elementary_step displacement(
@@ -75,6 +73,24 @@ struct elementary_step {
   static elementary_step make_capture(
     position from, boost::optional<piece> what = boost::optional<piece>()
   );
+
+  ///@}
+
+  /// \name Observers
+  ///@{
+  position               from() const;
+  direction              where() const;
+  bool                   capture() const;
+  bool                   invalid() const { return representation_[0] == 0; }
+  boost::optional<piece> what() const;
+  std::string            to_string() const;
+  bool                   equal(elementary_step const& other) const;
+  ///@}
+
+  /// \name Modifiers
+  ///@{
+  void set_what(boost::optional<piece> new_what);
+  ///@}
 
 private:
   friend elementary_step detail::el_step_from_string(
@@ -88,8 +104,7 @@ private:
   explicit elementary_step(position which, boost::optional<piece> what);
 
   /// Construct from string.
-  explicit elementary_step(std::string::const_iterator begin, 
-                           std::string::const_iterator end) {
+  explicit elementary_step(std::string::const_iterator begin, std::string::const_iterator end) {
     assert(end - begin == 4);
     assert(*begin == 'E' || *begin == 'M' || *begin == 'H' || *begin == 'D' || 
            *begin == 'C' || *begin == 'R' || *begin == 'e' || *begin == 'm' || 
@@ -100,6 +115,8 @@ private:
     assert(*(begin + 3) == 'n' || *(begin + 3) == 'e' || *(begin + 3) == 's' || 
            *(begin + 3) == 'w' || *(begin + 3) == 'x');
     std::copy(begin, end, representation_.begin());
+
+    assert(!invalid());
   }
 
   /// Four-character representation of the elementary step. This is a string
@@ -180,52 +197,16 @@ enum e_step_kind {
  * guaranteed by some other means.
  */
 class step {
+  static std::size_t const MAX_EL_STEPS = 4;
+
   typedef std::vector<elementary_step> elementary_step_seq;
+  typedef boost::array<elementary_step, MAX_EL_STEPS> representation_t;
 
 public:
   /// \name Iteration
   /// @{
 
-  /// Iterator over the sequence of elementary steps.
-  struct iterator : boost::iterator_facade<
-    iterator, 
-    elementary_step const, 
-    boost::bidirectional_traversal_tag,
-    elementary_step const
-  > {
-    reference dereference() const { 
-      return detail::el_step_from_string(position_, position_ + 4); 
-    }
-
-    void increment() { 
-      position_ += 4;
-      if (position_ != end_)
-        ++position_;
-    }
-
-    void decrement() { 
-      if (position_ == end_)
-        position_ -= 4;
-      else
-        position_ -= 5;
-    }
-
-    bool equal(iterator const& other) const {
-      return position_ == other.position_; 
-    }
-
-  private:
-    friend class step;
-
-    std::string::const_iterator position_;
-    std::string::const_iterator end_;
-
-    explicit iterator(std::string::const_iterator pos,
-                               std::string::const_iterator end) 
-      : position_(pos), end_(end) 
-    { }
-  };
-
+  typedef representation_t::const_iterator  iterator;
   typedef boost::reverse_iterator<iterator> reverse_iterator;
 
   ///@}
@@ -234,16 +215,14 @@ public:
   /// @{
 
   template <typename Iter>
-  step(Iter el_steps_begin, Iter el_steps_end)
-    : representation_(detail::string_from_el_steps(el_steps_begin,
-                                                   el_steps_end))
-  { }
+  step(Iter el_steps_begin, Iter el_steps_end) {
+    std::copy(el_steps_begin, el_steps_end, representation_.begin());
+  }
 
   /// Validate and possibly construct an ordinary step.
   /// \param board The board which is to be affected by this step.
   /// \param step Movement of the single piece.
-  static step_holder validate_ordinary_step(board const& board,
-                                            elementary_step step);
+  static step_holder validate_ordinary_step(board const& board, elementary_step step);
 
   /// Validate and possibly construct a push kind of step.
   /// \param board The board which is to be affected by this step.
@@ -298,28 +277,23 @@ public:
   bool moves_rabbit() const;
 
   std::string to_string() const;
+
   ///@}
 
   void swap(step& other) { representation_.swap(other.representation_); }
 
 
 private:
-  typedef boost::flyweight<
-    std::string, boost::flyweights::no_locking
-  > representation_t;
-
   representation_t representation_;
 
   friend class step_holder;
 
   // These two are to be used by step_holder.
   step() { }
-  bool empty() const { return representation_.get().empty(); }
+  bool empty() const { return representation_[0].invalid(); }
 
   /// Make a push/pull move assuming that the move is valid.
-  static step make_push_pull(board const& board,
-                             elementary_step first_step, 
-                             elementary_step second_step);
+  static step make_push_pull(board const& board, elementary_step first_step, elementary_step second_step);
 };
 
 ///@{ Step operators
