@@ -692,8 +692,10 @@ std::size_t collect_proved(vertex& parent) {
 
 std::size_t cut(vertex& parent) {
   namespace bl = boost::lambda;
-  std::size_t const count = std::accumulate(parent.begin(), parent.end(), 0,
-                                            bl::_1 + bl::bind(&vertex::subtree_size, bl::_2));
+  std::size_t const count = std::accumulate(
+    parent.begin(), parent.end(), (std::size_t) 0,
+    bl::ret<std::size_t>(bl::_1 + bl::bind(&vertex::subtree_size, bl::_2))
+  );
 
   parent.resize(0);
   parent.pack();

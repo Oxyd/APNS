@@ -37,7 +37,10 @@ namespace {
 /// Set the subtree size of a vertex, assuming the subtree sizes of its children are set correctly.
 void compute_size(vertex& v) {
   namespace bl = boost::lambda;
-  v.subtree_size = std::accumulate(v.begin(), v.end(), 1, bl::_1 + bl::bind(&vertex::subtree_size, bl::_2));
+  v.subtree_size = std::accumulate(
+    v.begin(), v.end(), 1, 
+    bl::ret<std::size_t>(bl::_1 + bl::bind(&vertex::subtree_size, bl::_2))
+  );
 }
 
 }
