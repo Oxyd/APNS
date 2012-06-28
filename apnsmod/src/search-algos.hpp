@@ -353,18 +353,15 @@ bool pt_lookup(proof_table& pt, search_stack& stack);
 //! Store vertex's values in the proof table.
 void pt_store(proof_table& pt, vertex const& v,
               zobrist_hasher::hash_t hash,
-              std::size_t ply,
               search_stack::history_sequence::const_iterator history_begin,
               search_stack::history_sequence::const_iterator history_end);
 
 //! Attempt to find values for given hash in the transposition table.
 //! \returns True if values were found; false otherwise.
-bool tt_lookup(transposition_table& tt, zobrist_hasher::hash_t hash,
-               vertex& child);
+bool tt_lookup(transposition_table& tt, zobrist_hasher::hash_t hash, vertex& child);
 
 //! Store a vertex's values in the transposition table.
-void tt_store(transposition_table& tt, vertex const& v, 
-              zobrist_hasher::hash_t hash, std::size_t ply);
+void tt_store(transposition_table& tt, vertex const& v, zobrist_hasher::hash_t hash);
 
 //! Cut vertices in worst-first manner until enough vertices have been cut.
 //! This also accepts a search_stack so that it knows which vertices to avoid
@@ -573,15 +570,15 @@ protected:
   void store_in_pt(
     search_stack::history_sequence::const_iterator history_begin,
     search_stack::history_sequence::const_iterator history_end,
-    zobrist_hasher::hash_t hash, std::size_t level, vertex const& v
+    zobrist_hasher::hash_t hash, vertex const& v
   ) {
     if (proof_tbl_ && v.step)
-      pt_store(*proof_tbl_, v, hash, level, history_begin, history_end);
+      pt_store(*proof_tbl_, v, hash, history_begin, history_end);
   }
 
-  void store_in_tt(zobrist_hasher::hash_t hash, std::size_t level, vertex const& v) {
+  void store_in_tt(zobrist_hasher::hash_t hash, vertex const& v) {
     if (trans_tbl_ && v.step)
-      tt_store(*trans_tbl_, v, hash, level);
+      tt_store(*trans_tbl_, v, hash);
   }
 
   void update_and_store(
@@ -599,24 +596,21 @@ protected:
     current.subtree_size += size_increment;
 
     if (!is_lambda(current)) {
-      bool const numbers_changed = current.proof_number != old_pn ||
-                                   current.disproof_number != old_dn;
-      bool const proved = current.proof_number == 0 ||
-                          current.disproof_number == 0;
+      bool const numbers_changed = current.proof_number != old_pn || current.disproof_number != old_dn;
+      bool const proved = current.proof_number == 0 || current.disproof_number == 0;
       bool const cutoff = parent && apns::cutoff(*parent, current);
 
       if (proved && numbers_changed)
         log_proof(path_begin, path_end);
 
       std::size_t const level = std::distance(path_begin, path_end);
-
       if (cutoff && parent)
         store_in_killer_db(level, current);
 
       if (proved)
-        store_in_pt(history_begin, history_end, level, hash, current);
+        store_in_pt(history_begin, history_end, hash, current);
       else
-        store_in_tt(hash, level, current);
+        store_in_tt(hash, current);
     }
   }
 

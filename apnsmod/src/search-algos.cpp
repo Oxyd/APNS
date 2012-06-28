@@ -367,9 +367,7 @@ void search_stack_checkpoint::revert() {
     if (!stack_->at_root())
       stack_->pop();
     else
-      throw std::logic_error(
-        "revert: The watched stack was modified below the checkpoint"
-      );
+      throw std::logic_error("revert: The watched stack was modified below the checkpoint");
   }
 }
 
@@ -597,18 +595,14 @@ bool pt_lookup(proof_table& pt, search_stack& stack) {
 
 void pt_store(proof_table& pt, vertex const& v,
               zobrist_hasher::hash_t hash,
-              std::size_t ply,
               search_stack::history_sequence::const_iterator history_begin,
               search_stack::history_sequence::const_iterator history_end) {
   proof_entry_t entry(
     v.proof_number, v.disproof_number,
     history_t(std::distance(history_begin, history_end))
   );
-
-  std::copy(history_begin, history_end,
-            entry.history.begin());
-
-  pt.insert(hash, ply, entry);
+  std::copy(history_begin, history_end, entry.history.begin());
+  pt.insert(hash, v.subtree_size, entry);
 }
 
 bool tt_lookup(transposition_table& tt, zobrist_hasher::hash_t hash,
@@ -625,10 +619,8 @@ bool tt_lookup(transposition_table& tt, zobrist_hasher::hash_t hash,
   return false;
 }
 
-void tt_store(transposition_table& tt, vertex const& v,
-              zobrist_hasher::hash_t hash, std::size_t ply) {
-  tt.insert(hash, ply,
-            transposition_entry(v.proof_number, v.disproof_number));
+void tt_store(transposition_table& tt, vertex const& v, zobrist_hasher::hash_t hash) {
+  tt.insert(hash, v.subtree_size, transposition_entry(v.proof_number, v.disproof_number));
 }
 
 void garbage_collect(std::size_t how_many, search_stack stack) {
@@ -737,14 +729,6 @@ bool simulate(search_stack& stack, piece::color_t attacker,
     step_holder step = revalidate(*killer, position, player);
     if (step && parent.steps_remaining - step->steps_used() >= 0) {
       assert(parent.leaf());
-
-      // First append the step as a new child of opposite type (so that it makes
-      // sense to evaluate it at all) and see if that causes a proof. If it
-      // doesn't, and it's got enough steps remaining, flip its type and try
-      // one level deeper.
-      //
-      // This uses built-in recursion. It should be okay, since the recursion
-      // is at most four calls deep.
 
       vertex::iterator child = parent.add();
       ++size;

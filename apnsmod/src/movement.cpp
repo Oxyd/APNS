@@ -858,32 +858,20 @@ steps_cont generate_steps(board const& board, piece::color_t player) {
      board.players()[player_index].shift(east) |
      board.players()[player_index].shift(west));
 
-  for (
-    types_array_t::const_iterator type = TYPES.begin();
-    type != TYPES.end();
-    ++type
-  ) {
+  for (types_array_t::const_iterator type = TYPES.begin(); type != TYPES.end(); ++type) {
     std::size_t const type_index = index_from_type(*type);
     board::mask opponent_stronger, opponent_weaker;
 
-    for (
-      types_array_t::const_iterator op_type = TYPES.begin();
-      op_type != TYPES.end();
-      ++op_type
-    ) {
+    for (types_array_t::const_iterator op_type = TYPES.begin(); op_type != TYPES.end(); ++op_type) {
       std::size_t const op_type_index = index_from_type(*op_type);
 
       if (op_type < type)
-        opponent_stronger |=
-          board.players()[opponent_index] & board.types()[op_type_index];
+        opponent_stronger |= board.players()[opponent_index] & board.types()[op_type_index];
       else if (op_type > type)
-        opponent_weaker |=
-          board.players()[opponent_index] & board.types()[op_type_index];
+        opponent_weaker |= board.players()[opponent_index] & board.types()[op_type_index];
     }
 
-    board::mask const pieces =
-      board.players()[player_index] & board.types()[type_index];
-
+    board::mask const pieces = board.players()[player_index] & board.types()[type_index];
     board::mask const stronger_opponent_adjacent =
       pieces &
         (opponent_stronger.shift(north) |
@@ -891,17 +879,11 @@ steps_cont generate_steps(board const& board, piece::color_t player) {
          opponent_stronger.shift(east) |
          opponent_stronger.shift(west));
 
-    board::mask const unfrozen =
-      pieces & (~stronger_opponent_adjacent | have_friend);
+    board::mask const unfrozen = pieces & (~stronger_opponent_adjacent | have_friend);
 
-    for (
-      board::mask::iterator pos = unfrozen.begin();
-      pos != unfrozen.end();
-      ++pos
-    ) {
+    for (board::mask::iterator pos = unfrozen.begin(); pos != unfrozen.end(); ++pos) {
       board::mask const vacant = neighbourhood(*pos) & ~board.occupied();
-      board::mask const pullable =
-        neighbourhood(*pos) & opponent_weaker;
+      board::mask const pullable = neighbourhood(*pos) & opponent_weaker;
       board::mask const forbidden =
         *type == piece::rabbit
           ? board::mask::row(pos->row()).shift(
@@ -912,26 +894,15 @@ steps_cont generate_steps(board const& board, piece::color_t player) {
 
       // Ordinary steps and pulls:
 
-      for (
-        board::mask::iterator dir = targets.begin();
-        dir != targets.end();
-        ++dir
-      ) {
+      for (board::mask::iterator dir = targets.begin(); dir != targets.end(); ++dir) {
         std::vector<elementary_step> ordinary;
         int score = make_displacement(
           board, *pos, *dir, piece(player, *type),
           std::back_inserter(ordinary)
         );
 
-        steps.push_back(std::make_pair(
-          score, step(ordinary.begin(), ordinary.end())
-        ));
-
-        for (
-          board::mask::iterator pullee = pullable.begin();
-          pullee != pullable.end();
-          ++pullee
-        ) {
+        steps.push_back(std::make_pair(score, step(ordinary.begin(), ordinary.end())));
+        for (board::mask::iterator pullee = pullable.begin(); pullee != pullable.end(); ++pullee) {
           boost::optional<piece> const p = board.get(*pullee);
           assert(p);
           assert(p->color() != player);
@@ -954,18 +925,9 @@ steps_cont generate_steps(board const& board, piece::color_t player) {
 
       board::mask const& pushable = pullable;
 
-      for (
-        board::mask::iterator pushee = pushable.begin();
-        pushee != pushable.end();
-        ++pushee
-      ) {
-        board::mask const pushee_tgts =
-          neighbourhood(*pushee) & ~board.occupied();
-        for (
-          board::mask::iterator push_tgt = pushee_tgts.begin();
-          push_tgt != pushee_tgts.end();
-          ++push_tgt
-        ) {
+      for (board::mask::iterator pushee = pushable.begin(); pushee != pushable.end(); ++pushee) {
+        board::mask const pushee_tgts = neighbourhood(*pushee) & ~board.occupied();
+        for (board::mask::iterator push_tgt = pushee_tgts.begin(); push_tgt != pushee_tgts.end(); ++push_tgt) {
           std::vector<elementary_step> push;
           int score = 0;
           boost::optional<piece> const p = board.get(*pushee);

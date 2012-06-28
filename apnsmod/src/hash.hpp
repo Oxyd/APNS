@@ -158,14 +158,11 @@ private:
   //! One record in the table.
   struct record {
     entry_t   entry;
-    unsigned  depth;
+    unsigned  importance;
     hash_t    hash;
 
-    record() : depth(UNSET), hash(0) { }
-
-    bool is_set() {
-      return depth != UNSET;
-    }
+    record() : importance(UNSET), hash(0) { }
+    bool is_set() { return importance != UNSET; }
 
   private:
     static unsigned const UNSET;
@@ -198,19 +195,19 @@ public:
   /**
    * Insert an element to the table.
    * \param hash Key of the element.
-   * \param depth Depth of the element.
+   * \param importance Importance of the key, higher is more important.
    * \param entry Value of the element.
    */
-  void insert(hash_t hash, unsigned depth, entry_t entry) {
+  void insert(hash_t hash, unsigned importance, entry_t entry) {
     record* r = find_record(hash, true);
     assert(r);
 
-    if (!r->is_set() || r->hash == hash || depth < r->depth) {
+    if (!r->is_set() || r->hash == hash || importance < r->importance) {
       if (!r->is_set())
         ++elements_;
-      r->entry = entry;
-      r->depth = depth;
-      r->hash = hash;
+      r->entry      = entry;
+      r->importance = importance;
+      r->hash       = hash;
     }
   }
 
@@ -299,16 +296,15 @@ private:
 
   std::size_t allocated_pages_;   //!< Number of pages allocated.
   std::size_t elements_;          //!< Number of elements stored.
-  std::size_t hits_;       //!< Number of successful retreivals from the table.
-  std::size_t misses_;     //!< Number of unsuccessful retreival attempts.
+  std::size_t hits_;              //!< Number of successful retreivals from the table.
+  std::size_t misses_;            //!< Number of unsuccessful retreival attempts.
 };
 
 template <typename Entry, typename Hash>
 std::size_t const table<Entry, Hash>::SIZE_OF_ELEMENT = sizeof(record);
 
 template <typename Entry, typename Hash>
-unsigned const table<Entry, Hash>::record::UNSET =
-  std::numeric_limits<unsigned>::max();
+unsigned const table<Entry, Hash>::record::UNSET = std::numeric_limits<unsigned>::min();
 
 } // namespace detail
 
