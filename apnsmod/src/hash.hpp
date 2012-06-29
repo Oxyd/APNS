@@ -151,6 +151,8 @@ public:
   typedef Entry entry_t;
   typedef Hash  hash_t;
 
+  typedef boost::uint_least64_t count_t;  // Integer type for counters.
+
   //! Size, in bytes, of one element of the table.
   static std::size_t const SIZE_OF_ELEMENT;  
   
@@ -249,10 +251,10 @@ public:
   std::size_t elements() const    { return elements_; }    
 
   //! Get the number of successful retreivals from the table.
-  std::size_t hits() const        { return hits_; }        
+  count_t hits() const        { return hits_; }
 
   //! Get the number of unsuccessful retreival attempts.
-  std::size_t misses() const      { return misses_; }      
+  count_t misses() const      { return misses_; }
 
 private:
   static std::size_t const PAGE_SIZE_ = 1024 * 1024;  //!< One megabyte.
@@ -261,8 +263,8 @@ private:
   static std::size_t const PAGE_RECORDS_ = PAGE_SIZE_ / sizeof(record);  
 
   typedef boost::array<record, PAGE_RECORDS_> page;  //!< One page of records.
-  typedef boost::scoped_ptr<page> page_ptr;         //!< Pointer to page.
-  typedef boost::scoped_array<page_ptr> directory;  //!< Directory of pages_.
+  typedef boost::scoped_ptr<page> page_ptr;          //!< Pointer to page.
+  typedef boost::scoped_array<page_ptr> directory;   //!< Directory of pages_.
 
   //! Given an index of an element, get the index into the directory.
   std::size_t page_number(std::size_t index) const {  
@@ -296,8 +298,8 @@ private:
 
   std::size_t allocated_pages_;   //!< Number of pages allocated.
   std::size_t elements_;          //!< Number of elements stored.
-  std::size_t hits_;              //!< Number of successful retreivals from the table.
-  std::size_t misses_;            //!< Number of unsuccessful retreival attempts.
+  count_t     hits_;              //!< Number of successful retreivals from the table.
+  count_t     misses_;            //!< Number of unsuccessful retreival attempts.
 };
 
 template <typename Entry, typename Hash>
