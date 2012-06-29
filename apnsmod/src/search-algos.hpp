@@ -348,11 +348,11 @@ void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log);
 
 //! Attempt to find values for the top vertex in the proof table.
 //! \returns true if values were found; false otherwise.
-bool pt_lookup(proof_table& pt, search_stack& stack);
+bool pt_lookup(proof_table& pt, search_stack& stack, piece::color_t attacker);
 
 //! Store vertex's values in the proof table.
 void pt_store(proof_table& pt, vertex const& v,
-              zobrist_hasher::hash_t hash,
+              zobrist_hasher::hash_t hash, piece::color_t attacker,
               search_stack::history_sequence::const_iterator history_begin,
               search_stack::history_sequence::const_iterator history_end);
 
@@ -573,7 +573,7 @@ protected:
     zobrist_hasher::hash_t hash, vertex const& v
   ) {
     if (proof_tbl_ && v.step)
-      pt_store(*proof_tbl_, v, hash, history_begin, history_end);
+      pt_store(*proof_tbl_, v, hash, game_->attacker, history_begin, history_end);
   }
 
   void store_in_tt(zobrist_hasher::hash_t hash, vertex const& v) {
@@ -638,7 +638,7 @@ protected:
         search_stack_checkpoint checkpoint(stack_);
         stack_.push(&*child);
 
-        bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_);
+        bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_, game_->attacker);
         if (!found_in_pt) {
           bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), *child);
 

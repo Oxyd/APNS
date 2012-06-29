@@ -576,14 +576,19 @@ void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
   }
 }
 
-bool pt_lookup(proof_table& pt, search_stack& stack) {
+bool pt_lookup(proof_table& pt, search_stack& stack, piece::color_t attacker) {
   vertex& child = *stack.path_top();
 
   boost::optional<proof_table::entry_t> values = pt.query(stack.hashes_top());
 
   if (values && histories_compatible(stack, values->history)) {
-    child.proof_number = values->proof_number;
-    child.disproof_number = values->disproof_number;
+    if (values->winner == attacker) {
+      child.proof_number    = 0;
+      child.disproof_number = vertex::infty;
+    } else {
+      child.proof_number    = vertex::infty;
+      child.disproof_number = 0;
+    }
 
     return true;
   } else if (values) {
@@ -594,11 +599,13 @@ bool pt_lookup(proof_table& pt, search_stack& stack) {
 }
 
 void pt_store(proof_table& pt, vertex const& v,
-              zobrist_hasher::hash_t hash,
+              zobrist_hasher::hash_t hash, piece::color_t attacker,
               search_stack::history_sequence::const_iterator history_begin,
               search_stack::history_sequence::const_iterator history_end) {
+  assert(v.proof_number == 0 || v.disproof_number == 0);
+
   proof_entry_t entry(
-    v.proof_number, v.disproof_number,
+    v.proof_number == 0 ? attacker : opponent_color(attacker),
     history_t(std::distance(history_begin, history_end))
   );
   std::copy(history_begin, history_end, entry.history.begin());
@@ -749,7 +756,7 @@ bool simulate(search_stack& stack, piece::color_t attacker,
       search_stack_checkpoint checkpoint(stack);
       stack.push(&*child);
 
-      bool const found_in_pt = proof_tbl && pt_lookup(*proof_tbl, stack);
+      bool const found_in_pt = proof_tbl && pt_lookup(*proof_tbl, stack, attacker);
       if (!found_in_pt)
         evaluate(stack, attacker, log);
 

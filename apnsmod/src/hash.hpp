@@ -330,14 +330,12 @@ typedef std::vector<zobrist_hasher::hash_t> history_t;
 
 //! An entry in the proof table.
 struct proof_entry_t {
-  vertex::number_t  proof_number;
-  vertex::number_t  disproof_number;
-  history_t         history;
+  piece::color_t winner;
+  history_t      history;
 
-  proof_entry_t() : proof_number(0), disproof_number(0) { }
-  proof_entry_t(vertex::number_t pn, vertex::number_t dn, history_t const& h) :
-    proof_number(pn), disproof_number(dn), history(h)
-  { }
+  proof_entry_t() { }
+  proof_entry_t(piece::color_t winner, history_t const& h) :
+    winner(winner), history(h) { }
 };
 
 typedef detail::table<proof_entry_t, zobrist_hasher::hash_t> proof_table;
