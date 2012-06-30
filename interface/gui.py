@@ -754,7 +754,6 @@ class DialogWindow(object):
     self._window = Tkinter.Toplevel(parent, takefocus=True)
     self._window.title(title)
     self._window.transient(self._parent)
-    self._window.resizable(0, 0)
 
     if deleteAction is None:
       deleteAction = self.close
@@ -988,11 +987,8 @@ class RunSearchDialog(Observable):
 
     self._dialog = DialogWindow(parent, 'Run Search')
 
-    infoLabel = ttk.Label(self._dialog.content,
-                          text='Enter parameters of the search:')
-
-    algoFrame = ttk.Labelframe(self._dialog.content, text='Algorithm:',
-                               padding=5)
+    infoLabel = ttk.Label(self._dialog.content, text='Enter parameters of the search:')
+    algoFrame = ttk.Labelframe(self._dialog.content, text='Algorithm:', padding=5)
     
     self._algoVar = Tkinter.StringVar(value=algos[0][0])
     algoRadios = []
@@ -1182,6 +1178,7 @@ class RunSearchDialog(Observable):
     cancelBtn.grid(row=0, column=1)
 
     self._dialog.buttonBox.rowconfigure(0, weight=1)
+    self._dialog.content.columnconfigure(0, weight=1)
 
     self._dialog.window.bind('<Return>', lambda e: self._execute())
     self._dialog.window.bind('<Escape>', lambda e: self.close())
@@ -1528,11 +1525,9 @@ class SearchProgressDialog(Observable):
       self._dialog = DialogWindow(parent, 'Statistics')
 
     if running:
-      infoLabel = ttk.Label(self._dialog.content,
-                          text='Computation is now in progress. Please wait.')
+      infoLabel = ttk.Label(self._dialog.content, text='Computation is now in progress. Please wait.')
     else:
-      infoLabel = ttk.Label(self._dialog.content,
-                            text='Last search statistics:')
+      infoLabel = ttk.Label(self._dialog.content, text='Last search statistics:')
 
     stats = ttk.Labelframe(self._dialog.content, text='Statistics:', padding=3)
 
@@ -1564,9 +1559,7 @@ class SearchProgressDialog(Observable):
     )
     self._dialog.setDeleteAction(lambda: self._cancelBtn.invoke())
 
-    progress = ttk.Labelframe(self._dialog.content,
-                              text='Progress:' if running else 'Time:',
-                              padding=3)
+    progress = ttk.Labelframe(self._dialog.content, text='Progress:' if running else 'Time:', padding=3)
 
     rootPnLabel = ttk.Label(progress, text='Root PN:')
     rootDnLabel = ttk.Label(progress, text='Root DN:')
@@ -1620,6 +1613,7 @@ class SearchProgressDialog(Observable):
     self._posPerSec.grid(row=9, column=1, sticky='W', padx=(5, 0))
 
     stats.columnconfigure(1, weight=1)
+    self._dialog.content.columnconfigure(0, weight=1)
 
     self._cancelBtn.grid(row=0, column=0, sticky='E')
     self._cancelBtn.focus_set()
