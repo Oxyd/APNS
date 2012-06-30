@@ -38,7 +38,7 @@ namespace {
 void compute_size(vertex& v) {
   namespace bl = boost::lambda;
   v.subtree_size = std::accumulate(
-    v.begin(), v.end(), 1, 
+    v.begin(), v.end(), (std::size_t) 1, 
     bl::ret<std::size_t>(bl::_1 + bl::bind(&vertex::subtree_size, bl::_2))
   );
 }

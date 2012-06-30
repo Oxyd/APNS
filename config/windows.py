@@ -21,6 +21,7 @@ def config(conf, bits, debug, profile):
         '/wd4224',                  # Disable an annoying warning. (I believe MSVS is being wrong here.)                                                                                                                        
         '/wd4180',                  # Disable the "C4180: qualifier applied to function type has no meaning; ignored" warning.                                                                                    
                                     # It looks like MSVC likes to warn about this even though it really shouldn't.
+        '/wd4005',                  # Disable C4005: Macro redefinition
         '/Zi' if debug else '',     # Enable debugging information.
 
         '/Ot' if not debug else '', # Favor code speed.                                                                                                                                                                               
