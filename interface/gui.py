@@ -784,7 +784,7 @@ class DialogWindow(object):
     '''
 
     self._window.update_idletasks()
-    self._window.grab_set()
+    #self._window.grab_set()
     self._window.focus_set()
     if wait:
       self._window.wait_window(self._window)
@@ -796,7 +796,9 @@ class DialogWindow(object):
     self._window.grab_release()
     self._window.destroy()
     if self._parent is not None:
+      self._parent.lift()
       self._parent.focus_set()
+      #self._parent.grab_set()
   
   
   def setDeleteAction(self, newAction):
@@ -1508,6 +1510,7 @@ class SearchProgressDialog(Observable):
   '''
   
   parent = property(lambda self: self._dialog.parent)
+  window = property(lambda self: self._dialog.window)
 
   def __init__(self, parent, showTimeLeft=True, running=True):
     '''Create the dialogue.
@@ -1801,7 +1804,7 @@ class SearchProgressController(object):
     def stateChanged(ctrl, newState):
       if newState == Controller.State.ALLOCATING:
         if self._allocDialog is None:
-          self._allocDialog = AllocatingDialog(self._searchProgressDlg.parent)
+          self._allocDialog = AllocatingDialog(self._searchProgressDlg.window)
           self._allocDialog.run()
           
       elif self._allocDialog is not None:
