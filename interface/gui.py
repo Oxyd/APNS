@@ -784,7 +784,7 @@ class DialogWindow(object):
     '''
 
     self._window.update_idletasks()
-    #self._window.grab_set()
+    self._window.grab_set()
     self._window.focus_set()
     if wait:
       self._window.wait_window(self._window)
@@ -795,10 +795,11 @@ class DialogWindow(object):
 
     self._window.grab_release()
     self._window.destroy()
+    self._window.update_idletasks()
     if self._parent is not None:
       self._parent.lift()
       self._parent.focus_set()
-      #self._parent.grab_set()
+      self._parent.grab_set()
   
   
   def setDeleteAction(self, newAction):
