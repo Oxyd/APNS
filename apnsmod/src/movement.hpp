@@ -441,9 +441,13 @@ void apply(step const& step, board_masks& masks);
 /// Undo the application of a step to board masks.
 void unapply(step const& step, board_masks& masks);
 
-typedef std::vector<step> steps_cont;
+/// Container for generated steps.
+typedef std::vector<step_holder> steps_cont;
 
-steps_cont generate_steps(board const& board, piece::color_t player);
+/// Generate all applicable steps (ignoring the repetition rules) from given board for given player.
+/// \param make_lambda If true, this will generate a one empty step in the result.
+/// \return A heuristically ordered sequence of steps.
+steps_cont generate_steps(board const& board, piece::color_t player, bool make_lambda);
 
 /**
  * Iterator over an abstract sequence of all possible steps. Given a position

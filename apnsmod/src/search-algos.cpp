@@ -471,35 +471,39 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
   if (!leaf.leaf())
     throw std::logic_error("expand: Attempt to expand a non-leaf vertex");
 
-  typedef std::vector<std::pair<step, vertex::e_type> > steps_seq;
+  typedef std::vector<std::pair<step_holder, vertex::e_type> > steps_seq;
 
   steps_seq steps;
   piece::color_t player = vertex_player(leaf, attacker);
 
-  std::vector<step> s = generate_steps(state, player);
+  bool const make_lambda = leaf.steps_remaining > 1;
+  steps_cont const s = generate_steps(state, player, make_lambda);
   for (
-    std::vector<step>::const_iterator new_step = s.begin();
+    steps_cont::const_iterator new_step = s.begin();
     new_step != s.end();
     ++new_step
   ) {
-    int const remaining =
-      leaf.steps_remaining - static_cast<signed>(new_step->steps_used());
+    if (*new_step) {
+      int const remaining =
+        leaf.steps_remaining - static_cast<signed>((**new_step).steps_used());
 
-    if (remaining >= 1) {
-      zobrist_hasher::hash_t child_hash = hasher.update(
-        last(move_hist),
-        new_step->begin(), new_step->end(),
-        player, player, leaf.steps_remaining
-      );
-      if (std::find(move_hist.begin(), move_hist.end(), child_hash) == move_hist.end())
-        steps.push_back(std::make_pair(*new_step, leaf.type));
-    } else if (remaining == 0)
-      steps.push_back(std::make_pair(*new_step, opposite_type(leaf.type)));
+      if (remaining >= 1) {
+        zobrist_hasher::hash_t child_hash = hasher.update(
+          last(move_hist),
+          (**new_step).begin(), (**new_step).end(),
+          player, player, leaf.steps_remaining
+        );
+        if (std::find(move_hist.begin(), move_hist.end(), child_hash) == move_hist.end())
+          steps.push_back(std::make_pair(*new_step, leaf.type));
+      } else if (remaining == 0)
+        steps.push_back(std::make_pair(*new_step, opposite_type(leaf.type)));
+
+    } else {
+      steps.push_back(std::make_pair(step_holder::none, leaf.type));
+    }
   }
 
-  bool const make_lambda = leaf.steps_remaining > 1;
-
-  leaf.resize(steps.size() + (make_lambda ? 1 : 0));
+  leaf.resize(steps.size());
   vertex::iterator child = leaf.begin();
 
   for (
@@ -510,18 +514,11 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
     child->proof_number = child->disproof_number = 1;
     child->step = step->first;
     child->type = step->second;
+    std::size_t const used = child->step ? child->step->steps_used() : 1;
     if (child->type == leaf.type)
-      child->steps_remaining = leaf.steps_remaining - child->step->steps_used();
+      child->steps_remaining = leaf.steps_remaining - used;
     else
       child->steps_remaining = MAX_STEPS;
-    child->subtree_size = 1;
-  }
-
-  if (make_lambda) {
-    assert(child != leaf.end());
-    child->proof_number = child->disproof_number = 1;
-    child->type = leaf.type;
-    child->steps_remaining = leaf.steps_remaining - 1;
     child->subtree_size = 1;
   }
 

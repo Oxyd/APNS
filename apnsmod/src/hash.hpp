@@ -186,10 +186,7 @@ public:
     , records_(new record[table_size])
     , elements_(0)
     , hits_(0)
-    , misses_(0) {
-    assert(sizeof(page) <= PAGE_SIZE_);
-    assert(pages_ * PAGE_RECORDS_ >= table_size_);
-  }
+    , misses_(0) { }
 
   /**
    * Insert an element to the table.
