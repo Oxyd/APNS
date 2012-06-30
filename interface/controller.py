@@ -192,6 +192,10 @@ class Controller(object):
       self.callbacks.call(self.ctrl)
       if self.ctrl._cancel:
         self.requestStop()
+  
+  
+  class State:
+    INACTIVE, SEARCHING, ALLOCATING = range(3)
 
 
   def __init__(self):
@@ -201,9 +205,13 @@ class Controller(object):
     self.searchParameters = SearchParameters()
 
     self.searchProgressCallbacks = _Callbacks()
+    self.stateCallbacks = _Callbacks()
     self.loadGameCallbacks = _Callbacks()
     self.saveGameCallbacks = _Callbacks()
+    
+    self._state = Controller.State.INACTIVE
 
+  state = property(lambda self: self._state)
   gameLoaded = property(lambda self: self._game is not None)
   root = property(lambda self: self._game.root if self._game else None)
   initialState = property(
@@ -273,6 +281,7 @@ class Controller(object):
     '''Run the search until one of the terminating conditions is met.'''
 
     self._cancel = False
+    self._switchState(Controller.State.INACTIVE)
 
     if self._game is None:
       raise RuntimeError('Create or load a game first')
@@ -295,12 +304,21 @@ class Controller(object):
       ptElems = 0
 
     if ttElems > 0 and (self._transTbl is None or self._transTbl.size != ttElems):
-      self._transTbl = apnsmod.TranspositionTable(ttElems)
+      self._switchState(Controller.State.ALLOCATING)
+      try:
+        self._transTbl = apnsmod.TranspositionTable(ttElems)
+      except OverflowError:
+        raise ValueError('Transposition table size is too large')
+      
     elif ttElems == 0:
       self._transTbl = None
 
     if ptElems > 0 and (self._proofTbl is None or self._proofTbl.size != ptElems):
-      self._proofTbl = apnsmod.ProofTable(ptElems)
+      self._switchState(Controller.State.ALLOCATING)
+      try:
+        self._proofTbl = apnsmod.ProofTable(ptElems)
+      except OverflowError:
+        raise ValueError('Proof table size is too large')
     elif ptElems == 0:
       self._proofTbl = None
     
@@ -331,16 +349,20 @@ class Controller(object):
     self._lastPosPerSec = 0
 
     try:
+      self._switchState(Controller.State.SEARCHING)
       while not self._search.finished and not self._limitsExceeded() and not self._cancel:
         self._search.run(burst)
         self._updateProgress()
+        
     except MemoryError:
       self.dropGame()
       raise
-
-    self._search.logSink.flush()
-    self._posCount = self._search.positionCount
-    self.stats = self._makeStats()
+    
+    finally:
+      self._switchState(Controller.State.INACTIVE)
+      self._search.logSink.flush()
+      self._posCount = self._search.positionCount
+      self.stats = self._makeStats()
 
   def cancel(self):
     '''Cancel whatever operation is running now.'''
@@ -404,6 +426,12 @@ class Controller(object):
       progress.killerCount = 0
 
     return progress
+  
+  def _switchState(self, newState):
+    changed = newState != self._state
+    self._state = newState
+    if changed:
+      self.stateCallbacks.call(self, newState)
 
   def _algoType(self, algo):
     return apnsmod.algos[algo][0]

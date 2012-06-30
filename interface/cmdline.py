@@ -181,7 +181,14 @@ def main():
   def cancelCallback(ctrl):
     if interruptHandler.interrupted:
       ctrl.cancel()
+  
+  def stateCallback(ctrl, state):
+    if state == Controller.State.ALLOCATING:
+      print 'Allocating transposition and proof tables...'
+    elif state == Controller.State.SEARCHING:
+      print '... Done. Commencing search.'
 
+  controller.stateCallbacks.add(stateCallback)
   controller.loadGameCallbacks.add(cancelCallback)
   controller.saveGameCallbacks.add(cancelCallback)
 

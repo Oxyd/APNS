@@ -183,17 +183,10 @@ public:
    */
   table(std::size_t table_size)
     : table_size_(table_size)
-
-    // pages := ceil(table_size / PAGE_RECORDS)
-    , pages_((table_size / PAGE_RECORDS_) + 
-             (table_size % PAGE_RECORDS_ != 0 ? 1 : 0))
-
-    , dir_(new page_ptr[pages_])
-    , allocated_pages_(0)
+    , records_(new record[table_size])
     , elements_(0)
     , hits_(0)
-    , misses_(0)
-  {
+    , misses_(0) {
     assert(sizeof(page) <= PAGE_SIZE_);
     assert(pages_ * PAGE_RECORDS_ >= table_size_);
   }
@@ -205,15 +198,14 @@ public:
    * \param entry Value of the element.
    */
   void insert(hash_t hash, unsigned importance, entry_t entry) {
-    record* r = find_record(hash, true);
-    assert(r);
+    record& r = find_record(hash);
 
-    if (!r->is_set() || r->hash == hash || importance < r->importance) {
-      if (!r->is_set())
+    if (!r.is_set() || r.hash == hash || importance < r.importance) {
+      if (!r.is_set())
         ++elements_;
-      r->entry      = entry;
-      r->importance = importance;
-      r->hash       = hash;
+      r.entry      = entry;
+      r.importance = importance;
+      r.hash       = hash;
     }
   }
 
@@ -223,10 +215,10 @@ public:
    * \returns Either the found element or nothing if the element wasn't found.
    */
   boost::optional<entry_t> query(hash_t hash) {
-    record* r = find_record(hash, false);
-    if (r && r->is_set() && r->hash == hash) {
+    record& r = find_record(hash);
+    if (r.is_set() && r.hash == hash) {
       ++hits_;
-      return r->entry;
+      return r.entry;
     } else {
       ++misses_;
       return boost::none;
@@ -244,9 +236,7 @@ public:
   }
 
   //! Get the amount of memory, in bytes, of this table.
-  std::size_t memory_usage() const {                       
-    return allocated_pages_ * PAGE_SIZE_ + pages_ * sizeof(page_ptr);
-  }
+  std::size_t memory_usage() const { return table_size_ * sizeof(record); }
 
   //! Get the maximal number of elements storeable in this table.
   std::size_t table_size() const  { return table_size_; }  
@@ -261,49 +251,17 @@ public:
   count_t misses() const      { return misses_; }
 
 private:
-  static std::size_t const PAGE_SIZE_ = 1024 * 1024;  //!< One megabyte.
+  typedef boost::scoped_array<record> records_cont;
 
-  //! Number of records that can fit into one page.
-  static std::size_t const PAGE_RECORDS_ = PAGE_SIZE_ / sizeof(record);  
+  std::size_t const table_size_;   //!< Max size of the table.
 
-  typedef boost::array<record, PAGE_RECORDS_> page;  //!< One page of records.
-  typedef boost::scoped_ptr<page> page_ptr;          //!< Pointer to page.
-  typedef boost::scoped_array<page_ptr> directory;   //!< Directory of pages_.
+  records_cont records_;
+  std::size_t  elements_;          //!< Number of elements stored.
+  count_t      hits_;              //!< Number of successful retreivals from the table.
+  count_t      misses_;            //!< Number of unsuccessful retreival attempts.
 
-  //! Given an index of an element, get the index into the directory.
-  std::size_t page_number(std::size_t index) const {  
-    return index / PAGE_RECORDS_;
-  }
-
-  //! Given an index of an element, get the index into the page.
-  std::size_t page_offset(std::size_t index) const {  
-    return index % PAGE_RECORDS_;
-  }
-  
   //! Get the record for given hash.
-  record* find_record(hash_t hash, bool allocate) {
-    page_ptr& pg = dir_[page_number(hash % table_size_)];
-
-    if (pg == 0 && allocate) {
-      pg.reset(new page);
-      ++allocated_pages_;
-    }
-
-    if (pg != 0)
-      return &((*pg)[page_offset(hash % table_size_)]);
-    else
-      return 0;
-  }
-
-  std::size_t const table_size_;  //!< How many elements are there in one page?
-  std::size_t const pages_;       //!< How many pages are there?
-
-  directory dir_;                 //!< The table itself.
-
-  std::size_t allocated_pages_;   //!< Number of pages allocated.
-  std::size_t elements_;          //!< Number of elements stored.
-  count_t     hits_;              //!< Number of successful retreivals from the table.
-  count_t     misses_;            //!< Number of unsuccessful retreival attempts.
+  record& find_record(hash_t hash) { return records_[hash % table_size_]; }
 };
 
 template <typename Entry, typename Hash>

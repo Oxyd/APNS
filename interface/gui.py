@@ -796,9 +796,10 @@ class DialogWindow(object):
 
     self._window.grab_release()
     self._window.destroy()
-    self._parent.focus_set()
-
-
+    if self._parent is not None:
+      self._parent.focus_set()
+  
+  
   def setDeleteAction(self, newAction):
     '''Set a new action that will be called when the dialog is closed.'''
 
@@ -1508,6 +1509,8 @@ class SearchProgressDialog(Observable):
   '''A dialog window showing the progress of a search along with a Cancel
   button.
   '''
+  
+  parent = property(lambda self: self._dialog.parent)
 
   def __init__(self, parent, showTimeLeft=True, running=True):
     '''Create the dialogue.
@@ -1702,6 +1705,25 @@ class SearchProgressDialog(Observable):
 
   def _cancel(self):
     self.notifyObservers()
+    
+
+class AllocatingDialog(object):
+  '''A dialog with just the message 'Allocating Memory.' '''
+  
+  def __init__(self, parent):
+    object.__init__(self)
+    
+    self._dlg = DialogWindow(parent, 'Allocating...')
+    
+    message = ttk.Label(self._dlg.content, text='Allocating Tables...')
+    message.pack()
+    
+  def run(self):
+    self._dlg.window.update()
+    self._dlg.run(wait=False)
+  
+  def close(self):
+    self._dlg.close()
 
 
 class SearchProgressController(object):
@@ -1711,6 +1733,7 @@ class SearchProgressController(object):
     object.__init__(self)
 
     self._searchProgressDlg = searchProgressDlg
+    self._allocDialog = None
 
     self._timeLimit = timeLimit
     self._posLimit = posLimit
@@ -1727,7 +1750,7 @@ class SearchProgressController(object):
     '''
 
     MS_BURST_TIME = 250
-
+    
     self._searchProgressDlg.run()
 
     class Updater:
@@ -1773,25 +1796,50 @@ class SearchProgressController(object):
 
         dlg.showKillerCount(count=progress.killerCount)
 
-        dlg.showPosCount(posCount=progress.positionCount,
-                         posPerSec=progress.positionsPerSecond)
+        dlg.showPosCount(posCount=progress.positionCount, posPerSec=progress.positionsPerSecond)
         dlg.showRootPnDn(progress.rootPN, progress.rootDN)
         dlg.updateGui()
 
     updater = Updater(self._searchProgressDlg, self)
     self._searchProgressDlg.addObserver(updater)
-
     controller.searchProgressCallbacks.add(updater.updateDlg)
+    
+    def stateChanged(ctrl, newState):
+      if newState == Controller.State.ALLOCATING:
+        if self._allocDialog is None:
+          self._allocDialog = AllocatingDialog(self._searchProgressDlg.parent)
+          self._allocDialog.run()
+          
+      elif self._allocDialog is not None:
+        self._allocDialog.close()
+        self._allocDialog = None
+        
+    controller.stateCallbacks.add(stateChanged)
+
     try:
       controller.runSearch(MS_BURST_TIME)
+      
+    except MemoryError:
+      if controller.state == Controller.State.ALLOCATING:
+        tkMessageBox.showerror('Error', 'There is not enough memory to allocate the proof or transposition table.')
+      else:
+        raise
+      
     except RuntimeError, e:
       tkMessageBox.showerror(
         'Error',
-        'An internal error has happened. This is likely a bug.\n\n' +
-        '{0}'.format(e)
+        'An internal error has occured. This is likely a bug.\n\n{0}'.format(e)
       )
+      
+    except ValueError, e:
+      tkMessageBox.showerror('Error', str(e))
+      
     finally:
       controller.searchProgressCallbacks.remove(updater.updateDlg)
+      controller.stateCallbacks.remove(stateChanged)
+      if self._allocDialog is not None:
+        self._allocDialog.close()
+        self._allocDialog = None
       self._searchProgressDlg.close()
 
 
