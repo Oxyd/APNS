@@ -17,6 +17,8 @@
 #include <boost/flyweight.hpp>
 #include <boost/flyweight/no_locking.hpp>
 #include <boost/array.hpp>
+#include <boost/bind.hpp>
+#include <boost/utility.hpp>
 
 #include <vector>
 #include <utility>
@@ -255,11 +257,19 @@ public:
   /// \name Iteration
   /// @{
 
-  iterator begin() const;
-  iterator end() const;
+  iterator begin() const { return representation_.begin(); }
+  iterator end() const   {
+    // NB: This function is often used and used to show up on the first place in profiling. This if/else if chain may
+    // be ugly, but it appears to produce fast code.
 
-  reverse_iterator rbegin() const;
-  reverse_iterator rend() const;
+    if (representation_[1].invalid()) return begin() + 1;
+    else if (representation_[2].invalid()) return begin() + 2;
+    else if (representation_[3].invalid()) return begin() + 3;
+    else return begin() + 4;
+  }
+
+  reverse_iterator rbegin() const { return reverse_iterator(end()); }
+  reverse_iterator rend() const   { return reverse_iterator(begin()); }
 
   ///@}
 

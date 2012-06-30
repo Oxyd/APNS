@@ -541,23 +541,6 @@ std::string step::to_string() const {
   return result;
 }
 
-step::iterator step::begin() const {
-  return representation_.begin();
-}
-
-step::iterator step::end() const {
-  return std::find_if(representation_.begin(), representation_.end(),
-                      boost::bind(&elementary_step::invalid, _1));
-}
-
-step::reverse_iterator step::rbegin() const {
-  return reverse_iterator(end());
-}
-
-step::reverse_iterator step::rend() const {
-  return reverse_iterator(begin());
-}
-
 int step::steps_used() const {
   return std::count_if(begin(), end(), !boost::bind(&elementary_step::capture, _1));
 }

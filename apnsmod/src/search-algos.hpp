@@ -287,11 +287,9 @@ inline std::size_t move_depth(move_path const& path) {
 }
 
 inline move_path::iterator terminal(move_path& path) {
-  using namespace boost::lambda;
-  return std::find_if(
-    path.begin(), path.end(),
-    _1 == static_cast<vertex*>(0)
-  ) - 1;
+  namespace bl = boost::lambda;
+  return std::find_if(path.begin(), path.end(),
+                      bl::_1 == static_cast<vertex*>(0)) - 1;
 }
 
 //! Try to apply the given move path to the given board. If successful, returns
@@ -310,9 +308,9 @@ move_history_seq move_history(search_stack const& stack);
 
 //! Get the last non-zero element of a move history.
 inline zobrist_hasher::hash_t last(move_history_seq const& mh) {
-  using namespace boost::lambda;
+  namespace bl = boost::lambda;
   move_history_seq::const_reverse_iterator it =
-    std::find_if(mh.rbegin(), mh.rend(), _1 != 0);
+    std::find_if(mh.rbegin(), mh.rend(), bl::_1 != 0);
   assert(it != mh.rend());
   return *it;
 }

@@ -612,8 +612,7 @@ void pt_store(proof_table& pt, vertex const& v,
   pt.insert(hash, v.subtree_size, entry);
 }
 
-bool tt_lookup(transposition_table& tt, zobrist_hasher::hash_t hash,
-               vertex& child) {
+bool tt_lookup(transposition_table& tt, zobrist_hasher::hash_t hash, vertex& child) {
   boost::optional<transposition_table::entry_t> values = tt.query(hash);
 
   if (values) {

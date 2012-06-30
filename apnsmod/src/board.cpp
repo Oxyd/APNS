@@ -184,11 +184,9 @@ boost::optional<piece> board::get(position from) const {
     piece::color_t color = piece::color_t();
     piece::type_t  type  = piece::type_t();
 
-    for (players_masks::const_iterator p = players_.begin();
-         p != players_.end(); ++p)
+    for (players_masks::const_iterator p = players_.begin(); p != players_.end(); ++p)
       if (p->get(from)) { color = COLORS[p - players_.begin()]; break; }
-    for (types_masks::const_iterator t = types_.begin();
-         t != types_.end(); ++t)
+    for (types_masks::const_iterator t = types_.begin(); t != types_.end(); ++t)
       if (t->get(from)) { type = TYPES[t - types_.begin()]; break; }
 
     return piece(color, type);

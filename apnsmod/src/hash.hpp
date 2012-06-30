@@ -85,12 +85,22 @@ public:
   }
 
 private:
-  typedef boost::multi_array<hash_t, 4>   codes_cont;
-  typedef boost::array<hash_t, 2>         players_cont;
+  static std::size_t const TYPES     = types_array_t::static_size;
+  static std::size_t const COLORS    = colors_array_t::static_size;
+  static std::size_t const POSITIONS = board::ROWS * board::COLUMNS;
 
-  codes_cont    codes_;
+  typedef boost::array<hash_t, TYPES * COLORS * POSITIONS> pieces_cont;
+  typedef boost::array<hash_t, 2>                          players_cont;
+
+  pieces_cont   pieces_;
   players_cont  players_;
   hash_t        admits_double_;
+
+  hash_t piece_code(piece piece, position pos) const {
+    return pieces_[index_from_type(piece.type()) * TYPES * COLORS +
+                   index_from_color(piece.color()) * COLORS +
+                   pos.order()];
+  }
 };
 
 template <typename Iter>
@@ -112,17 +122,11 @@ zobrist_hasher::hash_t zobrist_hasher::update(
 
     // First remove the piece from its old position. If this is a displacement,
     // add the piece's new position to the hash later.
-    hash ^= codes_[index_from_type(piece.type())]
-                  [index_from_color(piece.color())]
-                  [old_position.row() - position::MIN_ROW]
-                  [old_position.column() - position::MIN_COLUMN];
+    hash ^= piece_code(piece, old_position);
 
     if (!step->capture()) {
       position new_position = make_adjacent(old_position, step->where());
-      hash ^= codes_[index_from_type(piece.type())]
-                    [index_from_color(piece.color())]
-                    [new_position.row() - position::MIN_ROW]
-                    [new_position.column() - position::MIN_COLUMN];
+      hash ^= piece_code(piece, new_position);
       --steps_remaining;
     }
   }

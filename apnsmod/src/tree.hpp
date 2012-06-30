@@ -140,9 +140,9 @@ public:
   //! \note This is surprisingly ineffective (O(n) instead of O(1)) -- could
   //!   it be improved or removed?
   iterator iter_from_ptr(vertex* child) {
-    using namespace boost::lambda;
+    namespace bl = boost::lambda;
     return std::find_if(children_.begin(), children_.end(),
-                        &_1 == child);
+                        &bl::_1 == child);
   }
 
   //! Sort the children of this vertex according to a comparator.
