@@ -93,38 +93,31 @@ winner(board const& board, piece::color_t player) {
   return boost::none;
 }
 
-std::pair<vertex*, vertex*>
-two_best_successors(vertex& parent) {
-  if (parent.size() >= 2) {
-    vertex::iterator best = parent.begin();
-    vertex::iterator second_best = boost::next(parent.begin());
-    vertex_comparator better(parent);
-
-    if (better(*second_best, *best))
-      std::swap(best, second_best);
-
-    for (vertex::iterator child = boost::next(second_best); child != parent.end(); ++child) {
-      if (better(*child, *best)) {
-        second_best = best;
-        best = child;
-      } else if (better(*child, *second_best) && child != best)
-        second_best = child;
-    }
-
-    assert(best != second_best);
-    assert(&*best == best_successor(parent));
-    return std::make_pair(&*best, &*second_best);
-  } else {
-    return std::make_pair(best_successor(parent), static_cast<vertex*>(0));
-  }
-}
-
 void killer_db::add(std::size_t level, step const& step) {
   while (level >= levels_) {
     levels_ *= 2;
     killers_.resize(levels_ * killer_count_);
   }
 
+  std::size_t i = 0;
+  for (; i < killer_count_; ++i) {
+    record& r = get(level, i);
+    if (r.step && *r.step == step)
+      return;
+    else if (!r.step)
+      break;
+  }
+
+  if (i < killer_count_) {
+    get(level, i).step = step;
+    ++size_;
+  } else {
+    for (std::size_t i = 0; i < killer_count_ - 1; ++i)
+      get(level, i) = get(level, i + 1);
+    get(level, killer_count_ - 1).step = step;
+  }
+
+#if 0
   killers_cont::value_type* least = 0;
   killers_cont::value_type* exact = 0;
   for (std::size_t i = 0; i < killer_count_; ++i) {
@@ -147,6 +140,7 @@ void killer_db::add(std::size_t level, step const& step) {
     least->step = step;
     least->hits = 1;
   }
+#endif
 }
 
 bool killer_db::is_killer(std::size_t level, step const& step) const {
@@ -900,10 +894,19 @@ void depth_first_pns::do_iterate() {
 
   // And go back down until we reach a leaf.
   while (!current->leaf()) {
+#if KILLER_SORT_BEFORE_SELECT
     if (killer_db_)
       killer_order(*killer_db_, stack_.size(), *stack_.path_top());
+#endif
 
+#if KILLER_PREFER
+    std::pair<vertex*, vertex*> best_two =
+      killer_db_
+        ? two_best_successors(*current, killer_vertex_value(stack_.size(), *killer_db_))
+        : two_best_successors(*current);
+#else
     std::pair<vertex*, vertex*> best_two = two_best_successors(*current);
+#endif
 
     assert(best_two.first);
     assert(best_two.first->proof_number > 0 && 

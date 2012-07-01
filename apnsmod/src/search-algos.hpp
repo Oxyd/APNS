@@ -121,15 +121,63 @@ CVVertex* best_successor(CVVertex& parent, ValueF value) {
 template <typename CVVertex>
 CVVertex* best_successor(CVVertex& parent) { return best_successor(parent, &zero); }
 
-//! Return the best successor of a vertex and, if any, the second-best
-//! successor.
-std::pair<vertex*, vertex*> two_best_successors(vertex& parent);
+//! Return the best successor of a vertex and, if any, the second-best successor.
+template <typename CVVertex, typename ValueF>
+std::pair<CVVertex*, CVVertex*>
+two_best_successors(CVVertex& parent, ValueF value) {
+  typedef typename
+    boost::mpl::if_<
+      boost::is_const<CVVertex>,
+      vertex::const_iterator,
+      vertex::iterator
+    >::type iterator;
+
+  if (parent.size() >= 2) {
+    vertex_comparator better(parent);
+
+    iterator best = parent.begin();
+    iterator second_best = boost::next(parent.begin());
+    int best_value = value(*best);
+    int second_best_value = value(*second_best);
+
+    if (better(*second_best, *best) || second_best_value > best_value) {
+      std::swap(best, second_best);
+      std::swap(best_value, second_best_value);
+    }
+
+    for (vertex::iterator child = boost::next(second_best); child != parent.end(); ++child) {
+      if (better(*child, *best) || (!better(*best, *child) && value(*child) > best_value)) {
+        second_best = best;
+        best = child;
+        second_best_value = best_value;
+        best_value = value(*child);
+      } else if (child != best &&
+                 (better(*child, *second_best) ||
+                   (!better(*second_best, *child) && value(*child) > second_best_value))) {
+        second_best = child;
+        second_best_value = value(*child);
+      }
+    }
+
+    assert(best != second_best);
+    assert(&*best == best_successor(parent, value));
+    return std::make_pair(&*best, &*second_best);
+  } else {
+    return std::make_pair(best_successor(parent, value), static_cast<vertex*>(0));
+  }
+}
+
+template <typename CVVertex>
+std::pair<CVVertex*, CVVertex*>
+two_best_successors(CVVertex& parent) {
+  return two_best_successors(parent, &zero);
+}
 
 //! Killer steps database.
 class killer_db {
   struct record {
     step_holder step;
-    std::size_t hits;
+    //std::size_t hits;
   };
   typedef std::vector<record> killers_cont;
 
@@ -742,11 +790,8 @@ protected:
           *log_ << stack_ << " proved by proof table\n";
         }
 
-        bool const cutoff = apns::cutoff(current, *child);
-
-        if (cutoff) {
+        if (cutoff(current, *child))
           store_in_killer_db(stack_.size() - 1, *child);
-        }
       }
     }
   }
