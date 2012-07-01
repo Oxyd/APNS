@@ -139,27 +139,52 @@ two_best_successors(vertex& parent) {
   }
 }
 
-void killer_db::add(std::size_t ply, step const& step) {
-  if (ply >= killers_.size())
-    killers_.resize(ply + 1, ply_killers_t(killer_count_));
+void killer_db::add(std::size_t level, step const& step) {
+  while (level >= levels_) {
+    levels_ *= 2;
+    killers_.resize(levels_ * killer_count_);
+  }
 
-  if (std::find(killers_[ply].begin(), killers_[ply].end(), step) ==
-      killers_[ply].end()) {
-    if (!killers_[ply].full())
-      ++size_;  // Otherwise this replaces an existing record.
+  killers_cont::value_type* least = 0;
+  killers_cont::value_type* exact = 0;
+  for (std::size_t i = 0; i < killer_count_; ++i) {
+    record& r = get(level, i);
+    if (r.step && *r.step == step) {
+      exact = &r;
+      break;
+    }
 
-    killers_[ply].push_back(step);
+    if (least == 0 || r.hits < least->hits)
+      least = &r;
+  }
+
+  if (exact)
+    ++exact->hits;
+  else {
+    assert(least);
+    if (!least->step)
+      ++size_;
+    least->step = step;
+    least->hits = 1;
   }
 }
 
-bool killer_db::is_killer(
-  std::size_t ply, step const& step
-) const {
-  if (killers_.size() > ply)
-    return
-      std::find(killers_[ply].begin(), killers_[ply].end(), step) !=
-      killers_[ply].end();
-  else return false;
+bool killer_db::is_killer(std::size_t level, step const& step) const {
+  if (level < levels_)
+    for (std::size_t i = 0; i < killer_count_; ++i) {
+      record const& r = get(level, i);
+      if (r.step && *r.step == step)
+        return true;
+    }
+  return false;
+}
+
+killer_db::record& killer_db::get(std::size_t level, std::size_t offset) {
+  return killers_[level * killer_count_ + offset];
+}
+
+killer_db::record const& killer_db::get(std::size_t level, std::size_t offset) const {
+  return killers_[level * killer_count_ + offset];
 }
 
 void history_table::insert(step const& step, std::size_t depth) {
@@ -808,8 +833,8 @@ void proof_number_search::do_iterate() {
   assert(stack_.at_root());
 
   while (!stack_.path_top()->leaf()) {
-    if (killer_db_)
-      killer_order(*killer_db_, stack_.size(), *stack_.path_top());
+/*    if (killer_db_)
+      killer_order(*killer_db_, stack_.size(), *stack_.path_top());*/
 
     push_best(stack_);
   }

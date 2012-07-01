@@ -98,23 +98,57 @@ std::pair<vertex*, vertex*> two_best_successors(vertex& parent);
 
 //! Killer steps database.
 class killer_db {
-  typedef boost::circular_buffer<step> ply_killers_t;
+  struct record {
+    step_holder step;
+    std::size_t hits;
+  };
+  typedef std::vector<record> killers_cont;
 
 public:
-  typedef ply_killers_t::const_iterator level_iterator;
+  struct level_iterator : boost::iterator_facade<
+    level_iterator,
+    step,
+    boost::random_access_traversal_tag,
+    step
+  > {
+    level_iterator() : db_(0), level_(0), offset_(0) { }
+
+  private:
+    friend class boost::iterator_core_access;
+    friend class killer_db;
+
+    killer_db const*    db_;
+    std::size_t         level_;
+    std::size_t         offset_;
+
+    level_iterator(killer_db const& db, std::size_t level, std::size_t offset)
+      : db_(&db), level_(level), offset_(offset) { }
+
+    step dereference() const { return *db_->get(level_, offset_).step; }
+    bool equal(level_iterator const& other) const {
+      return other.db_ == db_ && other.level_ == level_ && other.offset_ == offset_;
+    }
+    void            increment() { ++offset_; }
+    void            decrement() { --offset_; }
+    void            advance(difference_type n) { offset_ += n; }
+    difference_type distance_to(level_iterator const& other) const { return other.offset_ - offset_; }
+  };
 
   //! Make a killer DB that holds at most killer_count killers for each ply.
   explicit killer_db(std::size_t killer_count) 
-    : killer_count_(killer_count)
+    : killer_count_(0)
     , size_(0)
-  { }
+    , levels_(16) {
+    resize_plys(killer_count);
+  }
 
   //! Change the maximal number of killers per ply. This will drop all killers 
   //! stored in this db.
   void resize_plys(std::size_t new_killer_count) {
     if (new_killer_count != killer_count_) {
-      killers_.resize(0);
+      killers_cont().swap(killers_);
       killer_count_ = new_killer_count;
+      killers_.resize(killer_count_ * levels_);
       size_ = 0;
     }
   }
@@ -132,25 +166,29 @@ public:
   bool is_killer(std::size_t level, step const& step) const;
 
   level_iterator level_begin(std::size_t level) const {
-    if (level < killers_.size())
-      return killers_[level].begin();
+    if (level < levels_)
+      return level_iterator(*this, level, 0);
     else
       return level_iterator();
   }
 
   level_iterator level_end(std::size_t level) const {
-    if (level < killers_.size())
-      return killers_[level].end();
-    else
+    if (level < killers_.size()) {
+      std::size_t offset = 0;
+      while (offset < killer_count_ && get(level, offset).step) ++offset;
+      return level_iterator(*this, level, offset);
+    } else
       return level_iterator();
   };
 
 private:
-  typedef std::vector<ply_killers_t> plys;
+  killers_cont killers_;
+  std::size_t  killer_count_;       //!< How many killers at most per ply.
+  std::size_t  size_;
+  std::size_t  levels_;
 
-  std::size_t killer_count_;       //!< How many killers at most per ply.
-  std::size_t size_;
-  plys        killers_;
+  record& get(std::size_t level, std::size_t offset);
+  record const& get(std::size_t level, std::size_t offset) const;
 };
 
 //! History table serves for step-ordering within a vertex.
@@ -614,7 +652,7 @@ protected:
 
   std::size_t expand_and_eval() {
     std::size_t size = 0;
-    bool const simulated = killer_db_ && simulate(stack_, game_->attacker, size, *killer_db_, proof_tbl_, *log_);
+    bool const simulated = false;// killer_db_ && simulate(stack_, game_->attacker, size, *killer_db_, proof_tbl_, *log_);
 
     if (!simulated) {
       assert(stack_.path_top()->leaf());
@@ -623,6 +661,10 @@ protected:
         *stack_.path_top(), stack_.state(), game_->attacker,
         move_history(stack_), hasher_
       );
+
+      if (killer_db_)
+        killer_order(*killer_db_, stack_.size(), *stack_.path_top());
+
       evaluate_children();
     }
 
