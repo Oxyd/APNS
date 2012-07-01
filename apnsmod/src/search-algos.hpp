@@ -4,6 +4,7 @@
 #include "tree.hpp"
 #include "hash.hpp"
 #include "movement.hpp"
+#include "config.hpp"
 
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
@@ -15,6 +16,8 @@
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/function.hpp>
+#include <boost/mpl/if.hpp>
+#include <boost/type_traits.hpp>
 
 #include <vector>
 #include <stack>
@@ -86,11 +89,37 @@ private:
 
 inline int zero(vertex const&) { return 0; }
 
-//! Return the best successor of a vertex. Can be used as a traversal policy.
-//! If there are multiple "as good" children, this guarantees to select the
-//! one with highest value().
-vertex* best_successor(vertex& parent);
-vertex const* best_successor(vertex const& parent);
+/// Return the best successor of a vertex. Can be used as a traversal policy. If there are multiple "as good" children,
+/// this guarantees to select the one with highest value().
+template <typename CVVertex, typename ValueF>
+CVVertex* best_successor(CVVertex& parent, ValueF value) {
+  typedef typename
+    boost::mpl::if_<
+      boost::is_const<CVVertex>,
+      vertex::const_iterator,
+      vertex::iterator
+    >::type iterator;
+
+  if (parent.size() > 0) {
+    iterator best = parent.begin();
+    int best_value = value(*best);
+    vertex_comparator better(parent);
+
+    for (iterator child = boost::next(best); child != parent.end(); ++child) {
+      if (better(*child, *best) || (!better(*best, *child) && value(*child) > best_value)) {
+        best = child;
+        best_value = value(*child);
+      }
+    }
+
+    return &*best;
+  } else {
+    return 0;
+  }
+}
+
+template <typename CVVertex>
+CVVertex* best_successor(CVVertex& parent) { return best_successor(parent, &zero); }
 
 //! Return the best successor of a vertex and, if any, the second-best
 //! successor.
@@ -434,10 +463,13 @@ bool simulate(search_stack& stack, piece::color_t attacker,
               log_sink& log);
 
 //! Push the best successor among the top vertex's successors.
-inline void push_best(search_stack& stack) {
+template <typename ValueF>
+void push_best(search_stack& stack, ValueF value) {
   assert(!stack.path_top()->leaf());
-  stack.push(best_successor(*stack.path_top()));
+  stack.push(best_successor(*stack.path_top(), value));
 }
+
+inline void push_best(search_stack& stack) { push_best(stack, &zero); }
 
 //! Does the given child cause a cutoff for given parent?
 inline bool cutoff(vertex const& parent, vertex const& child) {
@@ -554,6 +586,20 @@ public:
   }
 
 protected:
+  struct killer_vertex_value {
+    killer_vertex_value(std::size_t level, killer_db const& killers) : level_(level), killers_(&killers) { }
+    int operator () (vertex const& v) const {
+      if (v.step && killers_->is_killer(level_, *v.step))
+        return std::numeric_limits<int>::max();
+      else
+        return 0;
+    }
+
+  private:
+    std::size_t      level_;
+    killer_db const* killers_;
+  };
+
   boost::shared_ptr<apns::game>           game_;
   zobrist_hasher                          hasher_;        ///< Hasher to be used during the algorithm's execution.
   zobrist_hasher::hash_t                  initial_hash_;  ///< Hash corresponding to initial_state.
@@ -641,7 +687,7 @@ protected:
 
       std::size_t const level = std::distance(path_begin, path_end);
       if (cutoff && parent)
-        store_in_killer_db(level, current);
+        store_in_killer_db(level - 1, current);
 
       if (proved)
         store_in_pt(history_begin, history_end, hash, current);
@@ -652,7 +698,12 @@ protected:
 
   std::size_t expand_and_eval() {
     std::size_t size = 0;
-    bool const simulated = false;// killer_db_ && simulate(stack_, game_->attacker, size, *killer_db_, proof_tbl_, *log_);
+
+#if KILLER_SIMULATE
+    bool const simulated = killer_db_ && simulate(stack_, game_->attacker, size, *killer_db_, proof_tbl_, *log_);
+#else
+    bool const simulated = false;
+#endif
 
     if (!simulated) {
       assert(stack_.path_top()->leaf());
@@ -662,8 +713,10 @@ protected:
         move_history(stack_), hasher_
       );
 
+#if KILLER_SORT_AFTER_EXPAND
       if (killer_db_)
         killer_order(*killer_db_, stack_.size(), *stack_.path_top());
+#endif
 
       evaluate_children();
     }
@@ -692,10 +745,26 @@ protected:
         bool const cutoff = apns::cutoff(current, *child);
 
         if (cutoff) {
-          store_in_killer_db(stack_.size(), *child);
+          store_in_killer_db(stack_.size() - 1, *child);
         }
       }
     }
+  }
+
+  void select_best() {
+#if KILLER_SORT_BEFORE_SELECT
+    if (killer_db)
+      killer_order(*killer_db_, stack_.size(), *stack_.path_top());
+#endif
+
+#if KILLER_PREFER
+    if (killer_db_)
+      push_best(stack_, killer_vertex_value(stack_.size(), *killer_db_));
+    else
+      push_best(stack_);
+#else
+    push_best(stack_);
+#endif
   }
 };
 

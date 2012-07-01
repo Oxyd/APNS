@@ -93,26 +93,6 @@ winner(board const& board, piece::color_t player) {
   return boost::none;
 }
 
-vertex* best_successor(vertex& parent) {
-  return const_cast<vertex*>(best_successor(const_cast<vertex const&>(parent)));
-}
-
-vertex const* best_successor(vertex const& parent) {
-  if (parent.size() > 0) {
-    vertex::const_iterator best = parent.begin();
-    vertex_comparator better(parent);
-
-    for (vertex::const_iterator child = boost::next(best); child != parent.end(); ++child) {
-      if (better(*child, *best))
-        best = child;
-    }
-
-    return &*best;
-  } else {
-    return 0;
-  }
-}
-
 std::pair<vertex*, vertex*>
 two_best_successors(vertex& parent) {
   if (parent.size() >= 2) {
@@ -173,8 +153,11 @@ bool killer_db::is_killer(std::size_t level, step const& step) const {
   if (level < levels_)
     for (std::size_t i = 0; i < killer_count_; ++i) {
       record const& r = get(level, i);
-      if (r.step && *r.step == step)
-        return true;
+      if (r.step) {
+        if (*r.step == step)
+          return true;
+      } else
+        break;
     }
   return false;
 }
@@ -791,6 +774,26 @@ bool simulate(search_stack& stack, piece::color_t attacker,
 
         return true;
       }
+
+#if KILLER_SIMULATE_RECURSIVE
+      else if (parent.steps_remaining - step->steps_used() >= 1) {
+        child->steps_remaining = parent.steps_remaining - step->steps_used();
+        child->type = parent.type;
+
+        if (simulate(stack, attacker, size, killers, proof_tbl, log)) {
+          log << stack << " proved by recursive simulation\n";
+
+          update_numbers(parent);
+
+          assert(child->proof_number == 0 || child->disproof_number == 0);
+          assert(parent.proof_number == 0 || parent.disproof_number == 0);
+
+          child_added.commit();
+
+          return true;
+        }
+      }
+#endif
     }
   }
 
@@ -833,10 +836,7 @@ void proof_number_search::do_iterate() {
   assert(stack_.at_root());
 
   while (!stack_.path_top()->leaf()) {
-/*    if (killer_db_)
-      killer_order(*killer_db_, stack_.size(), *stack_.path_top());*/
-
-    push_best(stack_);
+    select_best();
   }
 
   std::size_t const increment = expand_and_eval();
