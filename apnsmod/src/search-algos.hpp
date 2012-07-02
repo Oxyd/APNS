@@ -177,7 +177,7 @@ two_best_successors(CVVertex& parent) {
 class killer_db {
   struct record {
     step_holder step;
-    //std::size_t hits;
+    std::size_t hits;
   };
   typedef std::vector<record> killers_cont;
 
@@ -681,7 +681,9 @@ protected:
       std::ostringstream out;
       format_path(out, path_begin, path_end);
 
-      out << " proved by children\n";
+      out << " "
+          << ((**boost::prior(path_end)).proof_number == 0 ? "proved" : "disproved")
+          << " by children\n";
       *log_ << out.str();
     }
   }
@@ -691,7 +693,7 @@ protected:
       killer_db_->add(level, *v.step);
 
       *log_ << v.step->to_string()
-            << " at level " << level << '\n';
+            << " is a killer at level " << level << '\n';
     }
   }
 
@@ -772,6 +774,8 @@ protected:
 
   void evaluate_children() {
     vertex& current = *stack_.path_top();
+    assert(current.proof_number > 0 && current.disproof_number > 0);
+
     for (vertex::iterator child = current.begin(); child != current.end(); ++child) {
       if (!is_lambda(*child)) {
         piece::color_t const attacker = game_->attacker;
@@ -780,10 +784,12 @@ protected:
         stack_.push(&*child);
 
         if (child->type != current.type && repetition(stack_)) {
-          *log_ << stack_ << " proved by repetition\n";
-
           child->proof_number = player == attacker ? vertex::infty : 0;
           child->disproof_number = player == attacker ? 0 : vertex::infty;
+
+          *log_ << stack_ << ' '
+                << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
+                << " by repetition\n";
         }
 
         bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_, game_->attacker);
@@ -794,7 +800,9 @@ protected:
             evaluate(stack_, game_->attacker, *log_);
         } else {
           // found_in_pt
-          *log_ << stack_ << " proved by proof table\n";
+          *log_ << stack_
+                << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
+                << " by proof table\n";
         }
 
         if (cutoff(current, *child))

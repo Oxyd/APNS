@@ -99,25 +99,6 @@ void killer_db::add(std::size_t level, step const& step) {
     killers_.resize(levels_ * killer_count_);
   }
 
-  std::size_t i = 0;
-  for (; i < killer_count_; ++i) {
-    record& r = get(level, i);
-    if (r.step && *r.step == step)
-      return;
-    else if (!r.step)
-      break;
-  }
-
-  if (i < killer_count_) {
-    get(level, i).step = step;
-    ++size_;
-  } else {
-    for (std::size_t i = 0; i < killer_count_ - 1; ++i)
-      get(level, i) = get(level, i + 1);
-    get(level, killer_count_ - 1).step = step;
-  }
-
-#if 0
   killers_cont::value_type* least = 0;
   killers_cont::value_type* exact = 0;
   for (std::size_t i = 0; i < killer_count_; ++i) {
@@ -140,7 +121,6 @@ void killer_db::add(std::size_t level, step const& step) {
     least->step = step;
     least->hits = 1;
   }
-#endif
 }
 
 bool killer_db::is_killer(std::size_t level, step const& step) const {
@@ -555,23 +535,25 @@ void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
     // If this isn't the start of a move, only consider wins, not losses.
 
     if (child.type != parent->type || *winner == player) {
-      log << stack << " proved by evaluation function\n";
-
       if (*winner == attacker) {
         child.proof_number = 0;
         child.disproof_number = vertex::infty;
-      } else if (child.type != parent->type) {
+      } else {
         child.proof_number = vertex::infty;
         child.disproof_number = 0;
       }
+
+      log << stack
+          << ' ' << (stack.path_top()->proof_number == 0 ? "proved" : "disproved")
+          << " by evaluation function\n";
     }
   }
 }
 
 bool pt_lookup(proof_table& pt, search_stack& stack, piece::color_t attacker) {
   vertex& child = *stack.path_top();
-
-  boost::optional<proof_table::entry_t> values = pt.query(stack.hashes_top());
+  piece::color_t const player = vertex_player(*stack.path_top(), attacker);
+  boost::optional<proof_table::entry_t> const values = pt.query(stack.hashes_top());
 
   if (values && histories_compatible(stack, values->history)) {
     if (values->winner == attacker) {
@@ -735,7 +717,8 @@ bool simulate(search_stack& stack, piece::color_t attacker,
     ++killer
   ) {
     step_holder step = revalidate(*killer, position, player);
-    if (step && parent.steps_remaining - step->steps_used() >= 0) {
+    int remaining = parent.steps_remaining - step->steps_used();
+    if (step && remaining >= 0) {
       assert(parent.leaf());
 
       vertex::iterator child = parent.add();
@@ -749,8 +732,14 @@ bool simulate(search_stack& stack, piece::color_t attacker,
 
       child->step = *step;
       child->proof_number = child->disproof_number = 1;
-      child->steps_remaining = MAX_STEPS;
-      child->type = opposite_type(parent.type);
+
+      if (remaining >= 1) {
+        child->steps_remaining = remaining;
+        child->type = parent.type;
+      } else {
+        child->steps_remaining = MAX_STEPS;
+        child->type = opposite_type(parent.type);
+      }
 
       search_stack_checkpoint checkpoint(stack);
       stack.push(&*child);
@@ -760,7 +749,9 @@ bool simulate(search_stack& stack, piece::color_t attacker,
         evaluate(stack, attacker, log);
 
       if (cutoff(parent, *child)) {
-        log << stack << " proved by simulation\n";
+        log << stack
+            << ' ' << (stack.path_top()->proof_number == 0 ? "proved" : "disproved")
+            << " by simulation\n";
 
         update_numbers(parent);
         assert(parent.proof_number == 0 || parent.disproof_number == 0);
@@ -771,12 +762,11 @@ bool simulate(search_stack& stack, piece::color_t attacker,
       }
 
 #if KILLER_SIMULATE_RECURSIVE
-      else if (parent.steps_remaining - step->steps_used() >= 1) {
-        child->steps_remaining = parent.steps_remaining - step->steps_used();
-        child->type = parent.type;
-
+      else if (remaining >= 1) {
         if (simulate(stack, attacker, size, killers, proof_tbl, log)) {
-          log << stack << " proved by recursive simulation\n";
+          log << stack
+              << ' ' << (stack.path_top()->proof_number == 0 ? "proved" : "disproved")
+              << " by recursive simulation\n";
 
           update_numbers(parent);
 
@@ -834,6 +824,7 @@ void proof_number_search::do_iterate() {
     select_best();
   }
 
+  assert(stack_.path_top()->proof_number > 0 && stack_.path_top()->disproof_number > 0);
   std::size_t const increment = expand_and_eval();
 
   while (true) {
