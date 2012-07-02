@@ -773,19 +773,19 @@ protected:
   void evaluate_children() {
     vertex& current = *stack_.path_top();
     for (vertex::iterator child = current.begin(); child != current.end(); ++child) {
-      piece::color_t const attacker = game_->attacker;
-      piece::color_t const player = vertex_player(current, attacker);
-      search_stack_checkpoint checkpoint(stack_);
+      if (!is_lambda(*child)) {
+        piece::color_t const attacker = game_->attacker;
+        piece::color_t const player = vertex_player(current, attacker);
+        search_stack_checkpoint checkpoint(stack_);
+        stack_.push(&*child);
 
-      stack_.push(&*child);
+        if (child->type != current.type && repetition(stack_)) {
+          *log_ << stack_ << " proved by repetition\n";
 
-      if (child->type != current.type && repetition(stack_)) {
-        *log_ << stack_ << " proved by repetition\n";
+          child->proof_number = player == attacker ? vertex::infty : 0;
+          child->disproof_number = player == attacker ? 0 : vertex::infty;
+        }
 
-        child->proof_number = player == attacker ? vertex::infty : 0;
-        child->disproof_number = player == attacker ? 0 : vertex::infty;
-      }
-      else if (!is_lambda(*child)) {
         bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_, game_->attacker);
         if (!found_in_pt) {
           bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), *child);
@@ -796,10 +796,10 @@ protected:
           // found_in_pt
           *log_ << stack_ << " proved by proof table\n";
         }
-      }
 
-      if (cutoff(current, *child))
-        store_in_killer_db(stack_.size() - 1, *child);
+        if (cutoff(current, *child))
+          store_in_killer_db(stack_.size() - 1, *child);
+      }
     }
   }
 

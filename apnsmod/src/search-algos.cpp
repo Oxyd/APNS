@@ -464,8 +464,7 @@ void killer_order(killer_db const& killers, std::size_t level, vertex& v) {
 }
 
 std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
-                   move_history_seq const& move_hist,
-                   zobrist_hasher const& hasher) {
+                   move_history_seq const& move_hist, zobrist_hasher const& hasher) {
   if (!leaf.leaf())
     throw std::logic_error("expand: Attempt to expand a non-leaf vertex");
 
@@ -484,13 +483,16 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
     signed const used = *new_step ? (**new_step).steps_used() : 1;
     int const remaining = leaf.steps_remaining - used;
 
+    piece::color_t const next_player = remaining >= 1 ? player : opponent_color(player);
+    zobrist_hasher::hash_t child_hash;
+    if (*new_step)
+      child_hash = hasher.update(last(move_hist), (**new_step).begin(), (**new_step).end(), player, next_player,
+                                  leaf.steps_remaining);
+    else
+      child_hash = hasher.update_lambda(last(move_hist), player, next_player, leaf.steps_remaining);
+
     if (*new_step) {
       if (remaining >= 1) {
-        zobrist_hasher::hash_t child_hash = hasher.update(
-          last(move_hist),
-          (**new_step).begin(), (**new_step).end(),
-          player, player, leaf.steps_remaining
-        );
         if (std::find(move_hist.begin(), move_hist.end(), child_hash) == move_hist.end())
           steps.push_back(std::make_pair(*new_step, leaf.type));
       } else if (remaining == 0)
@@ -499,7 +501,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
     } else {
       if (remaining >= 1)
         steps.push_back(std::make_pair(step_holder::none, leaf.type));
-      else if (remaining == 0)
+      else if (remaining == 0 && hasher.opponent_hash(child_hash) != move_hist[0])
         steps.push_back(std::make_pair(step_holder::none, opposite_type(leaf.type)));
     }
   }
