@@ -94,6 +94,8 @@ def main():
                       metavar='proof tbl size', dest='proofTblSize',
                       help='Size of the proof table to use, in megabytes. ' +
                            'If set to 0, don\'t use proof table')
+  parser.add_argument('-k', '--killer-count', type=int, default=2, dest='killerCount',
+                      help='Number of killer steps remembered for each level.')
   #parser.add_argument('-M', '--move-cache-size', type=int, default=32,
   #                    metavar='move cache size', dest='moveCacheSize',
   #                    help='Size of the move cache')
@@ -146,6 +148,7 @@ def main():
   checkNum(args.memLimit, 'Memory limit')
   checkNum(args.gcLow, 'Garbage collector low threshold')
   checkNum(args.gcHigh, 'Garbage collector high threshold')
+  checkNum(args.killerCount, 'Number of killers')
 
   params = SearchParameters()
   params.algo = args.algo
@@ -157,6 +160,7 @@ def main():
   params.gcLow = args.gcLow
   params.gcHigh = args.gcHigh
   params.logFilename = args.logFilename
+  params.killerCount = args.killerCount
 
   controller = Controller()
   controller.searchParameters = params

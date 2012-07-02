@@ -552,7 +552,6 @@ void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
 
 bool pt_lookup(proof_table& pt, search_stack& stack, piece::color_t attacker) {
   vertex& child = *stack.path_top();
-  piece::color_t const player = vertex_player(*stack.path_top(), attacker);
   boost::optional<proof_table::entry_t> const values = pt.query(stack.hashes_top());
 
   if (values && histories_compatible(stack, values->history)) {
