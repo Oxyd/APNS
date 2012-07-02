@@ -295,14 +295,13 @@ void search_stack::push(vertex* v) {
   piece::color_t const          parent_player =
     vertex_player(*parent, attacker_);
   piece::color_t const          v_player      = vertex_player(*v, attacker_);
-  zobrist_hasher::hash_t const  v_hash        =
-    v->step
-      ? hasher_->update(
-          parent_hash,
-          v->step->begin(), v->step->end(),
-          parent_player, v_player, parent->steps_remaining
-        )
-      : parent_hash;
+  zobrist_hasher::hash_t        v_hash        = parent_hash;
+
+  if (v->step)
+    v_hash = hasher_->update(parent_hash, v->step->begin(), v->step->end(), parent_player, v_player,
+                             parent->steps_remaining);
+  else if (v->type != parent->type)
+    v_hash = hasher_->opponent_hash(parent_hash);
 
   int stage = 0;
 
@@ -566,14 +565,6 @@ void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
         child.proof_number = vertex::infty;
         child.disproof_number = 0;
       }
-    }
-  } else if (child.type != parent->type) {
-    // Last chance is losing due to a repetition.
-    if (repetition(stack)) {
-      log << stack << " proved by repetition\n";
-
-      child.proof_number = player == attacker ? vertex::infty : 0;
-      child.disproof_number = player == attacker ? 0 : vertex::infty;
     }
   }
 }

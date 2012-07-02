@@ -776,14 +776,16 @@ protected:
       piece::color_t const attacker = game_->attacker;
       piece::color_t const player = vertex_player(current, attacker);
 
+      search_stack_checkpoint checkpoint(stack_);
+
       if (child->type != current.type && repetition(stack_)) {
+        stack_.push(&*child);
         *log_ << stack_ << " proved by repetition\n";
 
         child->proof_number = player == attacker ? vertex::infty : 0;
         child->disproof_number = player == attacker ? 0 : vertex::infty;
       }
       else if (!is_lambda(*child)) {
-        search_stack_checkpoint checkpoint(stack_);
         stack_.push(&*child);
 
         bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_, game_->attacker);
@@ -796,10 +798,10 @@ protected:
           // found_in_pt
           *log_ << stack_ << " proved by proof table\n";
         }
-      }
 
-      if (cutoff(current, *child))
-        store_in_killer_db(stack_.size() - 1, *child);
+        if (cutoff(current, *child))
+          store_in_killer_db(stack_.size() - 1, *child);
+      }
     }
   }
 
