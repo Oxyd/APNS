@@ -61,8 +61,8 @@ public:
    * Update the hash value after the situation on board has changed.
    *
    * \param old_hash Previous value of the hash.
-   * \param steps_begin Beginning of a sequence of elementary steps that 
-   *   describe the movement of the pieces on the board.
+   * \param steps_begin Beginning of a sequence of elementary steps that describe the movement of the pieces on the
+   *        board. This sequence may be empty.
    * \param steps_end End of the sequence of elementary steps.
    * \param current_player Who made the steps described?
    * \param next_player Whose turn is it now?
@@ -75,6 +75,21 @@ public:
       piece::color_t current_player, piece::color_t next_player,
       int steps_remaining
     ) const;
+
+  /// Update the hash value after a lambda step has been made.
+  hash_t update_lambda(hash_t hash, piece::color_t current_player, piece::color_t next_player,
+                       int steps_remaining) const {
+    if (steps_remaining >= 2)
+      hash ^= admits_double_;
+
+    hash ^= players_[current_player];
+    hash ^= players_[next_player];
+
+    if (steps_remaining - 1 >= 2 || current_player != next_player)
+      hash ^= admits_double_;
+
+    return hash;
+  }
 
   //! Given a hash, return the hash value corresponding to the same board 
   //! state, but with the opposite player to move.

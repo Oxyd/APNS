@@ -775,6 +775,9 @@ protected:
     for (vertex::iterator child = current.begin(); child != current.end(); ++child) {
       piece::color_t const attacker = game_->attacker;
       piece::color_t const player = vertex_player(current, attacker);
+      search_stack_checkpoint checkpoint(stack_);
+
+      stack_.push(&*child);
 
       if (child->type != current.type && repetition(stack_)) {
         *log_ << stack_ << " proved by repetition\n";
@@ -783,9 +786,6 @@ protected:
         child->disproof_number = player == attacker ? 0 : vertex::infty;
       }
       else if (!is_lambda(*child)) {
-        search_stack_checkpoint checkpoint(stack_);
-        stack_.push(&*child);
-
         bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_, game_->attacker);
         if (!found_in_pt) {
           bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), *child);
