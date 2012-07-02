@@ -478,17 +478,17 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
   steps_seq steps;
   piece::color_t player = vertex_player(leaf, attacker);
 
-  bool const make_lambda = leaf.steps_remaining > 1;
+  bool const make_lambda = true;//leaf.steps_remaining > 1;
   steps_cont const s = generate_steps(state, player, make_lambda);
   for (
     steps_cont::const_iterator new_step = s.begin();
     new_step != s.end();
     ++new_step
   ) {
-    if (*new_step) {
-      int const remaining =
-        leaf.steps_remaining - static_cast<signed>((**new_step).steps_used());
+    signed const used = *new_step ? (**new_step).steps_used() : 1;
+    int const remaining = leaf.steps_remaining - used;
 
+    if (*new_step) {
       if (remaining >= 1) {
         zobrist_hasher::hash_t child_hash = hasher.update(
           last(move_hist),
@@ -501,7 +501,10 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
         steps.push_back(std::make_pair(*new_step, opposite_type(leaf.type)));
 
     } else {
-      steps.push_back(std::make_pair(step_holder::none, leaf.type));
+      if (remaining >= 1)
+        steps.push_back(std::make_pair(step_holder::none, leaf.type));
+      else if (remaining == 0)
+        steps.push_back(std::make_pair(step_holder::none, opposite_type(leaf.type)));
     }
   }
 
@@ -628,13 +631,8 @@ void tt_store(transposition_table& tt, vertex const& v, zobrist_hasher::hash_t h
   tt.insert(hash, v.subtree_size, transposition_entry(v.proof_number, v.disproof_number));
 }
 
-void garbage_collect(std::size_t how_many, search_stack stack) {
-  // NB: This function destroys the passed-in stack, so it's accepted by copy.
-
-  vertex* avoid = 0;
-  if (!stack.at_root())
-    avoid = *boost::next(stack.path().begin());
-
+void garbage_collect(std::size_t how_many, search_stack const& orig_stack) {
+  search_stack stack(orig_stack);
   stack.reset_to_root();
   vertex* const root = stack.path_top();
 
@@ -643,32 +641,45 @@ void garbage_collect(std::size_t how_many, search_stack stack) {
 
   std::size_t removed = 0;
   while (removed < how_many) {
-    removed += collect_proved(*stack.path_top());
+    vertex const* const avoid = stack.size() <= orig_stack.size() ? orig_stack.path()[stack.size() - 1] : 0;
+    vertex* const avoid_child = stack.size() + 1 <= orig_stack.size() ? orig_stack.path()[stack.size()] : 0;
+
+    removed += collect_proved(*stack.path_top(), avoid_child);
     
     vertex& current = *stack.path_top();
     if (!current.leaf()) {
       vertex_comparator worse(current, false);
-      vertex::iterator worst = current.end();
+      vertex::reverse_iterator worst = current.rend();
 
-      for (vertex::iterator child = current.begin(); child != current.end(); ++child)
-        if (!child->leaf() && &*child != avoid && (worst == current.end() || worse(*child, *worst)))
-          worst = child;
+      bool want_avoiding = false;
 
-      if (worst != current.end())
+      for (vertex::reverse_iterator child = current.rbegin(); child != current.rend(); ++child) {
+        if (&*child != avoid_child) {
+          if (!child->leaf() && (worst == current.rend() || worse(*child, *worst)))
+            worst = child;
+        } else
+          want_avoiding = true;
+      }
+
+      if (worst == current.rend() && want_avoiding)
+        stack.push(avoid_child);
+      else if (worst != current.rend())
         stack.push(&*worst);
       else if (!stack.at_root()) {
-        assert(stack.path_top() != avoid);
+        if (stack.path_top() != avoid) {
+          std::size_t const removed_here = cut(*stack.path_top());
+          for (
+            search_stack::path_sequence::const_reverse_iterator v = stack.path().rbegin();
+            v != stack.path().rend();
+            ++v
+          )
+            (**v).subtree_size -= removed_here;
 
-        std::size_t const removed_here = cut(*stack.path_top());
-        for (
-          search_stack::path_sequence::const_reverse_iterator v = stack.path().rbegin();
-          v != stack.path().rend();
-          ++v
-        )
-          (**v).subtree_size -= removed_here;
-
-        removed += removed_here;
-        stack.pop();
+          removed += removed_here;
+          stack.pop();
+        } else {
+          break;
+        }
       } else
         break;
 
@@ -681,11 +692,11 @@ void garbage_collect(std::size_t how_many, search_stack stack) {
   }
 }
 
-std::size_t collect_proved(vertex& parent) {
+std::size_t collect_proved(vertex& parent, vertex const* avoid) {
   std::size_t removed = 0;
 
   for (vertex::iterator child = parent.begin(); child != parent.end(); ++child) {
-    if (child->type != parent.type &&
+    if (&*child != avoid && child->type != parent.type &&
         ((parent.type == vertex::type_or && child->disproof_number == 0) ||
          (parent.type == vertex::type_and && child->proof_number == 0))) {
       removed += cut(*child);
@@ -801,8 +812,7 @@ bool simulate(search_stack& stack, piece::color_t attacker,
 bool repetition(search_stack const& stack) {
   if (stack.history().size() >= 2) {
     // Check for null moves.
-    if (stack.hasher().opponent_hash(stack.history().back()) ==
-        *(stack.history().end() - 2))
+    if (stack.hasher().opponent_hash(stack.history().back()) == *(stack.history().end() - 2))
       return true;
 
     // Check for third-time repetitions.
@@ -810,9 +820,10 @@ bool repetition(search_stack const& stack) {
     // should have been checked by previous calls to this function.
 
     unsigned rep_count = 0;
-    for (search_stack::history_sequence::const_iterator h =
-         stack.history().begin(); h != stack.history().end() - 1; ++h)
-      if (*h == stack.history().back() && ++rep_count)
+    for (
+      search_stack::history_sequence::const_iterator h = stack.history().begin(); h != stack.history().end() - 1; ++h
+    )
+      if (*h == stack.history().back() && ++rep_count == 2)  // Twice in the history, third time is the .top().
         return true;
   }
 
@@ -961,12 +972,6 @@ void depth_first_pns::do_iterate() {
       break;
     }
   }
-
-#ifndef NDEBUG
-  vertex_counter counter;
-  traverse(game_->root, postorder(), boost::ref(counter));
-  assert(counter.count == game_->root.subtree_size);
-#endif
 }
 
 depth_first_pns::limits_t 

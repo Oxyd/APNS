@@ -72,7 +72,7 @@ def main():
                           ', '.join(apnsmod.algos.keys()[:-1]) + 
                           ', and ' + apnsmod.algos.keys()[-1]
                       ))
-  parser.add_argument('-t', '--time', type=int, default=60,
+  parser.add_argument('-t', '--time', type=int, default=0,
                       metavar='time limit', dest='timeLimit',
                       help='Maximum running time of the algorithm, ' +
                            'excluding any I/O operations, in seconds')

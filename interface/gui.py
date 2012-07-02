@@ -1356,7 +1356,7 @@ class RunSearchController(object):
     self._runSearchDlg.addObserver(self)
     self._runSearchDlg.algo = get('algo', apnsmod.algos.keys()[0])
     self._runSearchDlg.timeLimit = get('timeLimit', 60)
-    self._runSearchDlg.timeLimitCheck = get('timeLimitCheck', True)
+    self._runSearchDlg.timeLimitCheck = get('timeLimitCheck', False)
     self._runSearchDlg.positionLimit = get('positionLimit', 1000000)
     self._runSearchDlg.positionLimitCheck = get('positionLimitCheck', False)
     self._runSearchDlg.memLimit = get('memLimit', 1500)

@@ -343,18 +343,22 @@ int make_displacement(board const& board, position src, position dst, piece what
 }
 
 position elementary_step::from() const {
+  assert(consistent());
   return position(representation_[ROW_INDEX] - '0', representation_[COLUMN_INDEX]);
 }
 
 direction elementary_step::where() const {
+  assert(consistent());
   return dir_from_letter(representation_[DIR_INDEX]);
 }
 
 bool elementary_step::capture() const {
+  assert(consistent());
   return representation_[DIR_INDEX] == 'x';
 }
 
 boost::optional<piece> elementary_step::what() const {
+  assert(consistent());
   assert(representation_[PIECE_INDEX] != 0);
   if (representation_[PIECE_INDEX] != ' ')
     return piece_from_letter_unsafe(representation_[PIECE_INDEX]);
@@ -363,6 +367,7 @@ boost::optional<piece> elementary_step::what() const {
 }
 
 std::string elementary_step::to_string() const {
+  assert(consistent());
   return std::string(representation_.begin(), representation_.end());
 }
 
@@ -374,6 +379,7 @@ void elementary_step::set_what(boost::optional<piece> new_what) {
   }
 
   assert(representation_[PIECE_INDEX] != 0);
+  assert(consistent());
 }
 
 bool elementary_step::equal(elementary_step const& other) const {
@@ -395,7 +401,7 @@ elementary_step::elementary_step(position from, direction where, boost::optional
   representation_[DIR_INDEX] = letter_from_direction(where);
   set_what(what);
 
-  assert(!invalid());
+  assert(consistent());
 }
 
 elementary_step::elementary_step(position which, boost::optional<piece> what) {
@@ -404,7 +410,45 @@ elementary_step::elementary_step(position which, boost::optional<piece> what) {
   representation_[DIR_INDEX] = 'x';
   set_what(what);
 
-  assert(!invalid());
+  assert(consistent());
+}
+
+bool elementary_step::consistent() const {
+  assert(representation_[0] == ' ' ||
+         representation_[0] == 'e' ||
+         representation_[0] == 'm' ||
+         representation_[0] == 'h' ||
+         representation_[0] == 'd' ||
+         representation_[0] == 'c' ||
+         representation_[0] == 'r' ||
+         representation_[0] == 'E' ||
+         representation_[0] == 'M' ||
+         representation_[0] == 'H' ||
+         representation_[0] == 'D' ||
+         representation_[0] == 'C' ||
+         representation_[0] == 'R');
+  assert(representation_[1] == 'a' ||
+         representation_[1] == 'b' ||
+         representation_[1] == 'c' ||
+         representation_[1] == 'd' ||
+         representation_[1] == 'e' ||
+         representation_[1] == 'f' ||
+         representation_[1] == 'g' ||
+         representation_[1] == 'h');
+  assert(representation_[2] == '1' ||
+         representation_[2] == '2' ||
+         representation_[2] == '3' ||
+         representation_[2] == '4' ||
+         representation_[2] == '5' ||
+         representation_[2] == '6' ||
+         representation_[2] == '7' ||
+         representation_[2] == '8');
+  assert(representation_[3] == 'n' ||
+         representation_[3] == 's' ||
+         representation_[3] == 'e' ||
+         representation_[3] == 'w' ||
+         representation_[3] == 'x');
+  return true;
 }
 
 bool operator == (elementary_step const& lhs, elementary_step const& rhs) {

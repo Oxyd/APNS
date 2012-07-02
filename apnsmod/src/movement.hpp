@@ -99,6 +99,10 @@ private:
     std::string::const_iterator, std::string::const_iterator
   );
 
+  /// Four-character representation of the elementary step. This is a string
+  /// like "Rc7n" or " d3e" if the piece is not known.
+  boost::array<char, 4> representation_;
+
   /// A displacement.
   elementary_step(position from, direction where, boost::optional<piece> what);
 
@@ -116,14 +120,14 @@ private:
     assert(*(begin + 2) >= '1' && *(begin + 2) <= '8');
     assert(*(begin + 3) == 'n' || *(begin + 3) == 'e' || *(begin + 3) == 's' || 
            *(begin + 3) == 'w' || *(begin + 3) == 'x');
+
     std::copy(begin, end, representation_.begin());
 
-    assert(!invalid());
+    assert(consistent());
   }
 
-  /// Four-character representation of the elementary step. This is a string
-  /// like "Rc7n" or " d3e" if the piece is not known.
-  boost::array<char, 4> representation_;
+  /// For use with assert().
+  bool consistent() const;
 };
 
 bool operator == (elementary_step const& lhs, elementary_step const& rhs);

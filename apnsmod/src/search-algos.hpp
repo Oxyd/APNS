@@ -250,7 +250,7 @@ public:
   }
 
   level_iterator level_end(std::size_t level) const {
-    if (level < killers_.size()) {
+    if (level < levels_) {
       std::size_t offset = 0;
       while (offset < killer_count_ && get(level, offset).step) ++offset;
       return level_iterator(*this, level, offset);
@@ -481,15 +481,14 @@ void tt_store(transposition_table& tt, vertex const& v, zobrist_hasher::hash_t h
 //! collecting.
 //!
 //! \param how_many When to stop collecting.
-//! \param current_path Currently selected path -- vertices from it won't be
-//!        collected.
-void garbage_collect(std::size_t how_many, search_stack current_path);
+//! \param current_path Currently selected path -- vertices from it won't be collected.
+void garbage_collect(std::size_t how_many, search_stack const& current_path);
 
 //! Cut all negative dis/proved children of a vertex -- that is, children
 //! that are dis/proved but don't constitute a dis/proof of their parent.
 //!
 //! \returns Number of vertices removed from the tree.
-std::size_t collect_proved(vertex& parent);
+std::size_t collect_proved(vertex& parent, vertex const* avoid);
 
 //! Cut children of the given vertex.
 //! \returns Number of vertices removed from the tree.
@@ -628,7 +627,6 @@ public:
       std::size_t const size = get_position_count();
       if (gc_enabled() && size > gc_high_ && gc_low_ < size) {
         garbage_collect(size - gc_low_, stack_);
-        assert(game_->root.subtree_size <= gc_low_);
       }
     }
   }
@@ -775,7 +773,16 @@ protected:
   void evaluate_children() {
     vertex& current = *stack_.path_top();
     for (vertex::iterator child = current.begin(); child != current.end(); ++child) {
-      if (!is_lambda(*child)) {
+      piece::color_t const attacker = game_->attacker;
+      piece::color_t const player = vertex_player(current, attacker);
+
+      if (child->type != current.type && repetition(stack_)) {
+        *log_ << stack_ << " proved by repetition\n";
+
+        child->proof_number = player == attacker ? vertex::infty : 0;
+        child->disproof_number = player == attacker ? 0 : vertex::infty;
+      }
+      else if (!is_lambda(*child)) {
         search_stack_checkpoint checkpoint(stack_);
         stack_.push(&*child);
 
@@ -789,10 +796,10 @@ protected:
           // found_in_pt
           *log_ << stack_ << " proved by proof table\n";
         }
-
-        if (cutoff(current, *child))
-          store_in_killer_db(stack_.size() - 1, *child);
       }
+
+      if (cutoff(current, *child))
+        store_in_killer_db(stack_.size() - 1, *child);
     }
   }
 

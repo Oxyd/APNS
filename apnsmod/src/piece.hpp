@@ -47,17 +47,20 @@ struct piece {
   bool equal(piece const& other) const;
 
   /// Get the Arimaa letter for this piece.
-  char letter() const { return data_; }
+  char letter() const { assert(consistent()); return data_; }
 
 private:
   friend piece piece_from_letter_unsafe(char);
 
   char data_;
 
-  explicit piece(char letter) : data_(letter) {
+  explicit piece(char letter) : data_(letter) { assert(consistent()); }
+
+  bool consistent() const {
     assert(data_ == 'e' || data_ == 'm' || data_ == 'h' || data_ == 'd' ||
            data_ == 'c' || data_ == 'r' || data_ == 'E' || data_ == 'M' ||
            data_ == 'H' || data_ == 'D' || data_ == 'C' || data_ == 'R');
+    return true;
   }
 };
 

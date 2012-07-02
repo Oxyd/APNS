@@ -19,26 +19,21 @@ char letter_from_pair(piece::color_t c, piece::type_t t) {
 piece::piece(color_t c, type_t t) :
   data_(letter_from_pair(c, t))
 {
-  assert(data_ == 'e' || data_ == 'm' || data_ == 'h' || data_ == 'd' ||
-         data_ == 'c' || data_ == 'r' || data_ == 'E' || data_ == 'M' ||
-         data_ == 'H' || data_ == 'D' || data_ == 'C' || data_ == 'R');
+  assert(consistent());
 }
 
 piece::color_t piece::color() const {
-  assert(data_ == 'e' || data_ == 'm' || data_ == 'h' || data_ == 'd' ||
-         data_ == 'c' || data_ == 'r' || data_ == 'E' || data_ == 'M' ||
-         data_ == 'H' || data_ == 'D' || data_ == 'C' || data_ == 'R');
+  assert(consistent());
   return data_ & 0x20 ? piece::silver : piece::gold;
 }
 
 piece::type_t piece::type() const {
-  assert(data_ == 'e' || data_ == 'm' || data_ == 'h' || data_ == 'd' ||
-         data_ == 'c' || data_ == 'r' || data_ == 'E' || data_ == 'M' ||
-         data_ == 'H' || data_ == 'D' || data_ == 'C' || data_ == 'R');
+  assert(consistent());
   return static_cast<piece::type_t>(data_ | 0x20);
 }
 
 bool piece::equal(piece const& other) const {
+  assert(consistent());
   return data_ == other.data_;
 }
 
