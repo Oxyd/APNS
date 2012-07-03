@@ -288,7 +288,7 @@ private:
       : table_(&t) 
     { }
 
-    bool operator () (vertex const& lhs, vertex const& rhs);
+    bool operator () (vertex const& lhs, vertex const& rhs) const;
 
   private:
     table_t const* table_;

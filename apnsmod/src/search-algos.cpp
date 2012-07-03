@@ -190,7 +190,7 @@ void history_table::sort(vertex& v) const {
 
 bool history_table::compare::operator () (
   vertex const& lhs, vertex const& rhs
-) {
+) const {
   // Note: Lexicographical sorting with PN/DN values as the primary key would
   // require that resort_children doesn't destroy the secondary sort order,
   // which it currently does.
@@ -716,7 +716,7 @@ bool simulate(search_stack& stack, piece::color_t attacker,
     ++killer
   ) {
     step_holder step = revalidate(*killer, position, player);
-    int remaining = parent.steps_remaining - step->steps_used();
+    int remaining = step ? parent.steps_remaining - step->steps_used() : 0;
     if (step && remaining >= 0) {
       assert(parent.leaf());
 

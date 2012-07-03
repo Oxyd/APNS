@@ -26,12 +26,6 @@ vertex::number_t const vertex::max_num;
 vertex::number_t const vertex::infty;
 #endif
 
-void vertex::pack() {
-  children_container new_children;
-  new_children.transfer(new_children.begin(), children_);
-  children_.swap(new_children);
-}
-
 namespace {
 
 /// Set the subtree size of a vertex, assuming the subtree sizes of its children are set correctly.
