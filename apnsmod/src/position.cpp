@@ -8,13 +8,9 @@
 
 namespace apns {
 
-namespace {
-
 direction const directions[] = {
-  north, east, south, west
+  north, south, east, west
 };
-
-} // anonymous namespace
 
 position::position(row_t row, std::string const& col) {
   if (col.length() != 1)
@@ -90,6 +86,18 @@ char letter_from_direction(direction d) {
   }
 
   return '?';  // Shut up a compiler warning.
+}
+
+direction direction_from_letter(char letter) {
+  switch (letter) {
+  case 'n': return north;
+  case 'e': return east;
+  case 's': return south;
+  case 'w': return west;
+  default:  assert(!"Can't get here");
+  }
+
+  return north;
 }
 
 position make_adjacent(position original, direction direction) {

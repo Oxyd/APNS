@@ -135,11 +135,19 @@ inline position operator - (position p, std::size_t n) {
 ///@}
 
 /// The four cardinal directions.
-enum direction { north, south, east, west };
+enum direction { north = 0, south, east, west };
 
 /// Return the letter representing the given direction according to the Arimaa
 /// notation rules.
 char letter_from_direction(direction d);
+
+/// Return the direction corresponding to the given letter.
+direction direction_from_letter(char letter);
+
+extern direction const directions[4];
+
+/// Return an integer 0..3 representing the direction.
+inline std::size_t index_from_direction(direction dir) { return static_cast<std::size_t>(dir); }
 
 /**
  * Get a position adjacent to to the given one in the given direction.

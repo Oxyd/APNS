@@ -342,49 +342,58 @@ int make_displacement(board const& board, position src, position dst, piece what
   return score;
 }
 
+elementary_step::elementary_step()
+  : where_(INVALID) { }
+
 position elementary_step::from() const {
-  assert(consistent());
-  return position(representation_[ROW_INDEX] - '0', representation_[COLUMN_INDEX]);
+  return from_;
 }
 
 direction elementary_step::where() const {
-  assert(consistent());
-  return dir_from_letter(representation_[DIR_INDEX]);
+  return directions[where_];
 }
 
 bool elementary_step::capture() const {
-  assert(consistent());
-  return representation_[DIR_INDEX] == 'x';
+  return where_ == CAPTURE;
+}
+
+bool elementary_step::invalid() const {
+  return where_ == INVALID;
 }
 
 boost::optional<piece> elementary_step::what() const {
-  assert(consistent());
-  assert(representation_[PIECE_INDEX] != 0);
-  if (representation_[PIECE_INDEX] != ' ')
-    return piece_from_letter_unsafe(representation_[PIECE_INDEX]);
+  if (what_ != EMPTY)
+    return piece(COLORS[what_ & 1], TYPES[what_ >> 1]);
   else
     return boost::none;
 }
 
 std::string elementary_step::to_string() const {
-  assert(consistent());
-  return std::string(representation_.begin(), representation_.end());
+  std::string result(4, ' ');
+  if (what_ != EMPTY)
+    result[0] = letter_from_piece(*what());
+
+  result[1] = from().column();
+  result[2] = '0' + from().row();
+
+  if (!capture())
+    result[3] = letter_from_direction(where());
+  else
+    result[3] = 'x';
+
+  return result;
 }
 
 void elementary_step::set_what(boost::optional<piece> new_what) {
   if (new_what) {
-    representation_[PIECE_INDEX] = letter_from_piece(*new_what);
+    what_ = index_from_type(new_what->type()) * piece::color_count + index_from_color(new_what->color());
   } else {
-    representation_[PIECE_INDEX] = ' ';
+    what_ = EMPTY;
   }
-
-  assert(representation_[PIECE_INDEX] != 0);
-  assert(consistent());
 }
 
 bool elementary_step::equal(elementary_step const& other) const {
-  return std::equal(representation_.begin(), representation_.end(),
-                    other.representation_.begin());
+  return from_ == other.from_ && where_ == other.where_ && what_ == other.what_;
 }
 
 elementary_step elementary_step::displacement(position from, direction where, boost::optional<piece> what) {
@@ -396,59 +405,38 @@ elementary_step elementary_step::make_capture(position from, boost::optional<pie
 }
 
 elementary_step::elementary_step(position from, direction where, boost::optional<piece> what) {
-  representation_[ROW_INDEX] = '0' + from.row();
-  representation_[COLUMN_INDEX] = from.column();
-  representation_[DIR_INDEX] = letter_from_direction(where);
+  from_ = from;
+  where_ = index_from_direction(where);
   set_what(what);
-
-  assert(consistent());
 }
 
 elementary_step::elementary_step(position which, boost::optional<piece> what) {
-  representation_[ROW_INDEX] = '0' + which.row();
-  representation_[COLUMN_INDEX] = which.column();
-  representation_[DIR_INDEX] = 'x';
+  from_ = which;
+  where_ = CAPTURE;
   set_what(what);
-
-  assert(consistent());
 }
 
-bool elementary_step::consistent() const {
-  assert(representation_[0] == ' ' ||
-         representation_[0] == 'e' ||
-         representation_[0] == 'm' ||
-         representation_[0] == 'h' ||
-         representation_[0] == 'd' ||
-         representation_[0] == 'c' ||
-         representation_[0] == 'r' ||
-         representation_[0] == 'E' ||
-         representation_[0] == 'M' ||
-         representation_[0] == 'H' ||
-         representation_[0] == 'D' ||
-         representation_[0] == 'C' ||
-         representation_[0] == 'R');
-  assert(representation_[1] == 'a' ||
-         representation_[1] == 'b' ||
-         representation_[1] == 'c' ||
-         representation_[1] == 'd' ||
-         representation_[1] == 'e' ||
-         representation_[1] == 'f' ||
-         representation_[1] == 'g' ||
-         representation_[1] == 'h');
-  assert(representation_[2] == '1' ||
-         representation_[2] == '2' ||
-         representation_[2] == '3' ||
-         representation_[2] == '4' ||
-         representation_[2] == '5' ||
-         representation_[2] == '6' ||
-         representation_[2] == '7' ||
-         representation_[2] == '8');
-  assert(representation_[3] == 'n' ||
-         representation_[3] == 's' ||
-         representation_[3] == 'e' ||
-         representation_[3] == 'w' ||
-         representation_[3] == 'x');
-  return true;
+elementary_step::elementary_step(
+  std::string::const_iterator begin,
+#ifndef NDEBUG
+  std::string::const_iterator end
+#else
+  std::string::const_iterator
+#endif
+) {
+  assert(end - begin == 4);
+  assert(*begin == 'E' || *begin == 'M' || *begin == 'H' || *begin == 'D' ||
+         *begin == 'C' || *begin == 'R' || *begin == 'e' || *begin == 'm' ||
+         *begin == 'h' || *begin == 'd' || *begin == 'c' || *begin == 'r'
+         || *begin == ' ');
+  assert(*(begin + 1) >= 'a' && *(begin + 1) <= 'h');
+  assert(*(begin + 2) >= '1' && *(begin + 2) <= '8');
+  assert(*(begin + 3) == 'n' || *(begin + 3) == 'e' || *(begin + 3) == 's' ||
+         *(begin + 3) == 'w' || *(begin + 3) == 'x');
+
+  set_what(piece_from_letter_unsafe(*begin));
+  where_ = index_from_direction(direction_from_letter(*(begin + 3)));
+  from_  = position(*(begin + 1) - '0', *(begin + 2));
 }
 
 bool operator == (elementary_step const& lhs, elementary_step const& rhs) {

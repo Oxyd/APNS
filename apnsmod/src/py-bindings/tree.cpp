@@ -96,6 +96,12 @@ void vertex_remove_child(apns::vertex& parent, apns::vertex* child) {
   parent.remove(parent.iter_from_ptr(child));
 }
 
+int get_vertex_steps_remaining(apns::vertex const& v) { return v.steps_remaining; }
+void set_vertex_steps_remaining(apns::vertex& v, int s) { v.steps_remaining = s; }
+
+apns::vertex::e_type get_vertex_type(apns::vertex const& v) { return v.type; }
+void set_vertex_type(apns::vertex& v, apns::vertex::e_type t) { v.type = t; }
+
 apns::vertex* game_get_root(apns::game& g) {
   return &g.root;
 }
@@ -118,8 +124,12 @@ void export_tree() {
                     make_getter(&apns::vertex::step, return_value_policy<return_by_value>()),
                     &vertex_set_step,
                     "The step that leads from parent to this vertex.")
-      .def_readwrite("stepsRemaining", &apns::vertex::steps_remaining, "How many steps until the end of move")
-      .def_readwrite("type_", &apns::vertex::type, "The type of this vertex; either AND, or OR")
+      .add_property("stepsRemaining",
+                    &get_vertex_steps_remaining, &set_vertex_steps_remaining,
+                    "How many steps until the end of move")
+      .add_property("type_",
+                    &get_vertex_type, &set_vertex_type,
+                    "The type of this vertex; either AND or OR")
 
       .add_property("children", range<return_internal_reference<> >(
           static_cast<apns::vertex::iterator (apns::vertex::*)()>(&apns::vertex::begin),

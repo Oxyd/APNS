@@ -96,23 +96,23 @@ public:
   number_t    proof_number;
   number_t    disproof_number;
   step_holder step;
-  int         steps_remaining;
-  e_type      type;
   std::size_t subtree_size;
+  signed char steps_remaining : 4;
+  e_type      type            : 1;
 
   vertex()
     : proof_number(0)
     , disproof_number(0)
+    , subtree_size(0)
     , steps_remaining(0)
-    , type(vertex::type_or)
-    , subtree_size(0) { }
+    , type(vertex::type_or) { }
 
   vertex(BOOST_RV_REF(vertex) other)
     : proof_number(other.proof_number)
     , disproof_number(other.disproof_number)
+    , subtree_size(other.subtree_size)
     , steps_remaining(other.steps_remaining)
     , type(other.type)
-    , subtree_size(other.subtree_size)
     , children_(boost::move(other.children_)) { }
 
   vertex& operator = (BOOST_RV_REF(vertex) other) {

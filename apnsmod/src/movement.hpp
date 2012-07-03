@@ -60,10 +60,7 @@ struct elementary_step {
   ///@{
 
   /// Construct an invalid step.
-  elementary_step() {
-    std::fill(representation_.begin(), representation_.end(), 0);
-    assert(invalid());
-  }
+  elementary_step();
 
   /// Construct a displacement-kind elementary step.
   static elementary_step displacement(
@@ -83,7 +80,7 @@ struct elementary_step {
   position               from() const;
   direction              where() const;
   bool                   capture() const;
-  bool                   invalid() const { return representation_[0] == 0; }
+  bool                   invalid() const;
   boost::optional<piece> what() const;
   std::string            to_string() const;
   bool                   equal(elementary_step const& other) const;
@@ -95,13 +92,18 @@ struct elementary_step {
   ///@}
 
 private:
-  friend elementary_step detail::el_step_from_string(
-    std::string::const_iterator, std::string::const_iterator
-  );
+  friend elementary_step detail::el_step_from_string(std::string::const_iterator, std::string::const_iterator);
+
+  static unsigned char const CAPTURE = 5;
+  static unsigned char const INVALID = 6;
+  static unsigned char const EMPTY   = 15;
 
   /// Four-character representation of the elementary step. This is a string
   /// like "Rc7n" or " d3e" if the piece is not known.
-  boost::array<char, 4> representation_;
+  //boost::array<char, 4> representation_;
+  position      from_;
+  char          what_  : 5;
+  unsigned char where_ : 3;
 
   /// A displacement.
   elementary_step(position from, direction where, boost::optional<piece> what);
@@ -110,24 +112,7 @@ private:
   explicit elementary_step(position which, boost::optional<piece> what);
 
   /// Construct from string.
-  explicit elementary_step(std::string::const_iterator begin, std::string::const_iterator end) {
-    assert(end - begin == 4);
-    assert(*begin == 'E' || *begin == 'M' || *begin == 'H' || *begin == 'D' || 
-           *begin == 'C' || *begin == 'R' || *begin == 'e' || *begin == 'm' || 
-           *begin == 'h' || *begin == 'd' || *begin == 'c' || *begin == 'r'
-           || *begin == ' ');
-    assert(*(begin + 1) >= 'a' && *(begin + 1) <= 'h');
-    assert(*(begin + 2) >= '1' && *(begin + 2) <= '8');
-    assert(*(begin + 3) == 'n' || *(begin + 3) == 'e' || *(begin + 3) == 's' || 
-           *(begin + 3) == 'w' || *(begin + 3) == 'x');
-
-    std::copy(begin, end, representation_.begin());
-
-    assert(consistent());
-  }
-
-  /// For use with assert().
-  bool consistent() const;
+  explicit elementary_step(std::string::const_iterator begin, std::string::const_iterator end);
 };
 
 bool operator == (elementary_step const& lhs, elementary_step const& rhs);
