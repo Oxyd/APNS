@@ -261,14 +261,15 @@ static boost::array<int, types_array_t::static_size> const TYPE_COST = {{
 static int const CAPTURE_COEF = 4;
 static int const PUSH_PULL_COEF = 2;
 static int const TRAP_ABANDONMENT_PENALTY = 1;
+static int const RABBIT_ADVANCEMENT_COEF = 2;
 
 static int rabbit_score(piece::color_t color, position pos) {
   if (color == piece::gold) {
     if (pos.row() >= 5)
-      return pos.row() - position::MIN_ROW;
+      return RABBIT_ADVANCEMENT_COEF * (pos.row() - position::MIN_ROW);
   } else {
     if (pos.row() <= 4)
-      return position::MAX_ROW - pos.row();
+      return RABBIT_ADVANCEMENT_COEF * (position::MAX_ROW - pos.row());
   }
 
   return TYPE_COST[index_from_type(piece::rabbit)];
