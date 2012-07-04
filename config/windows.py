@@ -16,13 +16,11 @@ def config(conf, bits, debug, profile):
 
       'compile-flags': [
         '/EHsc',                    # Enable C++ exception handling.
-        #'/Za',                      # Disable language extensions.
         '/Zc:forScope',             # Standard C++ scoping rules.                                                                                                                                                               
         '/wd4224',                  # Disable an annoying warning. (I believe MSVS is being wrong here.)                                                                                                                        
         '/wd4180',                  # Disable the "C4180: qualifier applied to function type has no meaning; ignored" warning.                                                                                    
                                     # It looks like MSVC likes to warn about this even though it really shouldn't.
         '/wd4005',                  # Disable C4005: Macro redefinition
-        '/Zi' if debug else '',     # Enable debugging information.
 
         '/Ot' if not debug else '', # Favor code speed.                                                                                                                                                                               
         '/Ox' if not debug else '', # Maximum optimisations.
@@ -66,14 +64,17 @@ def config(conf, bits, debug, profile):
         'boost-system':     '',
         'gtest':            'gtest' if not debug else 'gtestd'
       },
-      'extra':            lambda env: _extraSetup(env, bits)
+      'extra':            lambda env: _extraSetup(env, bits, debug)
     }
   }
 
-def _extraSetup(env, bits):
+def _extraSetup(env, bits, debug):
   # Set the shared library suffix to .pyd, which is the Python extension suffix for Windows systems.
   env.Replace(SHLIBSUFFIX='.pyd')
   env.Replace(LIBSUFFIXES=['.pyd'])
 
   # Don't install the import library to the top-level directory.
   env.Replace(no_import_lib=1)
+
+  if debug:
+    env.Replace(PDB='${TARGET.base}.pdb')
