@@ -445,6 +445,8 @@ void killer_order(killer_db const& killers, std::size_t level, vertex& v) {
 
 std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
                    move_history_seq const& move_hist, zobrist_hasher const& hasher) {
+  assert(leaf.steps_remaining > 0);
+
   if (!leaf.leaf())
     throw std::logic_error("expand: Attempt to expand a non-leaf vertex");
 
@@ -453,7 +455,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
   steps_seq steps;
   piece::color_t player = vertex_player(leaf, attacker);
 
-  bool const make_lambda = true;//leaf.steps_remaining > 1;
+  bool const make_lambda = true;
   steps_cont const s = generate_steps(state, player, make_lambda);
   for (
     steps_cont::const_iterator new_step = s.begin();
@@ -466,10 +468,14 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
     piece::color_t const next_player = remaining >= 1 ? player : opponent_color(player);
     zobrist_hasher::hash_t child_hash;
     if (*new_step)
-      child_hash = hasher.update(last(move_hist), (**new_step).begin(), (**new_step).end(), player, next_player,
-                                  leaf.steps_remaining);
+      child_hash = hasher.update(
+        last(move_hist), (**new_step).begin(), (**new_step).end(), player, next_player,
+        leaf.steps_remaining
+      );
     else
-      child_hash = hasher.update_lambda(last(move_hist), player, next_player, leaf.steps_remaining);
+      child_hash = hasher.update_lambda(
+        last(move_hist), player, next_player, leaf.steps_remaining
+      );
 
     if (*new_step) {
       if (remaining >= 1) {

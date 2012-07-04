@@ -98,7 +98,7 @@ public:
   step_holder step;
   std::size_t subtree_size;
   signed char steps_remaining : 4;
-  e_type      type            : 1;
+  e_type      type            : 4;
 
   vertex()
     : proof_number(0)

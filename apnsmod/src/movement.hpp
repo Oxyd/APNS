@@ -26,7 +26,7 @@
 namespace apns {
 
 /// Maximum allowed number of steps in a move.
-unsigned const MAX_STEPS = 4;
+int const MAX_STEPS = 4;
 
 struct elementary_step;
 
