@@ -110,6 +110,7 @@ public:
   vertex(BOOST_RV_REF(vertex) other)
     : proof_number(other.proof_number)
     , disproof_number(other.disproof_number)
+    , step(other.step)
     , subtree_size(other.subtree_size)
     , steps_remaining(other.steps_remaining)
     , type(other.type)
@@ -118,6 +119,7 @@ public:
   vertex& operator = (BOOST_RV_REF(vertex) other) {
     proof_number = other.proof_number;
     disproof_number = other.disproof_number;
+    step = boost::move(other.step);
     steps_remaining = other.steps_remaining;
     type = other.type;
     subtree_size = other.subtree_size;

@@ -84,7 +84,6 @@ test_sources = [
 ]
 
 tests = list()
-
 objList = testEnv.Glob('test-build/*.cpp')
 
 def runTest(env, target, source):
@@ -104,3 +103,5 @@ t = Alias('tests_', tests)  # 'tests_' because without the underscore we have a 
 results['tests'] = t
 
 Return('results')
+
+# vim:syntax=python
