@@ -303,6 +303,8 @@ void update_numbers(vertex& v);
 //! Manages the various information that are to be kept during descent through 
 //! the tree.
 class search_stack {
+  typedef std::vector<board> board_sequence;
+
 public:
   typedef std::vector<vertex*>                path_sequence;
   typedef std::vector<zobrist_hasher::hash_t> hashes_sequence;
@@ -339,17 +341,17 @@ public:
   zobrist_hasher::hash_t  hashes_top() const  { return hashes_.back(); }
   zobrist_hasher::hash_t  history_top() const { return history_.back(); }
 
-  zobrist_hasher const& hasher() const { return *hasher_; }
+  zobrist_hasher const&   hasher() const { return *hasher_; }
 
 private:
-  // Implementation note: state_ is lazy -- the step sequence is only applied 
+  // Implementation note: states_ is lazy -- the step sequence is only applied 
   // to it when state() is requested. The state_pos_ variable is an index into
   // path_ that specifies the last vertex whose step was applied to state_.
 
   path_sequence                     path_;
   hashes_sequence                   hashes_;
   history_sequence                  history_;
-  mutable board                     state_;
+  mutable board_sequence            states_;
   mutable path_sequence::size_type  state_pos_;
   zobrist_hasher const*             hasher_;
   piece::color_t                    attacker_;

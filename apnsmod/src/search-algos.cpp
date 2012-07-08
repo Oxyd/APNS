@@ -257,7 +257,7 @@ search_stack::search_stack(
 ) : path_(1, root)
   , hashes_(1, initial_hash)
   , history_(1, initial_hash)
-  , state_(initial_state)
+  , states_(1, initial_state)
   , state_pos_(0)
   , hasher_(&hasher)
   , attacker_(attacker)
@@ -288,8 +288,8 @@ void search_stack::push(vertex* v) {
     if (v->type != parent->type) { history_.push_back(v_hash); ++stage; }
   } catch (...) {
     switch (stage) {
-    case 3:   history_.pop_back();
-    case 2:   hashes_.pop_back();
+    case 3:   history_.pop_back();  // fallthrough...
+    case 2:   hashes_.pop_back();   // fallthrough...
     case 1:   path_.pop_back();
     }
 
@@ -307,11 +307,9 @@ void search_stack::pop() {
   vertex* const parent = *(path_.end() - 2);
 
   if (state_pos_ == path_.size() - 1) {
-    if (top->step)
-      unapply(*top->step, state_);
+    states_.pop_back();
     --state_pos_;
   }
-
   path_.pop_back();
   hashes_.pop_back();
   if (top->type != parent->type) history_.pop_back();
@@ -325,14 +323,16 @@ void search_stack::reset_to_root() {
 board const& search_stack::state() const {
   assert(state_pos_ <= path_.size() - 1);
 
+  board state(states_.back());
   while (state_pos_ != path_.size() - 1) {
     ++state_pos_;
     if (path_[state_pos_]->step)
-      apply(*path_[state_pos_]->step, state_);
+      apply(*path_[state_pos_]->step, state);
+    states_.push_back(state);
   }
 
   assert(state_pos_ == path_.size() - 1);
-  return state_;
+  return states_.back();
 }
 
 std::ostream& operator << (std::ostream& out, search_stack const& stack) {
