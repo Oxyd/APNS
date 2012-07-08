@@ -314,7 +314,7 @@ def main():
       args.quiet = True
 
   if not args.quiet or args.noProgress:
-    print 'Search took {0} seconds'.format(end - start)
+    print 'Search took {0:.2f} seconds'.format(end - start)
 
   if args.destination is not None:
     show('Saving result to {0}'.format(args.destination))
