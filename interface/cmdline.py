@@ -51,6 +51,9 @@ def strFromNum(num):
     return 'inf'
 
 
+start = None  # To be set later by stateCallback
+
+
 def main():
   is64Bit = sys.maxsize > 2**32  # Trick straight from the docs.
 
@@ -192,6 +195,9 @@ def main():
     elif state == Controller.State.SEARCHING:
       print '... Done. Commencing search.'
 
+      global start
+      start = time.time()
+
   controller.stateCallbacks.add(stateCallback)
   controller.loadGameCallbacks.add(cancelCallback)
   controller.saveGameCallbacks.add(cancelCallback)
@@ -261,8 +267,6 @@ def main():
 
   controller.searchProgressCallbacks.add(printProgress)
   show('Starting search. Pres Control-C to stop the search at any time.')
-
-  start = time.time()
 
   try:
     controller.runSearch(burst=1000)
