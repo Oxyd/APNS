@@ -5,7 +5,7 @@ def config(conf, bits, debug, profile):
     'default-toolchain':  'gcc',
     'gcc': {
       'compile-flags': [
-	'-pipe',
+        '-pipe',
         '-Wall',
         '-Wextra',
         '-std=c++03',
