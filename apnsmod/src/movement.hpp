@@ -98,9 +98,6 @@ private:
   static unsigned char const INVALID = 6;
   static unsigned char const EMPTY   = 15;
 
-  /// Four-character representation of the elementary step. This is a string
-  /// like "Rc7n" or " d3e" if the piece is not known.
-  //boost::array<char, 4> representation_;
   position      from_;
   char          what_  : 5;
   unsigned char where_ : 3;
