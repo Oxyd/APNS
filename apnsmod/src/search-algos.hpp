@@ -337,9 +337,9 @@ public:
   history_sequence const& history() const { return history_; }
   board const&            state() const;
 
-  vertex*                 path_top() const    { return path_.back(); }
-  zobrist_hasher::hash_t  hashes_top() const  { return hashes_.back(); }
-  zobrist_hasher::hash_t  history_top() const { return history_.back(); }
+  vertex*                 path_top() const    { assert(!path_.empty()); return path_.back(); }
+  zobrist_hasher::hash_t  hashes_top() const  { assert(!hashes_.empty()); return hashes_.back(); }
+  zobrist_hasher::hash_t  history_top() const { assert(!history_.empty()); return history_.back(); }
 
   zobrist_hasher const&   hasher() const { return *hasher_; }
 
@@ -423,13 +423,18 @@ typedef boost::array<zobrist_hasher::hash_t, MAX_STEPS> move_history_seq;
 //! Get a move history for the move that leads to the current top vertex.
 move_history_seq move_history(search_stack const& stack);
 
-//! Get the last non-zero element of a move history.
-inline zobrist_hasher::hash_t last(move_history_seq const& mh) {
+/// Get the iterator to the last non-zero element of a move history.
+inline move_history_seq::const_iterator last_iter(move_history_seq const& seq) {
   namespace bl = boost::lambda;
   move_history_seq::const_reverse_iterator it =
-    std::find_if(mh.rbegin(), mh.rend(), bl::_1 != 0);
-  assert(it != mh.rend());
-  return *it;
+    std::find_if(seq.rbegin(), seq.rend(), bl::_1 != 0);
+  assert(it != seq.rend());
+  return boost::prior(it.base());
+}
+
+//! Get the last non-zero element of a move history.
+inline zobrist_hasher::hash_t last(move_history_seq const& mh) {
+  return *last_iter(mh);
 }
 
 //! Get the parent of the top vertex. If the top is the root, returns 0.

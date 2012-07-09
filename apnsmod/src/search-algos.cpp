@@ -310,9 +310,15 @@ void search_stack::pop() {
     states_.pop_back();
     --state_pos_;
   }
+
   path_.pop_back();
   hashes_.pop_back();
   if (top->type != parent->type) history_.pop_back();
+
+  assert(!path_.empty());
+  assert(!hashes_.empty());
+  assert(!history_.empty());
+  assert(!states_.empty());
 }
 
 void search_stack::reset_to_root() {
@@ -399,12 +405,20 @@ void unapply(move_path const& path, board& board) {
 }
 
 move_history_seq move_history(search_stack const& stack) {
-  search_stack::path_sequence::const_reverse_iterator v = stack.path().rbegin();
-  search_stack::hashes_sequence::const_iterator hash = stack.hashes().end();
+  search_stack::path_sequence::const_reverse_iterator v     = stack.path().rbegin();
+  search_stack::hashes_sequence::const_iterator       hash  = stack.hashes().end();
+  search_stack::hashes_sequence::const_iterator const min_hash =
+    stack.hashes().size() >= move_history_seq::static_size
+      ? hash - move_history_seq::static_size
+      : stack.hashes().begin();
+
   move_history_seq result = {{}};
 
   vertex::e_type const type = stack.path_top()->type;
-  while (v != stack.path().rend() && (**v++).type == type) --hash;
+  while (v != stack.path().rend() && (**v++).type == type && hash != min_hash) 
+    --hash;
+
+  assert(std::distance(hash, stack.hashes().end()) <= move_history_seq::static_size);
   std::copy(hash, stack.hashes().end(), result.begin());
 
   return result;
@@ -452,8 +466,11 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
 
   typedef std::vector<std::pair<step_holder, vertex::e_type> > steps_seq;
 
+  move_history_seq::const_iterator const last_it = last_iter(move_hist);
+  zobrist_hasher::hash_t const last = *last_it;
+
   steps_seq steps;
-  piece::color_t player = vertex_player(leaf, attacker);
+  piece::color_t const player = vertex_player(leaf, attacker);
 
   bool const make_lambda = true;
   steps_cont const s = generate_steps(state, player, make_lambda);
@@ -469,12 +486,12 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
     zobrist_hasher::hash_t child_hash;
     if (*new_step)
       child_hash = hasher.update(
-        last(move_hist), (**new_step).begin(), (**new_step).end(), player, next_player,
+        last, (**new_step).begin(), (**new_step).end(), player, next_player,
         leaf.steps_remaining
       );
     else
       child_hash = hasher.update_lambda(
-        last(move_hist), player, next_player, leaf.steps_remaining
+        last, player, next_player, leaf.steps_remaining
       );
 
     if (*new_step) {
@@ -492,6 +509,10 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
     }
   }
 
+  move_history_seq::difference_type const used_steps =
+    std::distance(move_hist.begin(), last_it) + 1;  // If last == .begin(), it's one step, and so forth.
+  std::size_t leaf_subtree_size = 0;
+
   leaf.resize(steps.size());
   vertex::iterator child = leaf.begin();
 
@@ -504,14 +525,33 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
     child->step = step->first;
     child->type = step->second;
     std::size_t const used = child->step ? child->step->steps_used() : 1;
+    child->subtree_size = 1;
+
     if (child->type == leaf.type)
       child->steps_remaining = leaf.steps_remaining - used;
-    else
+    else {
       child->steps_remaining = MAX_STEPS;
-    child->subtree_size = 1;
+
+      // Add lambdas below this vertex to compensate for missing levels in the case of pushes
+      // and pulls.
+
+      vertex::iterator v = child;
+      for (int i = used_steps + used; i <= MAX_STEPS; ++i) {
+        vertex::iterator const lambda = v->add();
+        lambda->proof_number = lambda->disproof_number = 1;
+        lambda->type = child->type;
+        lambda->steps_remaining = MAX_STEPS;
+
+        v = lambda;
+      }
+
+      calculate_sizes(*child);
+    }
+
+    leaf_subtree_size += child->subtree_size;
   }
 
-  return leaf.size();
+  return leaf_subtree_size;
 }
 
 void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {

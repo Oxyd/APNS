@@ -11,7 +11,7 @@
 #define KILLER_SORT_BEFORE_SELECT 0
 
 /// If set to 1, killer steps will be tried before an actual vertex expansion.
-#define KILLER_SIMULATE 1
+#define KILLER_SIMULATE 0
 
 /// If set to 1, the simulation using killer steps will continue recursively up to four levels deep. Requires
 /// KILLER_SIMULATE = 1.
