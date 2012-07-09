@@ -73,10 +73,9 @@ winner(board const& board, piece::color_t player) {
       ? board::mask::row(position::MIN_ROW)
       : board::mask::row(position::MAX_ROW);
 
-  board::mask const rabbits = board.types()[index_from_type(piece::rabbit)];
-  board::mask const player_pieces = board.players()[index_from_color(player)];
-  board::mask const opponent_pieces =
-    board.players()[index_from_color(opponent)];
+  board::mask const rabbits         = board.types()[index_from_type(piece::rabbit)];
+  board::mask const player_pieces   = board.player(player);
+  board::mask const opponent_pieces = board.player(opponent);
 
   if (rabbits & player_pieces & player_target)
     return player;

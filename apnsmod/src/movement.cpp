@@ -289,13 +289,13 @@ static int cost(piece what, position where) {
 template <typename OutIter>
 int check_captures(position src, position dst, board const& board,
                    piece what, OutIter out) {
-  std::size_t const player_index = index_from_color(what.color());
+  piece::color_t const player = what.color();
   board::mask supporters;
 
   int score = 0;
 
   if (trap(dst)) {
-    supporters = neighbourhood(dst) & board.players()[player_index];
+    supporters = neighbourhood(dst) & board.player(player);
     supporters[src] = false;
 
     // Check for piece stepping into a trap.
@@ -311,8 +311,8 @@ int check_captures(position src, position dst, board const& board,
       (neighbourhood(src) & board::mask::TRAPS).first_set();
     boost::optional<piece> const trapped = board.get(trap);
     if (trapped) {
-      std::size_t trapped_player_index = index_from_color(trapped->color());
-      supporters = neighbourhood(trap) & board.players()[trapped_player_index];
+      piece::color_t const trapped_player = trapped->color();
+      supporters = neighbourhood(trap) & board.player(trapped_player);
       supporters[src] = false;
 
       if (supporters.empty()) {
@@ -868,15 +868,12 @@ steps_cont generate_steps(board const& board, piece::color_t player, bool make_l
   std::vector<scored_step> steps;
   piece::color_t const opponent = opponent_color(player);
 
-  std::size_t const player_index = index_from_color(player);
-  std::size_t const opponent_index = index_from_color(opponent);
-
   board::mask const have_friend =
-    board.players()[player_index] &
-    (board.players()[player_index].shift(north) |
-     board.players()[player_index].shift(south) |
-     board.players()[player_index].shift(east) |
-     board.players()[player_index].shift(west));
+    board.player(player) &
+    (board.player(player).shift(north) |
+     board.player(player).shift(south) |
+     board.player(player).shift(east) |
+     board.player(player).shift(west));
 
   for (types_array_t::const_iterator type = TYPES.begin(); type != TYPES.end(); ++type) {
     std::size_t const type_index = index_from_type(*type);
@@ -886,12 +883,12 @@ steps_cont generate_steps(board const& board, piece::color_t player, bool make_l
       std::size_t const op_type_index = index_from_type(*op_type);
 
       if (op_type < type)
-        opponent_stronger |= board.players()[opponent_index] & board.types()[op_type_index];
+        opponent_stronger |= board.player(opponent) & board.types()[op_type_index];
       else if (op_type > type)
-        opponent_weaker |= board.players()[opponent_index] & board.types()[op_type_index];
+        opponent_weaker |= board.player(opponent) & board.types()[op_type_index];
     }
 
-    board::mask const pieces = board.players()[player_index] & board.types()[type_index];
+    board::mask const pieces = board.player(player) & board.types()[type_index];
     board::mask const stronger_opponent_adjacent =
       pieces &
         (opponent_stronger.shift(north) |

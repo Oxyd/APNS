@@ -156,7 +156,8 @@ std::pair<position, piece> board::iterator::dereference() const {
 void board::put(position where, piece what) {
   if (!occupied_[where]) {
     occupied_[where] = true;
-    players_[index_from_color(what.color())][where] = true;
+    if (what.color() == piece::gold)
+      gold_[where] = true;
     types_[index_from_type(what.type())][where] = true;
   } else throw std::logic_error("board::put: Position is occupied");
 }
@@ -164,8 +165,7 @@ void board::put(position where, piece what) {
 void board::remove(position from) {
   if (occupied_[from]) {
     occupied_[from ] = false;
-    for (players_masks::iterator p = players_.begin(); p != players_.end(); ++p)
-      p->set(from, false);
+    gold_[from] = false;
     for (types_masks::iterator t = types_.begin(); t != types_.end(); ++t)
       t->set(from, false);
   } else throw std::logic_error("board::remove: Position is empty");
@@ -173,8 +173,7 @@ void board::remove(position from) {
 
 void board::clear() {
   occupied_ = mask();
-  for (players_masks::iterator p = players_.begin(); p != players_.end(); ++p)
-    *p = mask();
+  gold_     = mask();
   for (types_masks::iterator t = types_.begin(); t != types_.end(); ++t)
     *t = mask();
 }
@@ -184,8 +183,11 @@ boost::optional<piece> board::get(position from) const {
     piece::color_t color = piece::color_t();
     piece::type_t  type  = piece::type_t();
 
-    for (players_masks::const_iterator p = players_.begin(); p != players_.end(); ++p)
-      if (p->get(from)) { color = COLORS[p - players_.begin()]; break; }
+    if (gold_[from]) 
+      color = piece::gold;
+    else
+      color = piece::silver;
+
     for (types_masks::const_iterator t = types_.begin(); t != types_.end(); ++t)
       if (t->get(from)) { type = TYPES[t - types_.begin()]; break; }
 
@@ -196,7 +198,7 @@ boost::optional<piece> board::get(position from) const {
 bool board::equal(board const& other) const {
   return
     occupied_ == other.occupied_ &&
-    players_ == other.players_ &&
+    gold_ == other.gold_ &&
     types_ == other.types_;
 }
 
@@ -204,8 +206,8 @@ bool board::less(board const& other) const {
   return
     occupied_ < other.occupied_ ||
     (occupied_ == other.occupied_ &&
-      (players_ < other.players_ ||
-        (players_ == other.players_ &&
+      (gold_ < other.gold_ ||
+        (gold_ == other.gold_ &&
           types_ < other.types_)));
 }
 

@@ -244,13 +244,13 @@ public:
   boost::optional<piece> get(position from) const;
 
   /// Mask of positions that are occupied.
-  mask                  occupied() const  { return occupied_; }
+  mask occupied() const { return occupied_; }
 
-  /// A mask for each player with positions occupied by the respective player.
-  players_masks const&  players() const   { return players_; }
+  /// Mask of positions occupied by the given player.
+  mask player(piece::color_t p) const;
 
   /// A mask for each type with positions occupied by the respective type.
-  types_masks const&    types() const     { return types_; }
+  types_masks const& types() const { return types_; }
 
   ///@}
 
@@ -267,8 +267,8 @@ public:
   ///@}
 
 private:
-  players_masks players_;
   types_masks   types_;
+  mask          gold_;
   mask          occupied_;
 };
 
@@ -295,6 +295,13 @@ inline board::mask operator ^ (board::mask lhs, board::mask rhs) {
 
 inline bool operator < (board::mask lhs, board::mask rhs) {
   return lhs.less(rhs);
+}
+
+inline board::mask board::player(piece::color_t p) const {
+  if (p == piece::gold)
+    return gold_;
+  else
+    return occupied() & ~gold_;
 }
 
 /// Test whether two board contain exactly the same elements.
