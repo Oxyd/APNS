@@ -79,14 +79,14 @@ public:
   /// Update the hash value after a lambda step has been made.
   hash_t update_lambda(hash_t hash, piece::color_t current_player, piece::color_t next_player,
                        int steps_remaining) const {
-    if (steps_remaining >= 2)
-      hash ^= admits_double_;
+    hash ^= steps_code(steps_remaining);
+    if (current_player == next_player)
+      hash ^= steps_code(steps_remaining - 1);
+    else
+      hash ^= steps_code(MAX_STEPS);
 
     hash ^= players_[current_player];
     hash ^= players_[next_player];
-
-    if (steps_remaining - 1 >= 2 || current_player != next_player)
-      hash ^= admits_double_;
 
     return hash;
   }
@@ -105,16 +105,22 @@ private:
   static std::size_t const POSITIONS = board::ROWS * board::COLUMNS;
 
   typedef boost::array<hash_t, TYPES * COLORS * POSITIONS> pieces_cont;
-  typedef boost::array<hash_t, 2>                          players_cont;
+  typedef boost::array<hash_t, piece::color_count>         players_cont;
+  typedef boost::array<hash_t, MAX_STEPS>                  steps_rem_cont;
 
-  pieces_cont   pieces_;
-  players_cont  players_;
-  hash_t        admits_double_;
+  pieces_cont    pieces_;
+  players_cont   players_;
+  steps_rem_cont steps_rem_;
 
   hash_t piece_code(piece piece, position pos) const {
     return pieces_[index_from_type(piece.type()) * TYPES * COLORS +
                    index_from_color(piece.color()) * COLORS +
                    pos.order()];
+  }
+
+  hash_t steps_code(int steps_remaining) const {
+    assert(steps_remaining >= 1 && steps_remaining <= 4);
+    return steps_rem_[steps_remaining - 1];
   }
 };
 
@@ -128,8 +134,7 @@ zobrist_hasher::hash_t zobrist_hasher::update(
 
   hash_t hash = old_hash;
 
-  if (steps_remaining >= 2)
-    hash ^= admits_double_;
+  hash ^= steps_code(steps_remaining);
 
   for (Iter step = steps_begin; step != steps_end; ++step) {
     position const& old_position = step->from();
@@ -146,11 +151,13 @@ zobrist_hasher::hash_t zobrist_hasher::update(
     }
   }
 
-  hash ^= players_[current_player];
-  hash ^= players_[next_player];
-
-  if (steps_remaining >= 2 || current_player != next_player)
-    hash ^= admits_double_;
+  if (current_player == next_player)
+    hash ^= steps_code(steps_remaining);
+  else {
+    hash ^= players_[current_player];
+    hash ^= players_[next_player];
+    hash ^= steps_code(MAX_STEPS);
+  }
 
   return hash;
 }

@@ -155,6 +155,7 @@ TEST(search_stack, push_pop_test) {
     hasher.generate_initial(b, piece::gold, MAX_STEPS);
   vertex root;
   root.steps_remaining = MAX_STEPS;
+  root.type = vertex::type_or;
 
   search_stack stack(hasher, root_hash, &root, piece::gold, b);
 
@@ -198,13 +199,13 @@ TEST(search_stack, push_pop_test) {
   vertex* second_child = &*child->begin();
   second_child->step = step::validate_ordinary_step(child_board, elementary_step::displacement(position(8, 'h'), south));
   second_child->type = vertex::type_and;
-  second_child->steps_remaining = MAX_STEPS - 2;
+  second_child->steps_remaining = MAX_STEPS;
 
   board second_child_board(child_board);
   apply(*second_child->step, second_child_board);
 
   zobrist_hasher::hash_t second_child_hash =
-    hasher.generate_initial(second_child_board, piece::silver, MAX_STEPS - 2);
+    hasher.generate_initial(second_child_board, piece::silver, MAX_STEPS);
 
   stack.push(second_child);
 
@@ -295,19 +296,28 @@ TEST(search_stack, null_move_test) {
   dummy1.type = vertex::type_or;
 
   stack.push(&dummy1);
-  EXPECT_EQ(root_hash, stack.hashes_top());
+  EXPECT_NE(root_hash, stack.hashes_top());
+
+  zobrist_hasher::hash_t const dummy1_hash = stack.hashes_top();
 
   vertex dummy2;
   dummy2.steps_remaining = dummy1.steps_remaining - 1;
   dummy2.type = vertex::type_or;
   stack.push(&dummy2);
-  EXPECT_EQ(root_hash, stack.hashes_top());
+  EXPECT_NE(dummy1_hash, stack.hashes_top());
+  EXPECT_NE(root_hash, stack.hashes_top());
+
+  zobrist_hasher::hash_t const dummy2_hash = stack.hashes_top();
 
   vertex dummy3;
   dummy3.steps_remaining = dummy2.steps_remaining - 1;
   dummy3.type = vertex::type_or;
   stack.push(&dummy3);
+  EXPECT_NE(dummy2_hash, stack.hashes_top());
+  EXPECT_NE(dummy1_hash, stack.hashes_top());
   EXPECT_NE(root_hash, stack.hashes_top());
+
+  zobrist_hasher::hash_t const dummy3_hash = stack.hashes_top();
 
   vertex dummy4;
   dummy4.steps_remaining = MAX_STEPS;
@@ -315,6 +325,9 @@ TEST(search_stack, null_move_test) {
   stack.push(&dummy4);
 
   EXPECT_EQ(hasher.opponent_hash(root_hash), stack.history_top());
+  EXPECT_NE(dummy3_hash, stack.hashes_top());
+  EXPECT_NE(dummy2_hash, stack.hashes_top());
+  EXPECT_NE(dummy1_hash, stack.hashes_top());
   EXPECT_NE(root_hash, stack.history_top());
 }
 

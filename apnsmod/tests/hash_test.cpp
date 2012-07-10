@@ -72,12 +72,12 @@ TEST(zobrist_test, pull_move_test) {
   zobrist_hasher::hash_t initial_h =
     hasher.generate_initial(initial, piece::gold, MAX_STEPS);
   zobrist_hasher::hash_t terminal_h =
-    hasher.generate_initial(terminal, piece::silver, MAX_STEPS - 2);
+    hasher.generate_initial(terminal, piece::gold, MAX_STEPS - 2);
   zobrist_hasher::hash_t resulting_h =
     hasher.update(
     initial_h,
     s->begin(), s->end(),
-    piece::gold, piece::silver,
+    piece::gold, piece::gold,
     MAX_STEPS
   );
 
@@ -104,7 +104,7 @@ TEST(zobrist_test, end_turn_test) {
   zobrist_hasher::hash_t initial_h =
     hasher.generate_initial(initial, piece::gold, MAX_STEPS);
   zobrist_hasher::hash_t terminal_h =
-    hasher.generate_initial(terminal, piece::silver, MAX_STEPS - 1);
+    hasher.generate_initial(terminal, piece::silver, MAX_STEPS);
   zobrist_hasher::hash_t resulting_h = hasher.update(
     initial_h,
     s->begin(), s->end(),

@@ -20,7 +20,7 @@ apns::zobrist_hasher::zobrist_hasher() {
 
   std::generate(pieces_.begin(), pieces_.end(), boost::bind(rand_distrib, prng));
   std::generate(players_.begin(), players_.end(), boost::bind(rand_distrib, prng));
-  admits_double_ = rand_distrib(prng);
+  std::generate(steps_rem_.begin(), steps_rem_.end(), boost::bind(rand_distrib, prng));
 }
 
 apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(
@@ -36,9 +36,7 @@ apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(
   }
 
   hash ^= players_[on_move];
-
-  if (steps_remaining >= 2)
-    hash ^= admits_double_;
+  hash ^= steps_code(steps_remaining);
 
   return hash;
 }
