@@ -408,19 +408,27 @@ void unapply(move_path const& path, board& board) {
 move_history_seq move_history(search_stack const& stack) {
   search_stack::path_sequence::const_reverse_iterator v     = stack.path().rbegin();
   search_stack::hashes_sequence::const_iterator       hash  = stack.hashes().end();
-  search_stack::hashes_sequence::const_iterator const min_hash =
-    stack.hashes().size() >= move_history_seq::static_size
-      ? hash - move_history_seq::static_size
-      : stack.hashes().begin();
 
   move_history_seq result = {{}};
 
   vertex::e_type const type = stack.path_top()->type;
-  while (v != stack.path().rend() && (**v++).type == type && hash != min_hash) 
+  while (v != stack.path().rend() && (**v++).type == type)
     --hash;
 
   assert(std::distance(hash, stack.hashes().end()) <= move_history_seq::static_size);
-  std::copy(hash, stack.hashes().end(), result.begin());
+
+  search_stack::hashes_sequence::const_iterator h = hash;
+  search_stack::path_sequence::const_iterator   u = 
+    stack.path().end() - std::distance(hash, stack.hashes().end());
+  move_history_seq::iterator dst = result.begin();
+
+  while (h != stack.hashes().end()) {
+    zobrist_hasher::hash_t const value = stack.hasher().unhash_steps(
+      *h++, (**u++).steps_remaining
+    );
+
+    *dst++ = value;
+  }
 
   return result;
 }
@@ -482,17 +490,22 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
   ) {
     int const remaining = leaf.steps_remaining - new_step->steps_used();
 
-    piece::color_t const next_player = remaining >= 1 ? player : opponent_color(player);
-    zobrist_hasher::hash_t child_hash = hasher.update(
-      last, new_step->begin(), new_step->end(), player, next_player,
-      leaf.steps_remaining
+    // Don't generate silent steps here -- those that result in a position that is the same
+    // as one previously encountered within this move. For that, we want to ignore the player
+    // and steps remaining.
+    
+    zobrist_hasher::hash_t child_hash = hasher.update_no_steps(
+      last, new_step->begin(), new_step->end(), player, player
     );
 
-    if (remaining >= 1) {
-      if (std::find(move_hist.begin(), move_hist.end(), child_hash) == move_hist.end())
-        steps.push_back(std::make_pair(new_step, leaf.type));
-    } else if (remaining == 0)
-      steps.push_back(std::make_pair(new_step, opposite_type(leaf.type)));
+    if (std::find(move_hist.begin(), move_hist.end(), child_hash) == move_hist.end()) {
+      if (remaining >= 0) {
+        steps.push_back(std::make_pair(new_step, opposite_type(leaf.type)));
+
+        if (remaining >= 1)
+          steps.push_back(std::make_pair(new_step, leaf.type));
+      }
+    }
   }
 
   leaf.resize(steps.size());

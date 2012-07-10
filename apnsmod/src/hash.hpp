@@ -76,6 +76,19 @@ public:
       int steps_remaining
     ) const;
 
+  /// Update the hash value after the situation on the board has changed, but ignore the number
+  /// of remaining steps.
+  template <typename Iter>
+    hash_t update_no_steps(
+      hash_t old_hash, Iter steps_begin, Iter steps_end,
+      piece::color_t current_player, piece::color_t next_player
+    ) const;
+
+  /// Unhash the "steps remaining" part of the Zobrist hash.
+  hash_t unhash_steps(hash_t old_hash, int steps_remaining) const {
+    return old_hash ^ steps_code(steps_remaining);
+  }
+
   //! Given a hash, return the hash value corresponding to the same board 
   //! state, but with the opposite player to move.
   hash_t opponent_hash(hash_t h) const {
@@ -122,8 +135,8 @@ zobrist_hasher::hash_t zobrist_hasher::update(
   hash ^= steps_code(steps_remaining);
 
   for (Iter step = steps_begin; step != steps_end; ++step) {
-    position const& old_position = step->from();
-    piece const& piece = *step->what();  // Assumed to be non-empty.
+    position const old_position = step->from();
+    piece const piece = *step->what();  // Assumed to be non-empty.
 
     // First remove the piece from its old position. If this is a displacement,
     // add the piece's new position to the hash later.
@@ -139,10 +152,35 @@ zobrist_hasher::hash_t zobrist_hasher::update(
   if (current_player == next_player)
     hash ^= steps_code(steps_remaining);
   else {
-    hash ^= players_[current_player];
-    hash ^= players_[next_player];
+    hash ^= players_[index_from_color(current_player)];
+    hash ^= players_[index_from_color(next_player)];
     hash ^= steps_code(MAX_STEPS);
   }
+
+  return hash;
+}
+
+template <typename Iter>
+zobrist_hasher::hash_t zobrist_hasher::update_no_steps(
+  hash_t old_hash, Iter steps_begin, Iter steps_end, 
+  piece::color_t current_player, piece::color_t next_player
+) const {
+  hash_t hash = old_hash;
+  for (Iter step = steps_begin; step != steps_end; ++step) {
+    position const old_position = step->from();
+    piece const    piece        = *step->what();
+
+    hash ^= piece_code(piece, old_position);
+
+    if (!step->capture()) {
+      position const new_position = make_adjacent(old_position, step->where());
+      hash ^= piece_code(piece, new_position);
+    }
+  }
+
+  if (current_player != next_player)
+    hash ^= players_[index_from_color(current_player)] ^ 
+            players_[index_from_color(next_player)];
 
   return hash;
 }

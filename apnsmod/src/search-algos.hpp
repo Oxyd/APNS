@@ -418,6 +418,7 @@ void unapply(move_path const& path, board& board);
 
 //! A sequence of hashes from the start of a move to one of its inner vertices.
 //! Some elements may be set to 0 value indicating that they are to be ignored.
+//! This sequence does not contain the steps remaining part of the hashes, and all
 typedef boost::array<zobrist_hasher::hash_t, MAX_STEPS> move_history_seq;
 
 //! Get a move history for the move that leads to the current top vertex.
