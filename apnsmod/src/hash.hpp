@@ -84,6 +84,20 @@ public:
       piece::color_t current_player, piece::color_t next_player
     ) const;
 
+  /// Update the hash after a lambda step has been made.
+  hash_t update_lambda(hash_t hash, piece::color_t current_player, piece::color_t next_player,
+                       int steps_remaining) const {
+    hash ^= steps_code(steps_remaining);
+    if (current_player == next_player)
+      hash ^= steps_code(steps_remaining - 1);
+    else
+      hash ^= steps_code(MAX_STEPS);
+
+    hash ^= players_[current_player] ^ players_[next_player];
+
+    return hash;
+  }
+
   /// Unhash the "steps remaining" part of the Zobrist hash.
   hash_t unhash_steps(hash_t old_hash, int steps_remaining) const {
     return old_hash ^ steps_code(steps_remaining);
