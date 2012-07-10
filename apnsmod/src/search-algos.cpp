@@ -920,13 +920,13 @@ void depth_first_pns::do_iterate() {
   while (!current->leaf()) {
 #if KILLER_SORT_BEFORE_SELECT
     if (killer_db_)
-      killer_order(*killer_db_, stack_.size(), *stack_.path_top());
+      killer_order(*killer_db_, virtual_level(stack_), *stack_.path_top());
 #endif
 
 #if KILLER_PREFER
     std::pair<vertex*, vertex*> best_two =
       killer_db_
-        ? two_best_successors(*current, killer_vertex_value(stack_.size(), *killer_db_))
+        ? two_best_successors(*current, killer_vertex_value(virtual_level(stack_), *killer_db_))
         : two_best_successors(*current);
 #else
     std::pair<vertex*, vertex*> best_two = two_best_successors(*current);

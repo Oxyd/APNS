@@ -543,6 +543,56 @@ inline std::size_t level(search_stack const& stack) {
   return stack.path().size();
 }
 
+/// Get the virtual level of the vertex at the end of the path assuming given history.
+inline std::size_t virtual_level(
+  search_stack::path_sequence::const_iterator     path_begin,
+  search_stack::path_sequence::const_iterator     path_end,
+  search_stack::history_sequence::const_iterator  history_begin,
+  search_stack::history_sequence::const_iterator  history_end
+) {
+  std::size_t const plys = std::distance(history_begin, history_end) - 1;
+  
+  if (std::distance(path_begin, path_end) > 1 && 
+      (**(path_end - 2)).type == (**(path_end - 1)).type)
+    // Within the same move.
+    return MAX_STEPS * plys + MAX_STEPS - (**(path_end - 1)).steps_remaining;
+  else  // current starts a move
+    return MAX_STEPS * plys;
+}
+
+/// Get the virtual level of the current top vertex.
+inline std::size_t virtual_level(search_stack const& stack) {
+  return virtual_level(stack.path().begin(), stack.path().end(),
+                       stack.history().begin(), stack.history().end());
+}
+
+/// Get the virtual level of the parent of a vertex at the end of the path
+/// assuming the given history.
+inline std::size_t virtual_parent_level(
+  search_stack::path_sequence::const_iterator     path_begin,
+  search_stack::path_sequence::const_iterator     path_end,
+  search_stack::history_sequence::const_iterator  history_begin,
+  search_stack::history_sequence::const_iterator  history_end
+) {
+  assert(std::distance(path_begin, path_end) > 1);
+
+  vertex const& current = **(path_end - 1);
+  vertex const& parent  = **(path_end - 2);
+
+  if (current.type == parent.type)
+    return virtual_level(path_begin, boost::prior(path_end),
+                         history_begin, history_end);
+  else
+    return virtual_level(path_begin, boost::prior(path_end),
+                         history_begin, boost::prior(history_end));
+}
+
+/// Get the virtual level of the parent of the top vertex.
+inline std::size_t virtual_parent_level(search_stack const& stack) {
+  return virtual_parent_level(stack.path().begin(), stack.path().end(),
+                              stack.history().begin(), stack.history().end());
+}
+
 //! Check whether the game would be lost due to a repetition if the
 //! given player made the given step from the given position assuming the
 //! passed-in game history.
@@ -741,10 +791,10 @@ protected:
       if (proved && numbers_changed)
         log_proof(path_begin, path_end);
 
-      // XXX: Calculate parent level properly.
-      std::size_t const level = std::distance(path_begin, path_end);
+      std::size_t const level = virtual_parent_level(path_begin, path_end,
+                                                     history_begin, history_end);
       if (cutoff && parent)
-        store_in_killer_db(level - 1, current);
+        store_in_killer_db(level, current);
 
       if (proved) {
         store_in_pt(history_begin, history_end, hash, current);
@@ -776,7 +826,7 @@ protected:
 
 #if KILLER_SORT_AFTER_EXPAND
       if (killer_db_)
-        killer_order(*killer_db_, stack_.size(), *stack_.path_top());
+        killer_order(*killer_db_, virtual_level(stack_), *stack_.path_top());
 #endif
 
       evaluate_children();
@@ -818,9 +868,8 @@ protected:
                 << " by proof table (hash = " << stack_.hashes_top() << ")\n";
         }
 
-        // XXX: Calculate parent level properly.
         if (cutoff(current, *child))
-          store_in_killer_db(stack_.size() - 1, *child);
+          store_in_killer_db(virtual_parent_level(stack_), *child);
       }
     }
   }
@@ -828,12 +877,12 @@ protected:
   void select_best() {
 #if KILLER_SORT_BEFORE_SELECT
     if (killer_db)
-      killer_order(*killer_db_, stack_.size(), *stack_.path_top());
+      killer_order(*killer_db_, virtual_level(stack_), *stack_.path_top());
 #endif
 
 #if KILLER_PREFER
     if (killer_db_)
-      push_best(stack_, killer_vertex_value(stack_.size(), *killer_db_));
+      push_best(stack_, killer_vertex_value(virtual_level(stack_), *killer_db_));
     else
       push_best(stack_);
 #else
