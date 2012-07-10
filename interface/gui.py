@@ -32,6 +32,8 @@ _OUTER_BORDER = 6
 # Amount of space between individual squares on the board background image.
 _INNER_BORDER = 1
 
+_TILES = (_TILES_X, _TILES_Y) = (8, 8)
+
 class MainWindow(Observable):
   '''Main window of the application. Displays a toolbar, the search tree and a
   position display. This object will also create an ImageManager instance.
@@ -2540,9 +2542,15 @@ class BoardController(object):
 
   def _boardCoordsFromDisplay(self, row, column):
     '''Convert to _board coordinates from display coordinates. Display
-    coordinates use numbers 1 to 8 for columns; _board coordinates use letters
+    coordinates use numbers 0 to 7 for columns; _board coordinates use letters
     'a' to 'h'.
     '''
+
+    if column < 0: column = 0
+    if row < 0: row = 0
+
+    if column >= 8: column = 7
+    if row >= 8: row = 7
 
     c = chr(ord('a') + column)
     return (8 - row, c)
