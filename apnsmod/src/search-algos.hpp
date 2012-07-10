@@ -709,12 +709,16 @@ protected:
     search_stack::history_sequence::const_iterator history_end,
     zobrist_hasher::hash_t hash, vertex const& v
   ) {
-    if (proof_tbl_ && v.step)
+    assert(v.step);
+
+    if (proof_tbl_)
       pt_store(*proof_tbl_, v, hash, game_->attacker, history_begin, history_end);
   }
 
   void store_in_tt(zobrist_hasher::hash_t hash, vertex const& v) {
-    if (trans_tbl_ && v.step)
+    assert(v.step);
+
+    if (trans_tbl_)
       tt_store(*trans_tbl_, v, hash);
   }
 
@@ -732,7 +736,9 @@ protected:
     update_numbers(current);
     current.subtree_size += size_increment;
 
-    if (!is_lambda(current)) {
+    if (parent) {  // not root
+      assert(current.step);
+
       bool const numbers_changed = current.proof_number != old_pn || current.disproof_number != old_dn;
       bool const proved = current.proof_number == 0 || current.disproof_number == 0;
       bool const cutoff = parent && apns::cutoff(*parent, current);
@@ -740,6 +746,7 @@ protected:
       if (proved && numbers_changed)
         log_proof(path_begin, path_end);
 
+      // XXX: Calculate parent level properly.
       std::size_t const level = std::distance(path_begin, path_end);
       if (cutoff && parent)
         store_in_killer_db(level - 1, current);
@@ -788,37 +795,38 @@ protected:
     assert(current.proof_number > 0 && current.disproof_number > 0);
 
     for (vertex::iterator child = current.begin(); child != current.end(); ++child) {
-      if (!is_lambda(*child)) {
-        piece::color_t const attacker = game_->attacker;
-        piece::color_t const player = vertex_player(current, attacker);
-        search_stack_checkpoint checkpoint(stack_);
-        stack_.push(&*child);
+      assert(child->step);
 
-        if (child->type != current.type && repetition(stack_)) {
-          child->proof_number = player == attacker ? vertex::infty : 0;
-          child->disproof_number = player == attacker ? 0 : vertex::infty;
+      piece::color_t const attacker = game_->attacker;
+      piece::color_t const player = vertex_player(current, attacker);
+      search_stack_checkpoint checkpoint(stack_);
+      stack_.push(&*child);
 
-          *log_ << stack_ << ' '
-                << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
-                << " by repetition\n";
-        }
+      if (child->type != current.type && repetition(stack_)) {
+        child->proof_number = player == attacker ? vertex::infty : 0;
+        child->disproof_number = player == attacker ? 0 : vertex::infty;
 
-        bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_, game_->attacker);
-        if (!found_in_pt) {
-          bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), *child);
-
-          if (!found_in_tt)
-            evaluate(stack_, game_->attacker, *log_);
-        } else {
-          // found_in_pt
-          *log_ << stack_
-                << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
-                << " by proof table (hash = " << stack_.hashes_top() << ")\n";
-        }
-
-        if (cutoff(current, *child))
-          store_in_killer_db(stack_.size() - 1, *child);
+        *log_ << stack_ << ' '
+              << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
+              << " by repetition\n";
       }
+
+      bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_, game_->attacker);
+      if (!found_in_pt) {
+        bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), *child);
+
+        if (!found_in_tt)
+          evaluate(stack_, game_->attacker, *log_);
+      } else {
+        // found_in_pt
+        *log_ << stack_
+              << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
+              << " by proof table (hash = " << stack_.hashes_top() << ")\n";
+      }
+
+      // XXX: Calculate parent level properly.
+      if (cutoff(current, *child))
+        store_in_killer_db(stack_.size() - 1, *child);
     }
   }
 

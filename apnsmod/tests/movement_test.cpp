@@ -388,14 +388,6 @@ void expect_counts(board const& b, std::vector<step> const& steps,
   EXPECT_EQ(expected_pull, pull_count);
 }
 
-void expect_counts(board const& b, std::vector<step_holder> const& steps,
-                   std::size_t tot, std::size_t ord, std::size_t push, std::size_t pull) {
-  std::vector<step> s;
-  std::transform(steps.begin(), steps.end(), std::back_inserter(s),
-                 boost::bind(static_cast<step const& (step_holder::*)() const>(&step_holder::operator *), _1));
-  expect_counts(b, s, tot, ord, push, pull);
-}
-
 TEST_F(move_generation, ordinary_step_generation) {
   std::vector<step> steps;
   steps.insert(steps.end(), steps_begin(position(4, 'd'), b), steps_end());
@@ -433,7 +425,7 @@ TEST_F(move_generation, all_steps) {
 }
 
 TEST_F(move_generation, new_generator) {
-  steps_cont steps = generate_steps(b, piece::gold, false);
+  steps_cont steps = generate_steps(b, piece::gold);
   expect_counts(b, steps, 27, 11, 10, 6);
 }
 
@@ -469,13 +461,6 @@ struct expect_steps {
       result.size() == expected.size() &&
       std::set<step>(result.begin(), result.end()) == expected;
   }
-
-  bool check(steps_cont const& result) {
-    std::vector<step> s;
-    std::transform(result.begin(), result.end(), std::back_inserter(s),
-                   boost::bind(static_cast<step const& (step_holder::*)() const>(&step_holder::operator *), _1));
-    return check(s);
-  }
 };
 
 expect_steps& operator , (expect_steps& e, std::string const& step) {
@@ -489,7 +474,7 @@ TEST(bit_step_generation, ordinary) {
   expect_steps s;
   s, "Cd4n", "Cd4e", "Cd4w", "Cd4s";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::gold, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
 }
 
 TEST(bit_step_generation, correct_player) {
@@ -499,12 +484,12 @@ TEST(bit_step_generation, correct_player) {
   expect_steps s;
   s, "Cd4n", "Cd4e", "Cd4w", "Cd4s";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::gold, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
 
   s.expected.clear();
   s, "mg7n", "mg7e", "mg7s", "mg7w";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::silver, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::silver)));
 }
 
 TEST(bit_step_generation, rabbit_movement) {
@@ -515,12 +500,12 @@ TEST(bit_step_generation, rabbit_movement) {
   expect_steps s;
   s, "Re4n", "Re4e", "Re4w";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::gold, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
 
   s.expected.clear();
   s, "rg5s", "rg5e", "rg5w";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::silver, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::silver)));
 }
 
 TEST(bit_step_generation, walls) {
@@ -545,7 +530,7 @@ TEST(bit_step_generation, walls) {
     "Cc8e", "Cc8w", "Cc8s",
     "Eh8w", "Eh8s";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::gold, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
 }
 
 TEST(bit_step_generation, block) {
@@ -567,7 +552,7 @@ TEST(bit_step_generation, block) {
     "cd5w", "cd5n",
     "de5n", "de5s", "de5e";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::silver, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::silver)));
 }
 
 TEST(bit_step_generation, freeze) {
@@ -583,7 +568,7 @@ TEST(bit_step_generation, freeze) {
     "Rg1e", "Rg1w",
     "Dg2n", "Dg2w";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::gold, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
 }
 
 TEST(bit_step_generation, suicide) {
@@ -593,7 +578,7 @@ TEST(bit_step_generation, suicide) {
   expect_steps s;
   s, "Cc5n Cc6x", "Cc5e", "Cc5w", "Cc5s";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::gold, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
 }
 
 TEST(bit_step_generation, abandonment) {
@@ -612,7 +597,7 @@ TEST(bit_step_generation, abandonment) {
     "Ef3n", "Ef3w",
     "Dg3n", "Dg3e", "Dg3s";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::gold, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
 }
 
 TEST(bit_step_generation, pull_push) {
@@ -651,7 +636,7 @@ TEST(bit_step_generation, pull_push) {
     "Hg8s", "Hg8s ch8w", "Hg8w", "Hg8w ch8w",
     "ch8s Hg8e";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::gold, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
 }
 
 TEST(bit_step_generation, push_pull_capture) {
@@ -682,7 +667,7 @@ TEST(bit_step_generation, push_pull_capture) {
     "cf5n Mf4n Hf3x", "cf5e Mf4n Hf3x", "cf5w Mf4n Hf3x",
     "Mf4e Hf3x cf5s", "Mf4w Hf3x cf5s";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::gold, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
 }
 
 TEST(bit_step_generation, forced_abandonment) {
@@ -697,7 +682,7 @@ TEST(bit_step_generation, forced_abandonment) {
     "Dg5s rg6s cf6x", "Dg5e rg6s cf6x", "Dg5w rg6s cf6x",
     "rg6n cf6x Dg5n", "rg6e cf6x Dg5n";
 
-  EXPECT_TRUE(s.check(generate_steps(b, piece::gold, false)));
+  EXPECT_TRUE(s.check(generate_steps(b, piece::gold)));
 }
 
 class apply_test : public testing::Test {

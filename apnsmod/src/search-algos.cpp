@@ -330,6 +330,8 @@ board const& search_stack::state() const {
 
   board state(states_.back());
   while (state_pos_ != path_.size() - 1) {
+    assert(path_[state_pos_]->step || state_pos_ == 0);
+
     ++state_pos_;
     if (path_[state_pos_]->step)
       apply(*path_[state_pos_]->step, state);
@@ -446,8 +448,9 @@ void killer_order(killer_db const& killers, std::size_t level, vertex& v) {
     child != v.end();
     ++child
   ) {
-    if (child != killers_end && child->step &&
-        killers.is_killer(level, *child->step)) {
+    assert(child->step);
+
+    if (child != killers_end && killers.is_killer(level, *child->step)) {
       // Need to bubble stuff around here to preserve heuristic order.
       vertex::iterator it = killers_end++;
       while (it != child)
@@ -463,7 +466,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
   if (!leaf.leaf())
     throw std::logic_error("expand: Attempt to expand a non-leaf vertex");
 
-  typedef std::vector<std::pair<step_holder, vertex::e_type> > steps_seq;
+  typedef std::vector<std::pair<steps_cont::const_iterator, vertex::e_type> > steps_seq;
 
   move_history_seq::const_iterator const last_it = last_iter(move_hist);
   zobrist_hasher::hash_t const last = *last_it;
@@ -471,46 +474,26 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
   steps_seq steps;
   piece::color_t const player = vertex_player(leaf, attacker);
 
-  bool const make_lambda = true;
-  steps_cont const s = generate_steps(state, player, make_lambda);
+  steps_cont const s = generate_steps(state, player);
   for (
     steps_cont::const_iterator new_step = s.begin();
     new_step != s.end();
     ++new_step
   ) {
-    signed const used = *new_step ? (**new_step).steps_used() : 1;
-    int const remaining = leaf.steps_remaining - used;
+    int const remaining = leaf.steps_remaining - new_step->steps_used();
 
     piece::color_t const next_player = remaining >= 1 ? player : opponent_color(player);
-    zobrist_hasher::hash_t child_hash;
-    if (*new_step)
-      child_hash = hasher.update(
-        last, (**new_step).begin(), (**new_step).end(), player, next_player,
-        leaf.steps_remaining
-      );
-    else
-      child_hash = hasher.update_lambda(
-        last, player, next_player, leaf.steps_remaining
-      );
+    zobrist_hasher::hash_t child_hash = hasher.update(
+      last, new_step->begin(), new_step->end(), player, next_player,
+      leaf.steps_remaining
+    );
 
-    if (*new_step) {
-      if (remaining >= 1) {
-        if (std::find(move_hist.begin(), move_hist.end(), child_hash) == move_hist.end())
-          steps.push_back(std::make_pair(*new_step, leaf.type));
-      } else if (remaining == 0)
-        steps.push_back(std::make_pair(*new_step, opposite_type(leaf.type)));
-
-    } else {
-      if (remaining >= 1)
-        steps.push_back(std::make_pair(step_holder::none, leaf.type));
-      else if (remaining == 0 && hasher.opponent_hash(child_hash) != move_hist[0])
-        steps.push_back(std::make_pair(step_holder::none, opposite_type(leaf.type)));
-    }
+    if (remaining >= 1) {
+      if (std::find(move_hist.begin(), move_hist.end(), child_hash) == move_hist.end())
+        steps.push_back(std::make_pair(new_step, leaf.type));
+    } else if (remaining == 0)
+      steps.push_back(std::make_pair(new_step, opposite_type(leaf.type)));
   }
-
-  move_history_seq::difference_type const used_levels =
-    std::distance(move_hist.begin(), last_it) + 1;  // If last == .begin(), it's one step, and so forth.
-  std::size_t leaf_subtree_size = 0;
 
   leaf.resize(steps.size());
   vertex::iterator child = leaf.begin();
@@ -521,36 +504,17 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
     ++step, ++child
   ) {
     child->proof_number = child->disproof_number = 1;
-    child->step = step->first;
+    child->step = *step->first;
     child->type = step->second;
-    std::size_t const used = child->step ? child->step->steps_used() : 1;
     child->subtree_size = 1;
 
     if (child->type == leaf.type)
-      child->steps_remaining = leaf.steps_remaining - used;
-    else {
+      child->steps_remaining = leaf.steps_remaining - child->step->steps_used();
+    else
       child->steps_remaining = MAX_STEPS;
-
-      // Add lambdas below this vertex to compensate for missing levels in the case of pushes
-      // and pulls.
-
-      vertex::iterator v = child;
-      for (int i = used_levels + 1; i <= MAX_STEPS; ++i) {
-        vertex::iterator const lambda = v->add();
-        lambda->proof_number = lambda->disproof_number = 1;
-        lambda->type = child->type;
-        lambda->steps_remaining = MAX_STEPS;
-
-        v = lambda;
-      }
-
-      calculate_sizes(*child);
-    }
-
-    leaf_subtree_size += child->subtree_size;
   }
 
-  return leaf_subtree_size;
+  return leaf.size();
 }
 
 void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
@@ -832,8 +796,10 @@ bool simulate(search_stack& stack, piece::color_t attacker,
 
 //! Check whether the game would be lost due to a repetition if the
 //! given player made the given step from the given position assuming the
-//! passed-in game history.
+//! passed-in game history. This may only be used on the first step in a move.
 bool repetition(search_stack const& stack) {
+  assert(stack.path_top()->steps_remaining == MAX_STEPS);
+
   if (stack.history().size() >= 2) {
     // Check for null moves.
     if (stack.hasher().opponent_hash(stack.history().back()) == *(stack.history().end() - 2))

@@ -863,9 +863,10 @@ void unapply(step const& step, board_masks& masks) {
   apply(step.rbegin(), step.rend(), masks);
 }
 
-steps_cont generate_steps(board const& board, piece::color_t player, bool make_lambda) {
-  typedef std::pair<int, step_holder> scored_step;
+steps_cont generate_steps(board const& board, piece::color_t player) {
+  typedef std::pair<int, step> scored_step;
   std::vector<scored_step> steps;
+
   piece::color_t const opponent = opponent_color(player);
 
   board::mask const have_friend =
@@ -979,9 +980,6 @@ steps_cont generate_steps(board const& board, piece::color_t player, bool make_l
   std::transform(steps.begin(), steps.end(),
                  std::back_inserter(result),
                  boost::bind(&scored_step::second, _1));
-
-  if (make_lambda)
-    result.push_back(step_holder::none);
 
   return result;
 }
