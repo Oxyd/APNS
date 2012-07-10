@@ -763,13 +763,8 @@ bool simulate(search_stack& stack, piece::color_t attacker,
       child->step = *step;
       child->proof_number = child->disproof_number = 1;
 
-      if (remaining >= 1) {
-        child->steps_remaining = remaining;
-        child->type = parent.type;
-      } else {
-        child->steps_remaining = MAX_STEPS;
-        child->type = opposite_type(parent.type);
-      }
+      child->steps_remaining = MAX_STEPS;
+      child->type = opposite_type(parent.type);
 
       search_stack_checkpoint checkpoint(stack);
       stack.push(&*child);
@@ -793,6 +788,9 @@ bool simulate(search_stack& stack, piece::color_t attacker,
 
 #if KILLER_SIMULATE_RECURSIVE
       else if (remaining >= 1) {
+        child->type = parent.type;
+        child->steps_remaining = remaining;
+
         if (simulate(stack, attacker, size, killers, proof_tbl, log)) {
           log << stack
               << ' ' << (stack.path_top()->proof_number == 0 ? "proved" : "disproved")
