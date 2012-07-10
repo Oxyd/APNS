@@ -744,9 +744,13 @@ protected:
       if (cutoff && parent)
         store_in_killer_db(level - 1, current);
 
-      if (proved)
+      if (proved) {
         store_in_pt(history_begin, history_end, hash, current);
-      else
+        *log_ << stack_ << ' '
+              << "stored in proof table with hash " << hash
+              << " and PN = " << current.proof_number
+              << '\n';
+      } else
         store_in_tt(hash, current);
     }
   }
@@ -809,7 +813,7 @@ protected:
           // found_in_pt
           *log_ << stack_
                 << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
-                << " by proof table\n";
+                << " by proof table (hash = " << stack_.hashes_top() << ")\n";
         }
 
         if (cutoff(current, *child))
