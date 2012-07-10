@@ -477,6 +477,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
 
   steps_seq steps;
   piece::color_t const player = vertex_player(leaf, attacker);
+  bool make_lambda = leaf.steps_remaining >= 1;
 
   steps_cont const s = generate_steps(state, player);
   for (
@@ -495,32 +496,44 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
     );
 
     if (std::find(move_hist.begin(), move_hist.end(), child_hash) == move_hist.end()) {
-      if (remaining >= 0) {
+      if (remaining == 0)
         steps.push_back(std::make_pair(new_step, opposite_type(leaf.type)));
-
-        if (remaining >= 1)
-          steps.push_back(std::make_pair(new_step, leaf.type));
-      }
+      else if (remaining > 0)
+        steps.push_back(std::make_pair(new_step, leaf.type));
     }
   }
 
-  leaf.resize(steps.size());
-  vertex::iterator child = leaf.begin();
+  if (!steps.empty()) {
+    leaf.resize(steps.size() + make_lambda);
 
-  for (
-    steps_seq::const_iterator step = steps.begin();
-    step != steps.end();
-    ++step, ++child
-  ) {
-    child->proof_number = child->disproof_number = 1;
-    child->step = *step->first;
-    child->type = step->second;
-    child->subtree_size = 1;
+    vertex::iterator          child = leaf.begin();
+    steps_seq::const_iterator step  = steps.begin();
 
-    if (child->type == leaf.type)
-      child->steps_remaining = leaf.steps_remaining - child->step->steps_used();
-    else
-      child->steps_remaining = MAX_STEPS;
+    for (; child != leaf.end(); ++child) {
+      child->proof_number = child->disproof_number = 1;
+      child->subtree_size = 1;
+
+      if (step != steps.end()) {
+        child->step = *step->first;
+        child->type = step->second;
+        ++step;
+
+        if (child->type == leaf.type)
+          child->steps_remaining = leaf.steps_remaining - child->step->steps_used();
+        else
+          child->steps_remaining = MAX_STEPS;
+
+      } else {
+        // Lambda step.
+        if (leaf.steps_remaining - 1 > 0) {
+          child->type = leaf.type;
+          child->steps_remaining = leaf.steps_remaining - 1;
+        } else {
+          child->type = opposite_type(leaf.type);
+          child->steps_remaining = MAX_STEPS;
+        }
+      }
+    }
   }
 
   return leaf.size();
