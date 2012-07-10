@@ -113,8 +113,8 @@ private:
   steps_rem_cont steps_rem_;
 
   hash_t piece_code(piece piece, position pos) const {
-    return pieces_[index_from_type(piece.type()) * TYPES * COLORS +
-                   index_from_color(piece.color()) * COLORS +
+    return pieces_[index_from_type(piece.type()) * POSITIONS * COLORS +
+                   index_from_color(piece.color()) * POSITIONS +
                    pos.order()];
   }
 

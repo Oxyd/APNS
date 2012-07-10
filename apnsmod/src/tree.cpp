@@ -81,7 +81,7 @@ struct printer {
   void operator () (vertex& v) {
     out << (v.step ? v.step->to_string() : "lambda")
         << " : " << (v.type == vertex::type_or ? "or" : "and")
-        << ' '   << v.steps_remaining
+        << ' '   << static_cast<int>(v.steps_remaining)
         << ' '   << (v.proof_number < vertex::infty ?
                      boost::lexical_cast<std::string>(v.proof_number) : 
                      "infty")

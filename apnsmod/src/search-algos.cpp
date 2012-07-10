@@ -508,7 +508,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
     }
   }
 
-  move_history_seq::difference_type const used_steps =
+  move_history_seq::difference_type const used_levels =
     std::distance(move_hist.begin(), last_it) + 1;  // If last == .begin(), it's one step, and so forth.
   std::size_t leaf_subtree_size = 0;
 
@@ -535,7 +535,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
       // and pulls.
 
       vertex::iterator v = child;
-      for (int i = used_steps + used; i <= MAX_STEPS; ++i) {
+      for (int i = used_levels + 1; i <= MAX_STEPS; ++i) {
         vertex::iterator const lambda = v->add();
         lambda->proof_number = lambda->disproof_number = 1;
         lambda->type = child->type;

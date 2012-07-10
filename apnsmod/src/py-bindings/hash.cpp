@@ -61,8 +61,11 @@ void export_hash() {
           "z.generateInitial(Board, Color) -> hash\n\n"
           "Generate the initial hash value for given board, assuming the specified player is on move")
       .def("update", &zobrist_hasher_update,
-          "z.update(hash, [ElementaryStep], Color, Color) -> hash\n\n"
+          "z.update(hash, [ElementaryStep], Color, Color, int) -> hash\n\n"
           "Update the hash value.")
+      .def("updateLambda", &apns::zobrist_hasher::update_lambda,
+           "z.updateLambda(hash, Color, Color, int) -> hash\n\n"
+           "Update the hash value after making a lambda step")
       ;
 
   export_table<apns::transposition_table>("TranspositionTable", "");
