@@ -27,7 +27,7 @@ void export_position() {
     ;
 
   class_<apns::position>("Position",
-    "A position on the board. Position is immutable.",
+    "A position on the board.",
     init<apns::position::row_t, std::string const&>())
     .def_readonly("MIN_COLUMN",
                   &apns::position::MIN_COLUMN,
