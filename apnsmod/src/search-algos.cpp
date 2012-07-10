@@ -268,16 +268,16 @@ void search_stack::push(vertex* v) {
   assert(!hashes_.empty());
   assert(!history_.empty());
   assert(hasher_);
+  assert(v->step);
 
   vertex* const                 parent        = path_.back();
   zobrist_hasher::hash_t const  parent_hash   = hashes_.back();
   piece::color_t const          parent_player = vertex_player(*parent, attacker_);
   piece::color_t const          v_player      = vertex_player(*v, attacker_);
-  zobrist_hasher::hash_t const  v_hash        =
-    v->step
-      ? hasher_->update(parent_hash, v->step->begin(), v->step->end(),
-                        parent_player, v_player, parent->steps_remaining)
-      : hasher_->update_lambda(parent_hash, parent_player, v_player, parent->steps_remaining);
+  zobrist_hasher::hash_t const  v_hash        = hasher_->update(
+    parent_hash, v->step->begin(), v->step->end(),
+    parent_player, v_player, parent->steps_remaining
+  );
 
   int stage = 0;
 
@@ -911,8 +911,8 @@ void depth_first_pns::do_iterate() {
 #endif
 
     assert(best_two.first);
-    assert(best_two.first->proof_number > 0 && 
-           best_two.first->disproof_number > 0);
+    assert(best_two.first->step);
+    assert(best_two.first->proof_number > 0 && best_two.first->disproof_number > 0);
 
     limits_.push_back(make_limits(
       *best_two.first,

@@ -277,60 +277,6 @@ TEST(search_stack, checkpoint_test) {
   EXPECT_EQ(child, stack.path().back());
 }
 
-TEST(search_stack, null_move_test) {
-  board b;
-  b.put(position(1, 'a'), piece(piece::gold, piece::dog));
-  b.put(position(8, 'h'), piece(piece::silver, piece::cat));
-
-  zobrist_hasher hasher;
-  zobrist_hasher::hash_t root_hash = hasher.generate_initial(b, piece::gold, MAX_STEPS);
-  vertex root;
-  root.steps_remaining = MAX_STEPS;
-  root.type = vertex::type_or;
-
-  search_stack stack(hasher, root_hash, &root, piece::gold, b);
-  EXPECT_EQ(root_hash, stack.hashes_top());
-
-  vertex dummy1;
-  dummy1.steps_remaining = root.steps_remaining - 1;
-  dummy1.type = vertex::type_or;
-
-  stack.push(&dummy1);
-  EXPECT_NE(root_hash, stack.hashes_top());
-
-  zobrist_hasher::hash_t const dummy1_hash = stack.hashes_top();
-
-  vertex dummy2;
-  dummy2.steps_remaining = dummy1.steps_remaining - 1;
-  dummy2.type = vertex::type_or;
-  stack.push(&dummy2);
-  EXPECT_NE(dummy1_hash, stack.hashes_top());
-  EXPECT_NE(root_hash, stack.hashes_top());
-
-  zobrist_hasher::hash_t const dummy2_hash = stack.hashes_top();
-
-  vertex dummy3;
-  dummy3.steps_remaining = dummy2.steps_remaining - 1;
-  dummy3.type = vertex::type_or;
-  stack.push(&dummy3);
-  EXPECT_NE(dummy2_hash, stack.hashes_top());
-  EXPECT_NE(dummy1_hash, stack.hashes_top());
-  EXPECT_NE(root_hash, stack.hashes_top());
-
-  zobrist_hasher::hash_t const dummy3_hash = stack.hashes_top();
-
-  vertex dummy4;
-  dummy4.steps_remaining = MAX_STEPS;
-  dummy4.type = vertex::type_and;
-  stack.push(&dummy4);
-
-  EXPECT_EQ(hasher.opponent_hash(root_hash), stack.history_top());
-  EXPECT_NE(dummy3_hash, stack.hashes_top());
-  EXPECT_NE(dummy2_hash, stack.hashes_top());
-  EXPECT_NE(dummy1_hash, stack.hashes_top());
-  EXPECT_NE(root_hash, stack.history_top());
-}
-
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
