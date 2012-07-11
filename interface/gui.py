@@ -350,10 +350,13 @@ class ResultsDisplay(Observable):
     self._position = BoardDisplay(self._content, imageManager)
     self._boardCtrl = BoardController(None, self._position, None)
 
+    self._zobristLbl = ttk.Label(self._content, text='Zobrist hash: ')
+
     self._tree.grid(row=0, column=0, sticky='NSEW')
     verticalScrollBar.grid(row=0, column=1, sticky='NS', padx=(3, 7))
     horizontalScrollBar.grid(row=1, column=0, sticky='WE', pady=(3, 7))
     self._position.widget.grid(row=0, column=2, sticky='N')
+    self._zobristLbl.grid(row=1, column=2, sticky='W')
 
     self._content.rowconfigure(0, weight=1)
     self._content.columnconfigure(0, weight=1)
@@ -443,6 +446,12 @@ class ResultsDisplay(Observable):
     '''Return the handle of the parent node.'''
 
     return self._tree.parent(node)
+  
+
+  def setZobrist(self, h):
+    '''Update the displayed Zobrist hash value'''
+
+    self._zobristLbl['text'] = 'Zobrist hash: {0}'.format(h)
 
 
   def _select(self, e):
@@ -616,8 +625,9 @@ class ResultsController(object):
     if command == ResultsDisplay.Command.show:
       # Display the board corresponding to the newly-selected vertex.
 
-      board = self._getDisplayedBoard(handle)
+      board, hash_ = self._getDisplayedBoard(handle)
       self._resultsDsply.showBoard(board)
+      self._resultsDsply.setZobrist(hash_)
 
     elif command == ResultsDisplay.Command.expand:
       self._expandVertex(handle)
@@ -639,6 +649,7 @@ class ResultsController(object):
         None, controller.root, self._resultsDsply, True, True
       )
       self._initialState = controller.initialState.copy()
+      self._attacker = controller.attacker
       self._tree.expand(self._resultsDsply)
       self._updateBest(self._tree)
       self._resultsDsply.selectNode(self._tree.handle)
@@ -673,7 +684,10 @@ class ResultsController(object):
 
 
   def _getDisplayedBoard(self, vertex):
-    '''Get the board object corresponding to the selected tree position.'''
+    '''Get the board object corresponding to the selected tree position and
+    its respective Zobrist value.'''
+
+    v = ResultsController._DisplayNode.getNode(vertex).vertex
 
     # First, go up the tree, saving all vertices on the path in a stack.
     stack = []
@@ -689,7 +703,10 @@ class ResultsController(object):
       if step is not None:
         apnsmod.apply(step, result)
 
-    return result
+    hasher = apnsmod.ZobristHasher()
+    h = hasher.generateInitial(result, apnsmod.vertexPlayer(v, self._attacker), 
+                               v.stepsRemaining)
+    return (result, h)
 
 
   def _addToDisplay(self, parent, parentHandle, child, bold):

@@ -145,6 +145,11 @@ void export_search_algos() {
       "Returns the best of all vertex's successors, or None if the given "
       "vertex is a leaf.");
 
+  def("vertexPlayer",
+      &apns::vertex_player,
+      "vertexPlayer(Vertex, attacker) -> Color\n\n"
+      "Get the player on turn in given vertex.");
+
   class_<killer_ply_iterator>("KillerPlyIterator", no_init)
     .def("__iter__", &killer_ply_iterator::iter)
     .def("__next__", &killer_ply_iterator::next)
