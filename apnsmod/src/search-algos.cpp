@@ -620,6 +620,8 @@ bool tt_lookup(transposition_table& tt, zobrist_hasher::hash_t hash, vertex& chi
   boost::optional<transposition_table::entry_t> values = tt.query(hash);
 
   if (values) {
+    assert(values->proof_number > 0 && values->disproof_number > 0);
+
     child.proof_number = values->proof_number;
     child.disproof_number = values->disproof_number;
 
@@ -630,6 +632,7 @@ bool tt_lookup(transposition_table& tt, zobrist_hasher::hash_t hash, vertex& chi
 }
 
 void tt_store(transposition_table& tt, vertex const& v, zobrist_hasher::hash_t hash) {
+  assert(v.proof_number > 0 && v.disproof_number > 0);
   tt.insert(hash, v.subtree_size, transposition_entry(v.proof_number, v.disproof_number));
 }
 

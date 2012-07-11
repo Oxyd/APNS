@@ -802,7 +802,7 @@ protected:
               << "stored in proof table with hash " << hash
               << " and PN = " << current.proof_number
               << '\n';
-      } else
+      } else if (!proved)
         store_in_tt(hash, current);
     }
   }
