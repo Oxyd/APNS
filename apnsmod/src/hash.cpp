@@ -18,9 +18,12 @@ apns::zobrist_hasher::zobrist_hasher() {
   boost::random::mt19937 prng(SEED);
   boost::random::uniform_int_distribution<hash_t> rand_distrib;
 
-  std::generate(pieces_.begin(), pieces_.end(), boost::bind(rand_distrib, prng));
-  std::generate(players_.begin(), players_.end(), boost::bind(rand_distrib, prng));
-  std::generate(steps_rem_.begin(), steps_rem_.end(), boost::bind(rand_distrib, prng));
+  for (pieces_cont::iterator p = pieces_.begin(); p != pieces_.end(); ++p)
+    *p = rand_distrib(prng);
+  for (players_cont::iterator p = players_.begin(); p != players_.end(); ++p)
+    *p = rand_distrib(prng);
+
+  admits_double_ = rand_distrib(prng);
 }
 
 apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(
@@ -35,7 +38,7 @@ apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(
     hash ^= piece_code(piece, position);
   }
 
-  hash ^= players_[on_move];
+  hash ^= players_[index_from_color(on_move)];
   hash ^= steps_code(steps_remaining);
 
   return hash;
