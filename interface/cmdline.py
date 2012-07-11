@@ -119,6 +119,9 @@ def main():
                       nargs='?', const='',
                       help='Save execution log into given file. Specify -l ' +
                            'alone to print the log to standard output')
+  parser.add_argument('-w', '--answer', dest='answer', const=True, default=False,
+                      action='store_const',
+                      help='If the root is proved, print the suggested move.')
   args = parser.parse_args()
 
   if args.searchFile is None and args.position is None:
@@ -191,9 +194,9 @@ def main():
   
   def stateCallback(ctrl, state):
     if state == Controller.State.ALLOCATING:
-      print 'Allocating transposition and proof tables...'
+      show('Allocating transposition and proof tables...')
     elif state == Controller.State.SEARCHING:
-      print '... Done. Commencing search.'
+      show('... Done. Commencing search.')
 
       global start
       start = time.time()
@@ -315,6 +318,19 @@ def main():
 
   if not args.quiet or args.noProgress:
     print 'Search took {0:.2f} seconds'.format(end - start)
+
+  if args.answer and controller.root.proofNumber == 0:
+    print 'Best move:',
+
+    v = controller.root
+    while v is not None:
+      if v.step:
+        print v.step.toString(),
+
+      if v.type_ == apnsmod.Vertex.Type.or_:
+        v = apnsmod.bestSuccessor(v)
+      else:
+        v = None
 
   if args.destination is not None:
     show('Saving result to {0}'.format(args.destination))

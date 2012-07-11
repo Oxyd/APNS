@@ -796,7 +796,7 @@ protected:
       if (cutoff && parent)
         store_in_killer_db(level, current);
 
-      if (proved) {
+      if (proved && parent && parent->type != current.type) {
         store_in_pt(history_begin, history_end, hash, current);
         *log_ << stack_ << ' '
               << "stored in proof table with hash " << hash
@@ -853,23 +853,27 @@ protected:
           *log_ << stack_ << ' '
                 << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
                 << " by repetition\n";
+        } 
+        else {
+          bool const found_in_pt = 
+            child->type != current.type && proof_tbl_ && 
+            pt_lookup(*proof_tbl_, stack_, game_->attacker);
+
+          if (!found_in_pt) {
+            bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), *child);
+
+            if (!found_in_tt)
+              evaluate(stack_, game_->attacker, *log_);
+          } else {
+            // found_in_pt
+            *log_ << stack_ << ' '
+                  << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
+                  << " by proof table (hash = " << stack_.hashes_top() << ")\n";
+          }
+
+          if (cutoff(current, *child))
+            store_in_killer_db(virtual_parent_level(stack_), *child);
         }
-
-        bool const found_in_pt = proof_tbl_ && pt_lookup(*proof_tbl_, stack_, game_->attacker);
-        if (!found_in_pt) {
-          bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), *child);
-
-          if (!found_in_tt)
-            evaluate(stack_, game_->attacker, *log_);
-        } else {
-          // found_in_pt
-          *log_ << stack_
-                << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
-                << " by proof table (hash = " << stack_.hashes_top() << ")\n";
-        }
-
-        if (cutoff(current, *child))
-          store_in_killer_db(virtual_parent_level(stack_), *child);
       }
     }
   }
