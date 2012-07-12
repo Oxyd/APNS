@@ -123,7 +123,6 @@ private:
   pieces_cont    pieces_;
   players_cont   players_;
   steps_cont     steps_;
-  hash_t         double_;
 
   hash_t piece_code(piece piece, position pos) const {
     return pieces_[index_from_type(piece.type()) * POSITIONS * COLORS +
@@ -133,11 +132,7 @@ private:
 
   hash_t steps_code(int steps_remaining) const {
     assert(steps_remaining >= 1 && steps_remaining <= 4);
-    //return steps_[steps_remaining - 1];
-    if (steps_remaining >= 2)
-      return double_;
-    else
-      return 0;
+    return steps_[steps_remaining - 1];
   }
 };
 

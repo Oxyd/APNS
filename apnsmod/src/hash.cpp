@@ -42,8 +42,6 @@ zobrist_hasher::zobrist_hasher() {
   rand_fill(pieces_.begin(), pieces_.end(), rand_distrib, prng, used_values);
   rand_fill(players_.begin(), players_.end(), rand_distrib, prng, used_values);
   rand_fill(steps_.begin(), steps_.end(), rand_distrib, prng, used_values);
-
-  rand_fill(&double_, &double_ + 1, rand_distrib, prng, used_values);
 }
 
 zobrist_hasher::hash_t zobrist_hasher::generate_initial(
