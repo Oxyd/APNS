@@ -118,10 +118,12 @@ private:
 
   typedef boost::array<hash_t, TYPES * COLORS * POSITIONS> pieces_cont;
   typedef boost::array<hash_t, piece::color_count>         players_cont;
+  typedef boost::array<hash_t, MAX_STEPS>                  steps_cont;
 
   pieces_cont    pieces_;
   players_cont   players_;
-  hash_t         admits_double_;
+  steps_cont     steps_;
+  hash_t         double_;
 
   hash_t piece_code(piece piece, position pos) const {
     return pieces_[index_from_type(piece.type()) * POSITIONS * COLORS +
@@ -131,8 +133,9 @@ private:
 
   hash_t steps_code(int steps_remaining) const {
     assert(steps_remaining >= 1 && steps_remaining <= 4);
+    //return steps_[steps_remaining - 1];
     if (steps_remaining >= 2)
-      return admits_double_;
+      return double_;
     else
       return 0;
   }

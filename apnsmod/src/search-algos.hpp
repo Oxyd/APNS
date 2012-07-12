@@ -48,28 +48,18 @@ struct vertex_comparator {
     if (best_first) {
       number_ = parent.type == vertex::type_or ?
         &vertex::proof_number : &vertex::disproof_number;
-      parent_type_ = parent.type;
     } else {
       number_ = parent.type == vertex::type_and ?
         &vertex::proof_number : &vertex::disproof_number;
-      parent_type_ = opposite_type(parent.type);
     }
   }
 
   bool operator () (vertex const& lhs, vertex const& rhs) {
-    // Performance note: It currently appears to be faster with this sort of
-    // lexicographial sorting that puts same-type children before other-type
-    // ones.
-    
-    return lhs.*number_ < rhs.*number_ || 
-            (lhs.*number_ == rhs.*number_ &&
-             lhs.type == parent_type_ &&
-             rhs.type != parent_type_);
+    return lhs.*number_ < rhs.*number_;
   }
 
 private:
   vertex::number_t vertex::*  number_;
-  vertex::e_type              parent_type_;
 };
 
 //! Compare pointers to children of a vertex according to the apropriate 

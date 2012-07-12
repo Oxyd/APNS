@@ -6,27 +6,47 @@
 #include <boost/random/uniform_int_distribution.hpp>
 #include <boost/bind.hpp>
 
+#include <vector>
+
+namespace apns {
+
 namespace {
 
 typedef boost::multi_array_types::index_range range;
 
+template <typename Iter, typename Distrib, typename Prng>
+void rand_fill(Iter begin, Iter end, Distrib distr, Prng& prng,
+               std::vector<typename std::iterator_traits<Iter>::value_type>& used) {
+  typedef typename std::iterator_traits<Iter>::value_type value_type;
+
+  while (begin != end) {
+    value_type v;
+    do
+      v = distr(prng);
+    while (std::find(used.begin(), used.end(), v) != used.end());
+
+    *begin++ = v;
+  }
+}
+
 } // anonymous namespace
 
-apns::zobrist_hasher::zobrist_hasher() {
+zobrist_hasher::zobrist_hasher() {
   boost::random::mt19937::result_type const SEED = 36992299;
 
   boost::random::mt19937 prng(SEED);
   boost::random::uniform_int_distribution<hash_t> rand_distrib;
 
-  for (pieces_cont::iterator p = pieces_.begin(); p != pieces_.end(); ++p)
-    *p = rand_distrib(prng);
-  for (players_cont::iterator p = players_.begin(); p != players_.end(); ++p)
-    *p = rand_distrib(prng);
+  std::vector<hash_t> used_values;
 
-  admits_double_ = rand_distrib(prng);
+  rand_fill(pieces_.begin(), pieces_.end(), rand_distrib, prng, used_values);
+  rand_fill(players_.begin(), players_.end(), rand_distrib, prng, used_values);
+  rand_fill(steps_.begin(), steps_.end(), rand_distrib, prng, used_values);
+
+  rand_fill(&double_, &double_ + 1, rand_distrib, prng, used_values);
 }
 
-apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(
+zobrist_hasher::hash_t zobrist_hasher::generate_initial(
   board const& board, piece::color_t on_move, int steps_remaining
 ) const {
   hash_t hash = 0;
@@ -42,5 +62,7 @@ apns::zobrist_hasher::hash_t apns::zobrist_hasher::generate_initial(
   hash ^= steps_code(steps_remaining);
 
   return hash;
+}
+
 }
 
