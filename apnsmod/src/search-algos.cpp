@@ -221,21 +221,25 @@ void update_numbers(vertex& v) {
 
   vertex::number_t  min = vertex::infty;
   sum_num_t         sum = 0;
+  bool              sum_infty = false;
 
-  for (vertex::iterator child = v.begin();
-       child != v.end(); ++child) {
+  for (vertex::iterator child = v.begin(); child != v.end(); ++child) {
     if (child->*minimise_num < min)
       min = child->*minimise_num;
 
-    sum += child->*sum_num;
-    if (sum > vertex::infty)
-      sum = vertex::infty;
+    if (child->*sum_num < vertex::infty) {
+      sum += child->*sum_num;
+      if (sum >= vertex::infty)
+        sum = vertex::infty - 1;
+
+    } else
+      sum_infty = true;
 
     assert(sum <= vertex::infty);
   }
 
   v.*minimise_num = min;
-  v.*sum_num      = sum;
+  v.*sum_num      = sum_infty ? vertex::infty : sum;
 
   if (v.proof_number == 0)
     v.disproof_number = vertex::infty;
