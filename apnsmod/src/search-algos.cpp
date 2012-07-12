@@ -549,22 +549,7 @@ void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
 
   piece::color_t const player = vertex_player(*parent, attacker);
 
-  boost::optional<piece::color_t> winner;
-
-  // Only check for win if a rabbit was moved or captured in this move.
-
-  search_stack::path_sequence::const_reverse_iterator iter =
-    stack.path().rbegin();
-
-  do {  // Iterate over the move.
-    vertex* const current = *iter;
-    if (current->step && current->step->moves_rabbit()) {
-      winner = apns::winner(stack.state(), player);
-      break;
-    }
-
-    ++iter;
-  } while (iter != stack.path().rend() && (**iter).type == parent->type);
+  boost::optional<piece::color_t> const winner = apns::winner(stack.state(), player);
 
   if (winner) {
     // If this isn't the start of a move, only consider wins, not losses.
@@ -581,7 +566,37 @@ void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
       log << stack
           << ' ' << (stack.path_top()->proof_number == 0 ? "proved" : "disproved")
           << " by evaluation function\n";
+
+      return;
     }
+  }
+
+  return;
+
+  // No proof. Use the minimal distance of a rabbit to goal as a heuristic.
+
+  position::row_t max_gold   = position::MIN_ROW;
+  position::row_t min_silver = position::MAX_ROW;
+
+  board const& board = stack.state();
+  board::mask const rabbits        = board.types()[index_from_type(piece::rabbit)];
+  board::mask const gold_rabbits   = rabbits & board.player(piece::gold);
+  board::mask const silver_rabbits = rabbits & board.player(piece::silver);
+
+  board::mask row = board::mask::row(position::MIN_ROW);
+  for (position::row_t row_num = position::MIN_ROW; row_num <= position::MAX_ROW; ++row_num) {
+    if (gold_rabbits & row) max_gold = row_num;
+    if (row_num < min_silver && silver_rabbits & row) min_silver = row_num;
+
+    row = row.shift(north);
+  }
+
+  if (attacker == piece::gold) {
+    child.proof_number    = position::MAX_ROW - max_gold;
+    child.disproof_number = min_silver - position::MIN_ROW;
+  } else {
+    child.proof_number    = min_silver - position::MIN_ROW;
+    child.disproof_number = position::MAX_ROW - max_gold;
   }
 }
 

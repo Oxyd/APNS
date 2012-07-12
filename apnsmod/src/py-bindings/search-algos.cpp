@@ -1,4 +1,5 @@
 #include "search-algos.hpp"
+#include "py-utils.hpp"
 
 #include <boost/python.hpp>
 
@@ -138,6 +139,9 @@ killer_ply_iterator killer_db_killers(apns::killer_db const& db,
 void export_search_algos() {
   using namespace boost::python;
 
+  to_python_converter<boost::optional<apns::piece::color_t>,
+                      optional_to_T<apns::piece::color_t> >();
+
   def("bestSuccessor",
       static_cast<apns::vertex* (*)(apns::vertex&)>(&apns::best_successor),
       return_internal_reference<>(),
@@ -149,6 +153,11 @@ void export_search_algos() {
       &apns::vertex_player,
       "vertexPlayer(Vertex, attacker) -> Color\n\n"
       "Get the player on turn in given vertex.");
+
+  def("winner", &apns::winner,
+      "winner(Board, player) -> Color\n\n"
+      "Determine whether a player is a winner in the given position, assuming "
+      "that the given player has just made a move and their opponent is on turn.");
 
   class_<killer_ply_iterator>("KillerPlyIterator", no_init)
     .def("__iter__", &killer_ply_iterator::iter)

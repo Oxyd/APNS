@@ -45,21 +45,26 @@ struct vertex_comparator {
   //! \param best_first When true, children are sorted in best-first manner;
   //!   when false, they are sorted in worst-first manner instead.
   explicit vertex_comparator(vertex const& parent, bool best_first = true) { 
-    if (best_first) {
-      number_ = parent.type == vertex::type_or ?
-        &vertex::proof_number : &vertex::disproof_number;
+    if (parent.type == vertex::type_or) {
+      number_ = &vertex::proof_number;
     } else {
-      number_ = parent.type == vertex::type_and ?
-        &vertex::proof_number : &vertex::disproof_number;
+      number_ = &vertex::disproof_number;
     }
+
+    better_      = best_first;
   }
 
   bool operator () (vertex const& lhs, vertex const& rhs) {
-    return lhs.*number_ < rhs.*number_;
+    bool const result = lhs.*number_ < rhs.*number_;
+    if (better_)
+      return result;
+    else
+      return !result;
   }
 
 private:
-  vertex::number_t vertex::*  number_;
+  vertex::number_t vertex::* number_;
+  bool                       better_;
 };
 
 //! Compare pointers to children of a vertex according to the apropriate 
@@ -830,40 +835,39 @@ protected:
     assert(current.proof_number > 0 && current.disproof_number > 0);
 
     for (vertex::iterator child = current.begin(); child != current.end(); ++child) {
-      if (!is_lambda(*child) || child->type != current.type) {
-        piece::color_t const attacker = game_->attacker;
-        piece::color_t const player = vertex_player(current, attacker);
-        search_stack_checkpoint checkpoint(stack_);
-        stack_.push(&*child);
+      piece::color_t const attacker = game_->attacker;
+      piece::color_t const player = vertex_player(current, attacker);
+      search_stack_checkpoint checkpoint(stack_);
+      stack_.push(&*child);
 
-        if (child->type != current.type && repetition(stack_)) {
-          child->proof_number = player == attacker ? vertex::infty : 0;
-          child->disproof_number = player == attacker ? 0 : vertex::infty;
+      if (child->type != current.type && repetition(stack_)) {
+        child->proof_number = player == attacker ? vertex::infty : 0;
+        child->disproof_number = player == attacker ? 0 : vertex::infty;
 
+        *log_ << stack_ << ' '
+              << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
+              << " by repetition\n";
+      } 
+      else {
+        bool const found_in_pt = 
+          child->type != current.type && proof_tbl_ && 
+          pt_lookup(*proof_tbl_, stack_, game_->attacker);
+
+        if (!found_in_pt) {
+          bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), 
+                                                           *child);
+
+          if (!found_in_tt)
+            evaluate(stack_, game_->attacker, *log_);
+        } else {
+          // found_in_pt
           *log_ << stack_ << ' '
                 << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
-                << " by repetition\n";
-        } 
-        else {
-          bool const found_in_pt = 
-            child->type != current.type && proof_tbl_ && 
-            pt_lookup(*proof_tbl_, stack_, game_->attacker);
-
-          if (!found_in_pt) {
-            bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), *child);
-
-            if (!found_in_tt)
-              evaluate(stack_, game_->attacker, *log_);
-          } else {
-            // found_in_pt
-            *log_ << stack_ << ' '
-                  << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
-                  << " by proof table (hash = " << stack_.hashes_top() << ")\n";
-          }
-
-          if (cutoff(current, *child))
-            store_in_killer_db(virtual_parent_level(stack_), *child);
+                << " by proof table (hash = " << stack_.hashes_top() << ")\n";
         }
+
+        if (cutoff(current, *child))
+          store_in_killer_db(virtual_parent_level(stack_), *child);
       }
     }
   }

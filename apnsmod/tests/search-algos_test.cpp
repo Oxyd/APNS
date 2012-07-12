@@ -107,7 +107,7 @@ TEST(algorithm, update_numbers_test) {
   EXPECT_EQ(2, v.disproof_number);
 }
 
-TEST(winner_test, attacker_goal) {
+TEST(winner_test, gold_goal) {
   board b;
   b.put(position(8, 'd'), piece(piece::gold, piece::rabbit));
   b.put(position(4, 'h'), piece(piece::silver, piece::rabbit));
@@ -115,14 +115,22 @@ TEST(winner_test, attacker_goal) {
   boost::optional<piece::color_t> w = winner(b, piece::gold);
   ASSERT_TRUE(w);
   EXPECT_EQ(*w, piece::gold);
+
+  w = winner(b, piece::silver);
+  ASSERT_TRUE(w);
+  EXPECT_EQ(*w, piece::gold);
 }
 
-TEST(winner_test, defender_goal) {
+TEST(winner_test, silver_goal) {
   board b;
   b.put(position(4, 'd'), piece(piece::gold, piece::rabbit));
   b.put(position(1, 'h'), piece(piece::silver, piece::rabbit));
 
   boost::optional<piece::color_t> w = winner(b, piece::gold);
+  ASSERT_TRUE(w);
+  EXPECT_EQ(*w, piece::silver);
+
+  w = winner(b, piece::silver);
   ASSERT_TRUE(w);
   EXPECT_EQ(*w, piece::silver);
 }
@@ -134,6 +142,10 @@ TEST(winner_test, attacker_out_of_rabbits) {
   boost::optional<piece::color_t> w = winner(b, piece::gold);
   ASSERT_TRUE(w);
   EXPECT_EQ(*w, piece::silver);
+
+  w = winner(b, piece::silver);
+  ASSERT_TRUE(w);
+  EXPECT_EQ(*w, piece::silver);
 }
 
 TEST(winner_test, defender_out_of_rabbits) {
@@ -143,6 +155,63 @@ TEST(winner_test, defender_out_of_rabbits) {
   boost::optional<piece::color_t> w = winner(b, piece::gold);
   ASSERT_TRUE(w);
   EXPECT_EQ(*w, piece::gold);
+
+  w = winner(b, piece::silver);
+  ASSERT_TRUE(w);
+  EXPECT_EQ(*w, piece::gold);
+}
+
+TEST(winner_test, no_goal) {
+  board b;
+  b.put(position(7, 'c'), piece(piece::gold, piece::rabbit));
+  b.put(position(4, 'd'), piece(piece::silver, piece::rabbit));
+
+  EXPECT_FALSE(winner(b, piece::gold));
+  EXPECT_FALSE(winner(b, piece::silver));
+}
+
+TEST(winner_test, correct_goal_row_gold) {
+  board b;
+  b.put(position(3, 'd'), piece(piece::silver, piece::rabbit));
+  b.put(position(1, 'c'), piece(piece::gold, piece::rabbit));
+
+  EXPECT_FALSE(winner(b, piece::gold));
+  EXPECT_FALSE(winner(b, piece::silver));
+}
+
+TEST(winner_test, correct_goal_row_silver) {
+  board b;
+  b.put(position(8, 'h'), piece(piece::silver, piece::rabbit));
+  b.put(position(2, 'b'), piece(piece::gold, piece::rabbit));
+
+  EXPECT_FALSE(winner(b, piece::silver));
+  EXPECT_FALSE(winner(b, piece::gold));
+}
+
+TEST(winner_test, goal_precedence) {
+  board b;
+  b.put(position(8, 'c'), piece(piece::gold, piece::rabbit));
+  b.put(position(1, 'd'), piece(piece::silver, piece::rabbit));
+
+  boost::optional<piece::color_t> w = winner(b, piece::gold);
+  ASSERT_TRUE(w);
+  EXPECT_EQ(*w, piece::gold);
+
+  w = winner(b, piece::silver);
+  ASSERT_TRUE(w);
+  EXPECT_EQ(*w, piece::silver);
+}
+
+TEST(winner_test, elimination_precedence) {
+  board b;
+  
+  boost::optional<piece::color_t> w = winner(b, piece::gold);
+  ASSERT_TRUE(w);
+  EXPECT_EQ(*w, piece::gold);
+
+  w = winner(b, piece::silver);
+  ASSERT_TRUE(w);
+  EXPECT_EQ(*w, piece::silver);
 }
 
 TEST(search_stack, push_pop_test) {
