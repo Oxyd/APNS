@@ -51,8 +51,8 @@ def strFromNum(num):
     return 'inf'
 
 
-start = None  # To be set later by stateCallback
-
+start    = None  # To be set later by stateCallback
+startCpu = None  # Ditto.
 
 def main():
   is64Bit = sys.maxsize > 2**32  # Trick straight from the docs.
@@ -191,15 +191,17 @@ def main():
   def cancelCallback(ctrl):
     if interruptHandler.interrupted:
       ctrl.cancel()
-  
+
   def stateCallback(ctrl, state):
     if state == Controller.State.ALLOCATING:
       show('Allocating transposition and proof tables...')
     elif state == Controller.State.SEARCHING:
       show('... Done. Commencing search.')
 
-      global start
+      global start, startCpu
+
       start = time.time()
+      startCpu = time.clock()
 
   controller.stateCallbacks.add(stateCallback)
   controller.loadGameCallbacks.add(cancelCallback)
@@ -265,7 +267,7 @@ def main():
       )
       show('    -- Hits:   {0}'.format(progress.proofTblHits))
       show('    -- Misses: {0}'.format(progress.proofTblMisses))
-    
+
     show('  -- Total killer count: {0}'.format(progress.killerCount))
 
   controller.searchProgressCallbacks.add(printProgress)
@@ -283,7 +285,8 @@ def main():
     raise SystemExit(EXIT_ERROR)
 
   end = time.time()
-  
+  endCpu = time.clock()
+
   exitStatus = None
 
   if not args.quiet or args.noProgress:
@@ -317,7 +320,9 @@ def main():
       args.quiet = True
 
   if not args.quiet or args.noProgress:
-    print 'Search took {0:.2f} seconds'.format(end - start)
+    print 'Elapsed: Real time: {0:.2f} seconds, CPU time: {1:.2f} seconds'.format(
+      end - start, endCpu - startCpu
+    )
 
   if args.answer and controller.root.proofNumber == 0:
     print 'Best move:',
