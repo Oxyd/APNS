@@ -939,6 +939,14 @@ void depth_first_pns::do_iterate() {
     assert(best_two.first);
     assert(best_two.first->proof_number > 0 && best_two.first->disproof_number > 0);
 
+    if (best_two.second) {
+      if (current->type == vertex::type_or) {
+        assert(best_two.second->proof_number > 0);
+      } else {
+        assert(best_two.second->disproof_number > 0);
+      }
+    }
+
     limits_.push_back(make_limits(
       *best_two.first,
       *current,
@@ -954,7 +962,17 @@ void depth_first_pns::do_iterate() {
     assert(current->disproof_number <= limits_.back().dn_limit);
   }
 
-  std::size_t const increment = expand_and_eval();
+  assert(current->leaf());
+  assert(current->proof_number > 0 && current->disproof_number > 0);
+
+  vertex const* parent  = apns::parent(stack_);
+
+  bool found_in_pt =
+    proof_tbl_ && parent && current->type != parent->type &&
+    pt_lookup(*proof_tbl_, stack_, game_->attacker);
+  std::size_t increment = 0;
+  if (!found_in_pt)
+    increment = expand_and_eval();
 
   search_stack::path_sequence::const_reverse_iterator
     current_path = stack_.path().rbegin();
@@ -962,25 +980,28 @@ void depth_first_pns::do_iterate() {
     current_hash = stack_.hashes().rbegin();
   search_stack::history_sequence::const_reverse_iterator
     current_history = stack_.history().rbegin();
-  std::size_t ply = stack_.history().size();
   
   bool changed = true;
+
   while (true) {
     vertex* parent = 0;
     if (boost::next(current_path) != stack_.path().rend())
       parent = *boost::next(current_path);
 
-    changed = update_and_store(
-      *current, parent,
-      stack_.path().begin(), current_path.base(),
-      stack_.history().begin(), current_history.base(),
-      *current_hash, increment, changed
-    );
+    if (!found_in_pt) {
+      changed = update_and_store(
+        *current, parent,
+        stack_.path().begin(), current_path.base(),
+        stack_.history().begin(), current_history.base(),
+        *current_hash, increment, changed
+      );
+    } else {
+      found_in_pt = false;
+    }
 
     if (parent) {
       if (parent->type != current->type) {
         ++current_history;
-        --ply;
       }
 
       current = *++current_path;
@@ -997,30 +1018,36 @@ depth_first_pns::make_limits(
   boost::optional<vertex const&> second_best,
   limits_t parent_limits
 ) {
-  double const EPSILON = 1.0;
+  double const EPSILON = 0.5;
 
   vertex::number_t vertex::* min_num = 
-    v.type == vertex::type_or ? &vertex::proof_number
-                              : &vertex::disproof_number;
+    parent.type == vertex::type_or ? &vertex::proof_number
+                                   : &vertex::disproof_number;
   vertex::number_t limits_t::* min_lim =
-    v.type == vertex::type_or ? &limits_t::pn_limit
-                              : &limits_t::dn_limit;
+    parent.type == vertex::type_or ? &limits_t::pn_limit
+                                   : &limits_t::dn_limit;
   vertex::number_t vertex::* dif_num = 
-    v.type == vertex::type_or ? &vertex::disproof_number
-                              : &vertex::proof_number;
+    parent.type == vertex::type_or ? &vertex::disproof_number
+                                   : &vertex::proof_number;
   vertex::number_t limits_t::* dif_lim =
-    v.type == vertex::type_or ? &limits_t::dn_limit
-                              : &limits_t::pn_limit;
+    parent.type == vertex::type_or ? &limits_t::dn_limit
+                                   : &limits_t::pn_limit;
 
   limits_t new_limits;
 
   vertex::number_t second_num = 
     second_best ? (*second_best).*min_num : v.*min_num;
-  new_limits.*min_lim = std::min(
-    parent_limits.*min_lim,
-    //second_num + 1
-    static_cast<vertex::number_t>(std::ceil(second_num * (1 + EPSILON)))
-  );
+  assert(second_num > 0);
+
+  double sn = std::ceil(second_num * (1 + EPSILON));
+  if (sn < vertex::infty - 1.5)
+    new_limits.*min_lim = std::min(
+      parent_limits.*min_lim,
+      //second_num + 1
+      static_cast<vertex::number_t>(sn)
+    );
+  else
+    new_limits.*min_lim = vertex::infty - 1;
 
   if (parent_limits.*dif_lim < vertex::infty)
     new_limits.*dif_lim = 
