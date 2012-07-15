@@ -764,42 +764,54 @@ protected:
       tt_store(*trans_tbl_, v, hash);
   }
 
-  void update_and_store(
+  bool update_and_store(
     vertex& current, vertex* parent,
     search_stack::path_sequence::const_iterator path_begin,
     search_stack::path_sequence::const_iterator path_end,
     search_stack::history_sequence::const_iterator history_begin,
     search_stack::history_sequence::const_iterator history_end,
-    zobrist_hasher::hash_t hash, std::size_t size_increment
+    zobrist_hasher::hash_t hash, std::size_t size_increment,
+    bool update_numbers
   ) {
     vertex::number_t const old_pn = current.proof_number;
     vertex::number_t const old_dn = current.disproof_number;
 
-    update_numbers(current);
     current.subtree_size += size_increment;
 
-    if (!is_lambda(current)) {
+    if (update_numbers) {
+      apns::update_numbers(current);
+
       bool const numbers_changed = current.proof_number != old_pn || current.disproof_number != old_dn;
       bool const proved = current.proof_number == 0 || current.disproof_number == 0;
       bool const cutoff = parent && apns::cutoff(*parent, current);
 
-      if (proved && numbers_changed)
-        log_proof(path_begin, path_end);
+      if (numbers_changed) {
+        if (proved)
+          log_proof(path_begin, path_end);
 
-      std::size_t const level = virtual_parent_level(path_begin, path_end,
-                                                     history_begin, history_end);
-      if (cutoff && parent)
-        store_in_killer_db(level, current);
+        if (parent) {
+          std::size_t const level = virtual_parent_level(path_begin, path_end,
+                                                         history_begin, history_end);
+          if (cutoff)
+            store_in_killer_db(level, current);
 
-      if (proved && parent && parent->type != current.type) {
-        store_in_pt(history_begin, history_end, hash, current);
-        *log_ << stack_ << ' '
-              << "stored in proof table with hash " << hash
-              << " and PN = " << current.proof_number
-              << '\n';
-      } else if (!proved)
-        store_in_tt(hash, current);
-    }
+          if (proved && parent->type != current.type) {
+            store_in_pt(history_begin, history_end, hash, current);
+            *log_ << stack_ << ' '
+                  << "stored in proof table with hash " << hash
+                  << " and PN = " << current.proof_number
+                  << '\n';
+          }
+
+        } 
+        
+        if (!proved)
+          store_in_tt(hash, current);
+      }
+
+      return numbers_changed;
+    } else
+      return false;
   }
 
   std::size_t expand_and_eval() {
@@ -849,27 +861,39 @@ protected:
               << " by repetition\n";
       } 
       else {
-        bool const found_in_pt = 
-          child->type != current.type && proof_tbl_ && 
-          pt_lookup(*proof_tbl_, stack_, game_->attacker);
-
-        if (!found_in_pt) {
-          bool const found_in_tt = trans_tbl_ && tt_lookup(*trans_tbl_, stack_.hashes_top(), 
-                                                           *child);
-
-          if (!found_in_tt)
-            evaluate(stack_, game_->attacker, *log_);
-        } else {
-          // found_in_pt
-          *log_ << stack_ << ' '
-                << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
-                << " by proof table (hash = " << stack_.hashes_top() << ")\n";
-        }
+        lookup();
+        if (child->proof_number == 1 && child->disproof_number == 1)
+          evaluate(stack_, game_->attacker, *log_);
 
         if (cutoff(current, *child))
           store_in_killer_db(virtual_parent_level(stack_), *child);
       }
     }
+  }
+
+  bool lookup() {
+    vertex&       current = *stack_.path_top();
+    vertex const* parent  = apns::parent(stack_);
+
+    bool const found_in_pt = 
+      parent && current.type != parent->type && proof_tbl_ &&
+      pt_lookup(*proof_tbl_, stack_, game_->attacker);
+    if (!found_in_pt) {
+      if (trans_tbl_)
+        tt_lookup(*trans_tbl_, stack_.hashes_top(), current);
+
+      assert(current.proof_number > 0 && current.disproof_number > 0);
+    } 
+    else {
+      // found_in_pt
+      *log_ << stack_ << ' '
+            << (stack_.path_top()->proof_number == 0 ? "proved" : "disproved")
+            << " by proof table (hash = " << stack_.hashes_top() << ")\n";
+
+      return true;
+    }
+
+    return false;
   }
 
   void select_best() {

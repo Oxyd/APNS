@@ -481,7 +481,6 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
 
   steps_seq steps;
   piece::color_t const player = vertex_player(leaf, attacker);
-  bool make_lambda = leaf.steps_remaining >= 1;
 
   steps_cont const s = generate_steps(state, player);
   for (
@@ -508,7 +507,7 @@ std::size_t expand(vertex& leaf, board const& state, piece::color_t attacker,
   }
 
   if (!steps.empty()) {
-    leaf.resize(steps.size() + make_lambda);
+    leaf.resize(steps.size() + 1);  // + lambda vertex.
 
     vertex::iterator          child = leaf.begin();
     steps_seq::const_iterator step  = steps.begin();
@@ -569,34 +568,6 @@ void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
 
       return;
     }
-  }
-
-  return;
-
-  // No proof. Use the minimal distance of a rabbit to goal as a heuristic.
-
-  position::row_t max_gold   = position::MIN_ROW;
-  position::row_t min_silver = position::MAX_ROW;
-
-  board const& board = stack.state();
-  board::mask const rabbits        = board.types()[index_from_type(piece::rabbit)];
-  board::mask const gold_rabbits   = rabbits & board.player(piece::gold);
-  board::mask const silver_rabbits = rabbits & board.player(piece::silver);
-
-  board::mask row = board::mask::row(position::MIN_ROW);
-  for (position::row_t row_num = position::MIN_ROW; row_num <= position::MAX_ROW; ++row_num) {
-    if (gold_rabbits & row) max_gold = row_num;
-    if (row_num < min_silver && silver_rabbits & row) min_silver = row_num;
-
-    row = row.shift(north);
-  }
-
-  if (attacker == piece::gold) {
-    child.proof_number    = position::MAX_ROW - max_gold;
-    child.disproof_number = min_silver - position::MIN_ROW;
-  } else {
-    child.proof_number    = min_silver - position::MIN_ROW;
-    child.disproof_number = position::MAX_ROW - max_gold;
   }
 }
 
@@ -877,8 +848,21 @@ void proof_number_search::do_iterate() {
   }
 
   assert(stack_.path_top()->proof_number > 0 && stack_.path_top()->disproof_number > 0);
-  std::size_t const increment = expand_and_eval();
 
+  vertex&             current = *stack_.path_top();
+  vertex const* const parent  = apns::parent(stack_);
+
+  bool const found_in_pt =
+    proof_tbl_ && parent && current.type != parent->type &&
+    pt_lookup(*proof_tbl_, stack_, game_->attacker);
+
+  std::size_t increment = 0;
+  if (!found_in_pt)
+    increment = expand_and_eval();
+  else
+    stack_.pop();
+
+  bool changed = true;
   while (true) {
     vertex& current = *stack_.path_top();
 
@@ -886,11 +870,11 @@ void proof_number_search::do_iterate() {
     if (!stack_.at_root())
       parent = apns::parent(stack_);
 
-    update_and_store(
+    changed = update_and_store(
       current, parent,
       stack_.path().begin(), stack_.path().end(),
       stack_.history().begin(), stack_.history().end(),
-      stack_.hashes_top(), increment
+      stack_.hashes_top(), increment, changed
     );
 
     if (parent)
@@ -980,16 +964,17 @@ void depth_first_pns::do_iterate() {
     current_history = stack_.history().rbegin();
   std::size_t ply = stack_.history().size();
   
+  bool changed = true;
   while (true) {
     vertex* parent = 0;
     if (boost::next(current_path) != stack_.path().rend())
       parent = *boost::next(current_path);
 
-    update_and_store(
+    changed = update_and_store(
       *current, parent,
       stack_.path().begin(), current_path.base(),
       stack_.history().begin(), current_history.base(),
-      *current_hash, increment
+      *current_hash, increment, changed
     );
 
     if (parent) {

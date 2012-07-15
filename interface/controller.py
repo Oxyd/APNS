@@ -36,7 +36,7 @@ def loadBoard(filename):
 
   if len(lines) >= 12:
     # First line needs to indicate turn number and player.
-    match = re.match(r'\d([gs])', lines[0])
+    match = re.match(r'\d+([gs])', lines[0])
     if match is None:
       raise RuntimeError(
         'Bad input file format: Expected turn and player on first line'
