@@ -1,0 +1,12 @@
+21s
+ +-----------------+
+8|     r r r r r   |
+7| r   c R   d     |
+6| r D x E   x c   |
+5| C h d   D r     |
+4| m   H R         |
+3| R C x   e x h H |
+2|   R   R       R |
+1|                 |
+ +-----------------+
+   a b c d e f g h

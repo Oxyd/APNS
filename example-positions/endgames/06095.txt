@@ -1,0 +1,12 @@
+33s
+ +-----------------+
+8| r r r   c H r r |
+7|     d c h R M r |
+6| D h x E H x e R |
+5|       d       R |
+4|           R     |
+3| R r x     x C   |
+2|   D m           |
+1|                 |
+ +-----------------+
+   a b c d e f g h
