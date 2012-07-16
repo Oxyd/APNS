@@ -205,7 +205,7 @@ load_game(std::string const& filename, operation_controller& op_ctrl) {
 
   boost::shared_ptr<apns::game> game(new apns::game(initial_state, attacker));
   traverse(game->root, backtrack(), reader(in), op_ctrl_stop_cond(op_ctrl));
-  compute_size(game->root);
+  calculate_sizes(game->root);
 
   if (!op_ctrl.stop())
     return std::make_pair(game, game->root.subtree_size);
