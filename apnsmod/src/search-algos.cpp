@@ -1018,7 +1018,7 @@ depth_first_pns::make_limits(
   boost::optional<vertex const&> second_best,
   limits_t parent_limits
 ) {
-  double const EPSILON = 0.5;
+  double const EPSILON = 0.1;
 
   vertex::number_t vertex::* min_num = 
     parent.type == vertex::type_or ? &vertex::proof_number
