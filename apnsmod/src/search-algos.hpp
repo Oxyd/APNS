@@ -44,27 +44,24 @@ struct vertex_comparator {
   //! Make a comparator to compare children of parent.
   //! \param best_first When true, children are sorted in best-first manner;
   //!   when false, they are sorted in worst-first manner instead.
-  explicit vertex_comparator(vertex const& parent, bool best_first = true) { 
-    if (parent.type == vertex::type_or) {
-      number_ = &vertex::proof_number;
-    } else {
-      number_ = &vertex::disproof_number;
-    }
-
-    better_      = best_first;
-  }
+  explicit vertex_comparator(vertex const& parent, bool best_first = true) 
+    : parent_type_(parent.type)
+    , better_(best_first) { }
 
   bool operator () (vertex const& lhs, vertex const& rhs) {
-    bool const result = lhs.*number_ < rhs.*number_;
-    if (better_)
-      return result;
+    if (parent_type_ == vertex::type_or)
+      return lhs.proof_number < rhs.proof_number ||
+             (lhs.proof_number == rhs.proof_number && 
+              lhs.disproof_number > rhs.disproof_number);
     else
-      return !result;
+      return lhs.disproof_number < rhs.disproof_number ||
+             (lhs.disproof_number == rhs.disproof_number &&
+              lhs.proof_number > rhs.proof_number);
   }
 
 private:
-  vertex::number_t vertex::* number_;
-  bool                       better_;
+  vertex::e_type parent_type_;
+  bool           better_;
 };
 
 //! Compare pointers to children of a vertex according to the apropriate 
