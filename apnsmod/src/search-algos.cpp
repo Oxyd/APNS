@@ -8,6 +8,7 @@
 #include <boost/bind.hpp>
 #include <boost/lambda/lambda.hpp>
 #include <boost/lambda/bind.hpp>
+#include <boost/iterator/indirect_iterator.hpp>
 
 #include <cassert>
 #include <vector>
@@ -203,7 +204,10 @@ bool history_table::compare::operator () (
   return left > right;
 }
 
-void update_numbers(vertex& v) {
+namespace {
+
+template <typename Iter>
+void do_update_numbers(Iter begin, Iter end, vertex& v) {
   vertex::number_t vertex::* minimise_num;  // The number to take the min of.
   vertex::number_t vertex::* sum_num;       // The number to take the sum of.
 
@@ -223,12 +227,12 @@ void update_numbers(vertex& v) {
   sum_num_t         sum = 0;
   bool              sum_infty = false;
 
-  for (vertex::iterator child = v.begin(); child != v.end(); ++child) {
-    if (child->*minimise_num < min)
-      min = child->*minimise_num;
+  for (Iter child = begin; child != end; ++child) {
+    if ((*child).*minimise_num < min)
+      min = (*child).*minimise_num;
 
-    if (child->*sum_num < vertex::infty) {
-      sum += child->*sum_num;
+    if ((*child).*sum_num < vertex::infty) {
+      sum += (*child).*sum_num;
       if (sum >= vertex::infty)
         sum = vertex::infty - 1;
 
@@ -252,6 +256,32 @@ void update_numbers(vertex& v) {
   assert(v.disproof_number < vertex::infty || v.proof_number == 0);
   assert(v.proof_number != 0 || v.disproof_number == vertex::infty);
   assert(v.disproof_number != 0 || v.proof_number == vertex::infty);
+}
+
+}
+
+void update_numbers(vertex& v, std::size_t consider) {
+  if (consider == 0 || consider >= v.size())
+    do_update_numbers(v.begin(), v.end(), v);
+  else {
+    stable_sort_children(v, vertex_comparator(v));
+    do_update_numbers(v.begin(), v.begin() + consider, v);
+
+#if 0
+    typedef std::vector<vertex*> children_cont;
+    children_cont children;
+    children.reserve(v.size());
+    for (vertex::iterator c = v.begin(); c != v.end(); ++c)
+      children.push_back(&*c);
+
+    std::stable_sort(children.begin(), children.end(),
+                     vertex_ptr_comparator(&v));
+
+    do_update_numbers(boost::make_indirect_iterator(children.begin()),
+                      boost::make_indirect_iterator(children.begin() + consider),
+                      v);
+#endif
+  }
 }
 
 search_stack::search_stack(

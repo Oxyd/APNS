@@ -48,7 +48,7 @@ struct vertex_comparator {
     : parent_type_(parent.type)
     , better_(best_first) { }
 
-  bool operator () (vertex const& lhs, vertex const& rhs) {
+  bool operator () (vertex const& lhs, vertex const& rhs) const {
     if (parent_type_ == vertex::type_or)
       return lhs.proof_number < rhs.proof_number ||
              (lhs.proof_number == rhs.proof_number && 
@@ -290,7 +290,10 @@ private:
 };
 
 //! Update proof- and disproof-numbers of a single vertex.
-void update_numbers(vertex& v);
+//! \param v The vertex to be updated.
+//! \param consider The number of successors to consider for the calculation. 0 means all
+//!                 successors.
+void update_numbers(vertex& v, std::size_t consider = 0);
 
 //! Manages the various information that are to be kept during descent through 
 //! the tree.
@@ -593,6 +596,12 @@ bool repetition(search_stack const& stack);
 /// Who plays from vertex v?
 piece::color_t vertex_player(vertex const& v, piece::color_t attacker);
 
+enum e_dyn_widening {
+  none,
+  fixed,
+  fraction
+};
+
 //! A CRTP base class for search algorithms.
 template <typename Algo>
 class search_algo : private boost::noncopyable {
@@ -656,6 +665,12 @@ public:
   bool get_heur_eval() const { return heur_eval_; }
   void set_heur_eval(bool e) { heur_eval_ = e; }
 
+  void set_dyn_widening(e_dyn_widening kind) { dyn_widening_ = kind; }
+  e_dyn_widening get_dyn_widening() const { return dyn_widening_; }
+
+  void set_dyn_widening_param(std::size_t param) { dyn_widening_n_ = param; }
+  std::size_t get_dyn_widening_param() const { return dyn_widening_n_; }
+
   //! Make this algorithm log into a sink.
   void log_into(boost::shared_ptr<log_sink> const& new_sink) {
     log_ = new_sink;
@@ -709,6 +724,8 @@ protected:
   std::size_t                             gc_low_;        ///< Low GC threshold.
   std::size_t                             gc_high_;       ///< High GC threshold.
   bool                                    heur_eval_;     ///< Use heuristic evaluation of new vertices?
+  e_dyn_widening                          dyn_widening_;
+  std::size_t                             dyn_widening_n_;
   boost::shared_ptr<log_sink>             log_;           ///< Logger to be used.
 
   search_algo(boost::shared_ptr<apns::game> const& game)
@@ -719,6 +736,8 @@ protected:
     , stack_(hasher_, initial_hash_, &game_->root, game_->attacker, game_->initial_state)
     , gc_low_(0)
     , gc_high_(0)
+    , heur_eval_(false)
+    , dyn_widening_(none)
     , log_(new null_sink) {
 #ifndef NDEBUG
     vertex_counter counter;
@@ -780,7 +799,19 @@ protected:
     current.subtree_size += size_increment;
 
     if (update_numbers) {
-      apns::update_numbers(current);
+      switch (dyn_widening_) {
+      case none: {
+        apns::update_numbers(current);
+      } break;
+      case fixed: {
+        apns::update_numbers(current, dyn_widening_n_);
+      } break;
+      case fraction: {
+        std::size_t k = current.size() / dyn_widening_n_;
+        if (k == 0) k = 1;
+        apns::update_numbers(current, k);
+      } break;
+      }
 
       bool const numbers_changed = current.proof_number != old_pn || current.disproof_number != old_dn;
       bool const proved = current.proof_number == 0 || current.disproof_number == 0;

@@ -158,6 +158,8 @@ class SearchParameters:
     self.gcHigh         = 5000000
     self.gcLow          = 3000000
     self.heurEval       = False
+    self.dynWidening    = apnsmod.DynWidening.none
+    self.dynWideningPar = 0
     self.logFilename    = None
 
 
@@ -193,8 +195,8 @@ class Controller(object):
       self.callbacks.call(self.ctrl)
       if self.ctrl._cancel:
         self.requestStop()
-  
-  
+
+
   class State:
     INACTIVE, SEARCHING, ALLOCATING = range(3)
 
@@ -209,7 +211,7 @@ class Controller(object):
     self.stateCallbacks = _Callbacks()
     self.loadGameCallbacks = _Callbacks()
     self.saveGameCallbacks = _Callbacks()
-    
+
     self._state = Controller.State.INACTIVE
 
   state = property(lambda self: self._state)
@@ -293,12 +295,12 @@ class Controller(object):
     def numElementsFromMbSize(mbSize, tableType):
       bSize = mbSize * MB
       return bSize / (tableType.sizeOfElement)
-    
+
     if self.searchParameters.transTblSize is not None:
       ttElems = numElementsFromMbSize(self.searchParameters.transTblSize, apnsmod.TranspositionTable)
     else:
       ttElems = 0
-    
+
     if self.searchParameters.proofTblSize is not None:
       ptElems = numElementsFromMbSize(self.searchParameters.proofTblSize, apnsmod.ProofTable)
     else:
@@ -310,7 +312,7 @@ class Controller(object):
         self._transTbl = apnsmod.TranspositionTable(ttElems)
       except OverflowError:
         raise ValueError('Transposition table size is too large')
-      
+
     elif ttElems == 0:
       self._transTbl = None
 
@@ -322,16 +324,18 @@ class Controller(object):
         raise ValueError('Proof table size is too large')
     elif ptElems == 0:
       self._proofTbl = None
-    
-    kCount = int(self.searchParameters.killerCount)    
+
+    kCount = int(self.searchParameters.killerCount)
     if kCount > 0 and (self._killerDb is None or self._killerDb.plysSize != kCount):
       self._killerDb = apnsmod.KillerDB(kCount)
     elif kCount == 0:
       self._killerDb = None
-      
+
     self._search.gcLow = int(self.searchParameters.gcLow)
     self._search.gcHigh = int(self.searchParameters.gcHigh)
     self._search.heurEval = self.searchParameters.heurEval
+    self._search.dynWidening = self.searchParameters.dynWidening
+    self._search.dynWideningParam = self.searchParameters.dynWideningPar
     self._search.transpositionTable = self._transTbl
     self._search.proofTable = self._proofTbl
     self._search.killerDB = self._killerDb
@@ -355,11 +359,11 @@ class Controller(object):
       while not self._search.finished and not self._limitsExceeded() and not self._cancel:
         self._search.run(burst)
         self._updateProgress()
-        
+
     except MemoryError:
       self.dropGame()
       raise
-    
+
     finally:
       self._switchState(Controller.State.INACTIVE)
       self._search.logSink.flush()
