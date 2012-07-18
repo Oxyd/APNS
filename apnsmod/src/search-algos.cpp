@@ -841,7 +841,6 @@ void proof_number_search::do_iterate() {
   assert(game_);
   assert(!game_->root.step);
   assert(log_);
-  assert(stack_.at_root());
 
   while (!stack_.path_top()->leaf()) {
     select_best();
@@ -862,24 +861,35 @@ void proof_number_search::do_iterate() {
   else
     stack_.pop();
 
+  search_stack::path_sequence::const_reverse_iterator    path_current    = stack_.path().rbegin();
+  search_stack::hashes_sequence::const_reverse_iterator  hash_current    = stack_.hashes().rbegin();
+  search_stack::history_sequence::const_reverse_iterator history_current = stack_.history().rbegin();
+
   bool changed = true;
   while (true) {
-    vertex& current = *stack_.path_top();
+    vertex& current = **path_current;
 
     vertex* parent = 0;
-    if (!stack_.at_root())
-      parent = apns::parent(stack_);
+    if (boost::next(path_current) != stack_.path().rend())
+      parent = *(boost::next(path_current));
 
     changed = update_and_store(
       current, parent,
-      stack_.path().begin(), stack_.path().end(),
-      stack_.history().begin(), stack_.history().end(),
-      stack_.hashes_top(), increment, changed
+      stack_.path().begin(), path_current.base(),
+      stack_.history().begin(), history_current.base(),
+      *hash_current, increment, changed
     );
 
-    if (parent)
-      stack_.pop();
-    else
+    if (parent) {
+      ++path_current;
+      ++hash_current;
+
+      if (current.type != parent->type)
+        ++history_current;
+
+      if (changed)
+        stack_.pop();
+    } else
       break;
   }
 }
