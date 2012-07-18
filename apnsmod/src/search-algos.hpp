@@ -656,6 +656,9 @@ public:
     gc_high_ = new_high;
   }
 
+  bool get_heur_eval() const { return heur_eval_; }
+  void set_heur_eval(bool e) { heur_eval_ = e; }
+
   //! Make this algorithm log into a sink.
   void log_into(boost::shared_ptr<log_sink> const& new_sink) {
     log_ = new_sink;
@@ -708,6 +711,7 @@ protected:
   boost::shared_ptr<killer_db>            killer_db_;
   std::size_t                             gc_low_;        ///< Low GC threshold.
   std::size_t                             gc_high_;       ///< High GC threshold.
+  bool                                    heur_eval_;     ///< Use heuristic evaluation of new vertices?
   boost::shared_ptr<log_sink>             log_;           ///< Logger to be used.
 
   search_algo(boost::shared_ptr<apns::game> const& game)
@@ -864,10 +868,41 @@ protected:
         lookup();
         if (child->proof_number == 1 && child->disproof_number == 1)
           evaluate(stack_, game_->attacker, *log_);
+        if (heur_eval_ && child->proof_number == 1 && child->disproof_number == 1)
+          heuristic_eval(*child, stack_.state());
 
         if (cutoff(current, *child))
           store_in_killer_db(virtual_parent_level(stack_), *child);
       }
+    }
+  }
+
+  void heuristic_eval(vertex& v, board const& state) {
+    position::row_t gold_max_rabbit   = position::MIN_ROW;
+    position::row_t silver_min_rabbit = position::MAX_ROW;
+    position::row_t current           = position::MIN_ROW;
+    board::mask     gold_rabbits      = state.types()[index_from_type(piece::rabbit)] &
+                                        state.player(piece::gold);
+    board::mask     silver_rabbits    = state.types()[index_from_type(piece::rabbit)] &
+                                        state.player(piece::silver);
+
+    board::mask row = board::mask::row(current);
+    while (row) {
+      if (row & gold_rabbits)
+        gold_max_rabbit = current;
+      if (current < silver_min_rabbit && row & silver_rabbits)
+        silver_min_rabbit = current;
+
+      ++current;
+      row = row.shift(north);
+    }
+
+    if (game_->attacker == piece::gold) {
+      v.proof_number    = position::MAX_ROW - gold_max_rabbit;
+      v.disproof_number = silver_min_rabbit - position::MIN_ROW;
+    } else {
+      v.proof_number    = silver_min_rabbit - position::MIN_ROW;
+      v.disproof_number = position::MAX_ROW - gold_max_rabbit;
     }
   }
 

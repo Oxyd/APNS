@@ -108,6 +108,9 @@ def main():
   parser.add_argument('-G', '--gc-high', type=int, default=5000000,
                       metavar='gc high', dest='gcHigh',
                       help='Garbage collector high threshold.')
+  parser.add_argument('-H', '--heur-eval', const=True, default=False,
+                      action='store_const', dest='heurEval',
+                      help='Use heuristic initialization of new vertex\' PN/DN values')
   parser.add_argument('-q', '--quiet', const=True, default=False,
                       action='store_const', dest='quiet',
                       help='Don\'t print any messages to standard output.')
@@ -167,6 +170,7 @@ def main():
   params.gcHigh = args.gcHigh
   params.logFilename = args.logFilename
   params.killerCount = args.killerCount
+  params.heurEval = args.heurEval
 
   controller = Controller()
   controller.searchParameters = params

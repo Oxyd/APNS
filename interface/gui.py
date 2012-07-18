@@ -224,6 +224,7 @@ class MainWindowController(object):
         pars.transTblSize = newPrefs.transTblSize
         pars.proofTblSize = newPrefs.proofTblSize
         pars.killerCount = newPrefs.killerCount
+        pars.heurEval = newPrefs.heurEval
         pars.logFilename = newPrefs.logPath if newPrefs.logCheck else None
         
         if newPrefs.gcCheck:
@@ -975,6 +976,8 @@ class RunSearchDialog(Observable):
                           lambda self, val: self.setProofTblSize(val))
   killerCount = property(lambda self: self._killerCountVar.get(),
                          lambda self, val: self.setKillerCount(val))
+  heurCheck = property(lambda self: self._heurVar.get() == '1',
+                       lambda self, val: self.enableHeurEval(val))
   logCheck = property(
     lambda self: self._logCheckVar.get() == '1',
     lambda self, val: self.enableLog(val)
@@ -999,8 +1002,8 @@ class RunSearchDialog(Observable):
   )
 
   class Command:
-    timeLimitCheck, positionLimitCheck, memLimitCheck, gcCheck, \
-      logCheck, logChoose, start = range(7)
+    timeLimitCheck, positionLimitCheck, memLimitCheck, gcCheck, heurCheck,\
+      logCheck, logChoose, start = range(8)
 
   def __init__(self, parent, algos):
     '''Create the dialog.'''
@@ -1011,7 +1014,7 @@ class RunSearchDialog(Observable):
 
     infoLabel = ttk.Label(self._dialog.content, text='Enter parameters of the search:')
     algoFrame = ttk.Labelframe(self._dialog.content, text='Algorithm:', padding=5)
-    
+
     self._algoVar = Tkinter.StringVar(value=algos[0][0])
     algoRadios = []
     for row, (algo, description) in enumerate(algos):
@@ -1019,9 +1022,9 @@ class RunSearchDialog(Observable):
                               variable=self._algoVar, value=algo)
       radio.grid(row=row, column=0, columnspan=3, sticky='WE')
       algoRadios.append(radio)
-    
+
     nextRow = len(algos)
-    
+
     self._gcCheckVar = Tkinter.StringVar(value='1')
     gcCheck = ttk.Checkbutton(
       algoFrame, text='Garbage Collector',
@@ -1033,10 +1036,10 @@ class RunSearchDialog(Observable):
     gcLowLabel = ttk.Label(algoFrame, text='Low threshold:')
     gcHighUnits = ttk.Label(algoFrame, text='vertices')
     gcLowUnits = ttk.Label(algoFrame, text='vertices')
-    
+
     self._gcHigh = Tkinter.StringVar(value='5000000')
     self._gcLow = Tkinter.StringVar(value='3000000')
-    
+
     self._gcHighSpin = Tkinter.Spinbox(
       algoFrame,
       from_=1, to=999999999999999,
@@ -1047,17 +1050,17 @@ class RunSearchDialog(Observable):
       from_=1, to=999999999999999,
       textvariable=self._gcLow
     )
-    
+
     gcCheck.grid(row=nextRow, column=0, columnspan=3, sticky='WE', pady=(5, 0))
-    
+
     gcHighLabel.grid(row=nextRow + 1, column=0, sticky='E', padx=(30, 0))
     self._gcHighSpin.grid(row=nextRow + 1, column=1, sticky='WE', padx=5)
     gcHighUnits.grid(row=nextRow + 1, column=2, sticky='W')
-    
+
     gcLowLabel.grid(row=nextRow + 2, column=0, sticky='E', padx=(30, 0))
     self._gcLowSpin.grid(row=nextRow + 2, column=1, sticky='WE', padx=5)
     gcLowUnits.grid(row=nextRow + 2, column=2, sticky='W')
-    
+
     limitsFrame = ttk.Labelframe(self._dialog.content,
                                  text='Search limits:', padding=5)
 
@@ -1105,12 +1108,13 @@ class RunSearchDialog(Observable):
 
     proofLabel = ttk.Label(algoParamsFrame, text='Proof table size: ')
     proofUnits = ttk.Label(algoParamsFrame, text='MB')
-    
+
     killerLabel = ttk.Label(algoParamsFrame, text='Killers for each level: ')
 
     self._memorySpinVar = Tkinter.StringVar(value='0')
     self._proofSpinVar = Tkinter.StringVar(value='0')
     self._killerCountVar = Tkinter.StringVar(value='0')
+    self._heurVar = Tkinter.StringVar(value='0')
     #self._moveCacheSpinVar = Tkinter.StringVar(value='0')
 
     #self._moveCacheSpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=1024,
@@ -1121,10 +1125,15 @@ class RunSearchDialog(Observable):
                                       textvariable=self._proofSpinVar)
     self._killersSpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=100,
                                         textvariable=self._killerCountVar)
-    
+    self._heurCheck = ttk.Checkbutton(algoParamsFrame, text='Heuristic PN/DN Initialization',
+                                      variable=self._heurVar,
+                                      command=lambda: self.notifyObservers(
+                                        command=RunSearchDialog.Command.heurCheck
+                                      ))
+
     loggingFrame = ttk.Labelframe(self._dialog.content,
                                   text='Logging:', padding=5)
-    
+
     self._logCheckVar = Tkinter.StringVar(value='0')
     self._loggingCheck = ttk.Checkbutton(
       loggingFrame, text='Enabled', variable=self._logCheckVar,
@@ -1132,20 +1141,20 @@ class RunSearchDialog(Observable):
         command=RunSearchDialog.Command.logCheck
       )
     )
-    
+
     self._logPathLabel = ttk.Label(loggingFrame, text='Log file:')
-    
+
     self._logPathNameVar = Tkinter.StringVar(value='')
     self._logPathName = ttk.Entry(loggingFrame, 
                                   textvariable=self._logPathNameVar)
-    
+
     self._logPathChooseBtn = ttk.Button(
       loggingFrame, text='Choose…',
       command=lambda: self.notifyObservers(
         command=RunSearchDialog.Command.logChoose
       )
     )
-    
+
     self._loggingCheck.grid(row=0, column=0, columnspan=3, sticky='WE')
     self._logPathLabel.grid(row=1, column=0, sticky='E', padx=(30, 5), pady=3)
     self._logPathName.grid(row=1, column=1, sticky='WE', pady=3)
@@ -1189,6 +1198,8 @@ class RunSearchDialog(Observable):
     
     killerLabel.grid(row=3, column=0, sticky='W')
     self._killersSpin.grid(row=3, column=1, sticky='WE', padx=5)
+
+    self._heurCheck.grid(row=4, column=0, columnspan=2, sticky='WE', pady=3)
 
     algoParamsFrame.columnconfigure(1, weight=1)
     algoParamsFrame.grid(row=4, column=0, sticky='EW', pady=(5, 5))
@@ -1267,6 +1278,13 @@ class RunSearchDialog(Observable):
       self._memLimitSpin['state'] = ['disabled']
       self._memLimitCheckVar.set('0')
 
+  def enableHeurEval(self, enable):
+    '''Check/uncheck the heuristic evaluation checkbuttom.'''
+
+    if enable:
+      self._heurVar.set('1')
+    else:
+      self._heurVar.set('0')
 
   def setMemLimit(self, value):
     '''Set the memory limit to a value.'''
@@ -1383,6 +1401,7 @@ class RunSearchController(object):
     self._runSearchDlg.transTblSize = get('transTblSize', 32)
     self._runSearchDlg.proofTblSize = get('proofTblSize', 32)
     self._runSearchDlg.killerCount = get('killerCount', 2)
+    self._runSearchDlg.heurCheck = get('heurEval', False)
     self._runSearchDlg.gcHigh = get('gcHigh', '5000000')
     self._runSearchDlg.gcLow = get('gcLow', '3000000')
     self._runSearchDlg.gcCheck = get('gcCheck', True)
@@ -1441,6 +1460,7 @@ class RunSearchController(object):
         self._memLimit = memLimit
         self._showTimeLeft = showTimeLeft
         self._killerCount = self._runSearchDlg.killerCount
+        self._heurEval = self._runSearchDlg.heurCheck
         self._gcHigh = self._runSearchDlg.gcHigh
         self._gcLow = self._runSearchDlg.gcLow
         self._gcCheck = self._runSearchDlg.gcCheck
@@ -1461,6 +1481,7 @@ class RunSearchController(object):
         last.transTblSize = int(self._runSearchDlg.transTblSize)
         last.proofTblSize = int(self._runSearchDlg.proofTblSize)
         last.killerCount = self._runSearchDlg.killerCount
+        last.heurEval = self._runSearchDlg.heurCheck
         last.gcHigh = self._runSearchDlg.gcHigh
         last.gcLow = self._runSearchDlg.gcLow
         last.gcCheck = self._runSearchDlg.gcCheck
@@ -1481,18 +1502,18 @@ class RunSearchController(object):
 
     elif command == RunSearchDialog.Command.memLimitCheck:
       self._runSearchDlg.enableMemLimit(self._runSearchDlg.memLimitCheck)
-    
+
     elif command == RunSearchDialog.Command.gcCheck:
       self._runSearchDlg.enableGC(self._runSearchDlg.gcCheck)
-    
+
     elif command == RunSearchDialog.Command.logCheck:
       self._runSearchDlg.enableLog(self._runSearchDlg.logCheck)
-    
+
     elif command == RunSearchDialog.Command.logChoose:
       pathname = tkFileDialog.asksaveasfilename()
       if len(pathname) > 0:
         self._runSearchDlg.setLogPathName(pathname)
-      
+
 
   def _validateInput(self):
     '''Check whether the values set on the dialog are correct. If they are,

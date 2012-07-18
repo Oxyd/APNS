@@ -569,36 +569,6 @@ void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
       return;
     }
   }
-
-#ifdef PN_DN_HEURISTIC_INIT
-  position::row_t gold_max_rabbit   = position::MIN_ROW;
-  position::row_t silver_min_rabbit = position::MAX_ROW;
-  position::row_t current           = position::MIN_ROW;
-  board const&    board             = stack.state();
-  board::mask     gold_rabbits      = board.types()[index_from_type(piece::rabbit)] &
-                                      board.player(piece::gold);
-  board::mask     silver_rabbits    = board.types()[index_from_type(piece::rabbit)] &
-                                      board.player(piece::silver);
-
-  board::mask row = board::mask::row(current);
-  while (row) {
-    if (row & gold_rabbits)
-      gold_max_rabbit = current;
-    if (current < silver_min_rabbit && row & silver_rabbits)
-      silver_min_rabbit = current;
-
-    ++current;
-    row = row.shift(north);
-  }
-
-  if (attacker == piece::gold) {
-    child.proof_number    = position::MAX_ROW - gold_max_rabbit;
-    child.disproof_number = silver_min_rabbit - position::MIN_ROW;
-  } else {
-    child.proof_number    = silver_min_rabbit - position::MIN_ROW;
-    child.disproof_number = position::MAX_ROW - gold_max_rabbit;
-  }
-#endif
 }
 
 bool pt_lookup(proof_table& pt, search_stack& stack, piece::color_t attacker) {

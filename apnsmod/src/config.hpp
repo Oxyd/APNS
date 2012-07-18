@@ -20,9 +20,6 @@
 /// If set to 1, killers will be preferred while selecting a successor.
 #define KILLER_PREFER 0
 
-/// If set to 1, initialize PN/DN values for new vertices heuristically.
-#define PN_DN_HEURISTIC_INIT 0
-
 // Consistency checks:
 
 #if KILLER_SIMULATE_RECURSIVE == 1 && KILLER_SIMULATE == 0

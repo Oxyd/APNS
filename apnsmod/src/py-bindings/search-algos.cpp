@@ -77,7 +77,9 @@ export_algo(char const* name, char const* description) {
                   get_gc_high, set_gc_high,
                   "High threshold for garbage collector. Value of 0 disables "
                   "garbage collector completely.")
-
+    .add_property("heurEval",
+                  &Base::get_heur_eval, &Base::set_heur_eval,
+                  "Whether to use heuristic PN/DN initialization of new vertices.")
     .add_property("logSink",
                   &Base::log, &Base::log_into,
                   "Sink into which the algorithm shall output some debugging "
