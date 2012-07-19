@@ -12,6 +12,7 @@
 #include <boost/array.hpp>
 #include <boost/multi_array.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/integer.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/scoped_array.hpp>
 #include <boost/utility.hpp>
@@ -253,7 +254,7 @@ public:
    * \param importance Importance of the key, higher is more important.
    * \param entry Value of the element.
    */
-  void insert(hash_t hash, unsigned importance, entry_t entry) {
+  void insert(hash_t hash, unsigned importance, entry_t const& entry) {
     record& r = find_record(hash);
 
     if (!r.is_set() || r.hash == hash || importance < r.importance) {
@@ -270,7 +271,7 @@ public:
    * \param hash The key.
    * \returns Either the found element or nothing if the element wasn't found.
    */
-  boost::optional<entry_t> query(hash_t hash) {
+  boost::optional<entry_t const&> query(hash_t hash) {
     record& r = find_record(hash);
     if (r.is_set() && r.hash == hash) {
       ++hits_;

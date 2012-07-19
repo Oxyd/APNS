@@ -23,21 +23,24 @@ bool histories_compatible(apns::search_stack const& stack,
                           apns::history_t const& history) {
   using namespace apns;
 
-  boost::unordered_map<zobrist_hasher::hash_t, std::size_t> repetitions;
-  bool repetition = false;
+  if (stack.history().size() >= 2 && history.size() >= 2) {
+    if (stack.hasher().opponent_hash(history.back()) == *(stack.history().end() - 2))
+      return false;
 
-  for (history_t::const_iterator h = history.begin(); h != history.end(); ++h)
-    ++repetitions[*h];
+    for (search_stack::history_sequence::const_iterator x = stack.history().begin();
+         x != stack.history().end(); ++x) {
+      std::size_t rep = 1;
+      for (history_t::const_iterator y = history.begin(); y != history.end(); ++y)
+        if (*y == *x && ++rep == 3) return false;
 
-  for (search_stack::history_sequence::const_iterator h =
-         stack.history().begin();
-       h != stack.history().end() && !repetition;
-       ++h) {
-    if (++repetitions[*h] >= 3)
-      repetition = true;
-  }
+      if (rep == 2)
+        for (search_stack::history_sequence::const_iterator y = boost::next(x); 
+             y != stack.history().end(); ++y)
+          if (*y == *x) return false;
+    }
+  } 
 
-  return !repetition;
+  return true;
 }
 
 } // anonymous namespace
@@ -264,10 +267,6 @@ void update_numbers(vertex& v, std::size_t consider) {
   if (consider == 0 || consider >= v.size())
     do_update_numbers(v.begin(), v.end(), v);
   else {
-    stable_sort_children(v, vertex_comparator(v));
-    do_update_numbers(v.begin(), v.begin() + consider, v);
-
-#if 0
     typedef std::vector<vertex*> children_cont;
     children_cont children;
     children.reserve(v.size());
@@ -280,7 +279,6 @@ void update_numbers(vertex& v, std::size_t consider) {
     do_update_numbers(boost::make_indirect_iterator(children.begin()),
                       boost::make_indirect_iterator(children.begin() + consider),
                       v);
-#endif
   }
 }
 
@@ -603,7 +601,7 @@ void evaluate(search_stack& stack, piece::color_t attacker, log_sink& log) {
 
 bool pt_lookup(proof_table& pt, search_stack& stack, piece::color_t attacker) {
   vertex& child = *stack.path_top();
-  boost::optional<proof_table::entry_t> const values = pt.query(stack.hashes_top());
+  boost::optional<proof_table::entry_t const&> const values = pt.query(stack.hashes_top());
 
   if (values && histories_compatible(stack, values->history)) {
     if (values->winner == attacker) {
@@ -637,7 +635,7 @@ void pt_store(proof_table& pt, vertex const& v,
 }
 
 bool tt_lookup(transposition_table& tt, zobrist_hasher::hash_t hash, vertex& child) {
-  boost::optional<transposition_table::entry_t> values = tt.query(hash);
+  boost::optional<transposition_table::entry_t const&> values = tt.query(hash);
 
   if (values) {
     assert(values->proof_number > 0 && values->disproof_number > 0);
@@ -895,6 +893,8 @@ void proof_number_search::do_iterate() {
   search_stack::hashes_sequence::const_reverse_iterator  hash_current    = stack_.hashes().rbegin();
   search_stack::history_sequence::const_reverse_iterator history_current = stack_.history().rbegin();
 
+  assert(path_current != stack_.path().rend());
+
   bool changed = true;
   while (true) {
     vertex& current = **path_current;
@@ -911,14 +911,18 @@ void proof_number_search::do_iterate() {
     );
 
     if (parent) {
-      ++path_current;
-      ++hash_current;
-
-      if (current.type != parent->type)
-        ++history_current;
-
-      if (changed)
+      if (changed) {
         stack_.pop();
+        path_current = stack_.path().rbegin();
+        hash_current = stack_.hashes().rbegin();
+        history_current = stack_.history().rbegin();
+      } else {
+        ++path_current;
+        ++hash_current;
+
+        if (current.type != parent->type)
+          ++history_current;
+      }
     } else
       break;
   }
@@ -942,7 +946,7 @@ void depth_first_pns::do_iterate() {
     bool const cut = !gc_enabled() && current->type != parent(stack_)->type;
     if (cut)
       cut_count += apns::cut(*current);
-    assert(cut_count < current->subtree_size);
+    assert(cut_count < current->subtree_size || current->subtree_size == 0);
     current->subtree_size -= cut_count;
 
     stack_.pop();
@@ -1042,6 +1046,7 @@ void depth_first_pns::do_iterate() {
     if (parent) {
       if (parent->type != current->type) {
         ++current_history;
+        assert(current_history != stack_.history().rend());
       }
 
       current = *++current_path;

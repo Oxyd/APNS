@@ -204,7 +204,7 @@ class MainWindowController(object):
       algoList = []
       for algo in apnsmod.algos:
         algoList.append((algo, apnsmod.algos[algo][1]))
-      
+
       dlg = RunSearchDialog(self._mainWindowDsply.window, algoList)
       runSearchCtrl = RunSearchController(dlg, self._searchPreferences)
       (doRun, newPrefs) = runSearchCtrl.run()
@@ -225,14 +225,22 @@ class MainWindowController(object):
         pars.proofTblSize = newPrefs.proofTblSize
         pars.killerCount = newPrefs.killerCount
         pars.heurEval = newPrefs.heurEval
+        if newPrefs.wideningCheck:
+          if newPrefs.wideningMethod == 'topn':
+            pars.dynWidening = apnsmod.DynWidening.fixed
+          else:
+            pars.dynWidening = apnsmod.DynWidening.fraction
+          pars.dynWideningPar = int(newPrefs.wideningParam)
+        else:
+          pars.dynWidening = apnsmod.DynWidening.none
         pars.logFilename = newPrefs.logPath if newPrefs.logCheck else None
-        
+
         if newPrefs.gcCheck:
           pars.gcHigh = newPrefs.gcHigh
           pars.gcLow = newPrefs.gcLow
         else:
           pars.gcHigh = pars.gcLow = 0
-        
+
         #pars.moveCacheSize = newPrefs.moveCacheSize
 
         try:
@@ -977,7 +985,13 @@ class RunSearchDialog(Observable):
   killerCount = property(lambda self: self._killerCountVar.get(),
                          lambda self, val: self.setKillerCount(val))
   heurCheck = property(lambda self: self._heurVar.get() == '1',
-                       lambda self, val: self.enableHeurEval(val))
+                       lambda self, val: self.setHeurEval(val))
+  wideningCheck = property(lambda self: self._wideningVar.get() == '1',
+                           lambda self, val: self.enableWidening(val))
+  wideningMethod = property(lambda self: self._wideningMethodVar.get(),
+                            lambda self, val: self.setWideningMethod(val))
+  wideningParam = property(lambda self: self._wideningParamVar.get(),
+                           lambda self, val: self.setWideningParam(val))
   logCheck = property(
     lambda self: self._logCheckVar.get() == '1',
     lambda self, val: self.enableLog(val)
@@ -1003,7 +1017,7 @@ class RunSearchDialog(Observable):
 
   class Command:
     timeLimitCheck, positionLimitCheck, memLimitCheck, gcCheck, heurCheck,\
-      logCheck, logChoose, start = range(8)
+      wideningCheck, logCheck, logChoose, start = range(9)
 
   def __init__(self, parent, algos):
     '''Create the dialog.'''
@@ -1029,7 +1043,7 @@ class RunSearchDialog(Observable):
     gcCheck = ttk.Checkbutton(
       algoFrame, text='Garbage Collector',
       variable=self._gcCheckVar,
-      command=lambda: 
+      command=lambda:
         self.notifyObservers(command=RunSearchDialog.Command.gcCheck)
     )
     gcHighLabel = ttk.Label(algoFrame, text='High threshold:')
@@ -1115,6 +1129,9 @@ class RunSearchDialog(Observable):
     self._proofSpinVar = Tkinter.StringVar(value='0')
     self._killerCountVar = Tkinter.StringVar(value='0')
     self._heurVar = Tkinter.StringVar(value='0')
+    self._wideningVar = Tkinter.StringVar(value='0')
+    self._wideningMethodVar = Tkinter.StringVar(value='topn')
+    self._wideningParamVar = Tkinter.StringVar(value='5')
     #self._moveCacheSpinVar = Tkinter.StringVar(value='0')
 
     #self._moveCacheSpin = Tkinter.Spinbox(algoParamsFrame, from_=0, to=1024,
@@ -1130,6 +1147,18 @@ class RunSearchDialog(Observable):
                                       command=lambda: self.notifyObservers(
                                         command=RunSearchDialog.Command.heurCheck
                                       ))
+    self._wideningCheck = ttk.Checkbutton(algoParamsFrame, text='Dynamic Widening',
+                                          variable=self._wideningVar,
+                                          command=lambda: self.notifyObservers(
+                                            command=RunSearchDialog.Command.wideningCheck
+                                          ))
+    self._topNRadio = ttk.Radiobutton(algoParamsFrame, text='TOPn',
+                                      variable=self._wideningMethodVar, value='topn')
+    self._rateNRadio = ttk.Radiobutton(algoParamsFrame, text='RATEn',
+                                       variable=self._wideningMethodVar, value='raten')
+    self._wideningParam = Tkinter.Spinbox(algoParamsFrame, from_=1, to=100,
+                                          textvariable=self._wideningParamVar)
+    wideningLabel = ttk.Label(algoParamsFrame, text='Parameter:')
 
     loggingFrame = ttk.Labelframe(self._dialog.content,
                                   text='Logging:', padding=5)
@@ -1145,7 +1174,7 @@ class RunSearchDialog(Observable):
     self._logPathLabel = ttk.Label(loggingFrame, text='Log file:')
 
     self._logPathNameVar = Tkinter.StringVar(value='')
-    self._logPathName = ttk.Entry(loggingFrame, 
+    self._logPathName = ttk.Entry(loggingFrame,
                                   textvariable=self._logPathNameVar)
 
     self._logPathChooseBtn = ttk.Button(
@@ -1195,15 +1224,20 @@ class RunSearchDialog(Observable):
     proofLabel.grid(row=2, column=0, sticky='W')
     self._proofSpin.grid(row=2, column=1, sticky='WE', padx=5)
     proofUnits.grid(row=2, column=2)
-    
+
     killerLabel.grid(row=3, column=0, sticky='W')
     self._killersSpin.grid(row=3, column=1, sticky='WE', padx=5)
 
     self._heurCheck.grid(row=4, column=0, columnspan=2, sticky='WE', pady=3)
+    self._wideningCheck.grid(row=5, column=0, columnspan=2, sticky='WE', pady=3)
+    self._topNRadio.grid(row=6, column=0, sticky='WE', padx=(30, 0))
+    self._rateNRadio.grid(row=7, column=0, sticky='WE', padx=(30, 0))
+    wideningLabel.grid(row=6, column=1, sticky='W', padx=5)
+    self._wideningParam.grid(row=7, column=1, sticky='WE', padx=5)
 
     algoParamsFrame.columnconfigure(1, weight=1)
     algoParamsFrame.grid(row=4, column=0, sticky='EW', pady=(5, 5))
-    
+
     loggingFrame.columnconfigure(1, weight=1)
     loggingFrame.grid(row=5, column=0, sticky='WE', pady=(5, 0))
 
@@ -1278,13 +1312,35 @@ class RunSearchDialog(Observable):
       self._memLimitSpin['state'] = ['disabled']
       self._memLimitCheckVar.set('0')
 
-  def enableHeurEval(self, enable):
+  def enableWidening(self, enable):
+    if enable:
+      self._wideningParam['state'] = ['normal']
+      self._topNRadio['state'] = ['normal']
+      self._rateNRadio['state'] = ['normal']
+      self._wideningVar.set('1')
+    else:
+      self._wideningParam['state'] = ['disabled']
+      self._topNRadio['state'] = ['disabled']
+      self._rateNRadio['state'] = ['disabled']
+      self._wideningVar.set('0')
+
+  def setHeurEval(self, enable):
     '''Check/uncheck the heuristic evaluation checkbuttom.'''
 
     if enable:
       self._heurVar.set('1')
     else:
       self._heurVar.set('0')
+
+  def setWideningMethod(self, method):
+    '''Set the value of the Dynamic Widening Radiobutton.'''
+
+    self._wideningMethodVar.set(method)
+
+  def setWideningParam(self, param):
+    '''Set the value of the Dynamic Widening Param spinbox.'''
+
+    self._wideningParamVar.set(int(param))
 
   def setMemLimit(self, value):
     '''Set the memory limit to a value.'''
@@ -1306,19 +1362,19 @@ class RunSearchDialog(Observable):
 
   def setKillerCount(self, value):
     '''Set the killer count for each level.'''
-    
+
     self._killerCountVar.set(int(value))
 
-  
+
   def setMoveCache(self, value):
     '''Set the move cache size.'''
-    
+
     self._moveCacheSpinVar.set(int(value))
-  
-  
+
+
   def enableGC(self, enable):
     '''Enable or disable garbage collector.'''
-    
+
     if enable:
       self._gcHighSpin['state'] = ['normal']
       self._gcLowSpin['state'] = ['normal']
@@ -1327,15 +1383,15 @@ class RunSearchDialog(Observable):
       self._gcHighSpin['state'] = ['disabled']
       self._gcLowSpin['state'] = ['disabled']
       self._gcCheckVar.set('0')
-  
-  
+
+
   def setGCHigh(self, val):
     self._gcHigh.set(val)
-  
+
   def setGCLow(self, val):
     self._gcLow.set(val)
-  
-  
+
+
   def enableLog(self, enable):
     if enable:
       self._logCheckVar.set('1')
@@ -1343,13 +1399,13 @@ class RunSearchDialog(Observable):
     else:
       self._logCheckVar.set('0')
       state = ['disabled']
-    
+
     self._logPathName['state'] = state
     self._logPathChooseBtn['state'] = state
-  
+
   def setLogPathName(self, name):
     self._logPathNameVar.set(name)
-    
+
 
   def _execute(self):
     '''User has clicked the 'Run' button: Dispatch the command to the 
@@ -1402,6 +1458,9 @@ class RunSearchController(object):
     self._runSearchDlg.proofTblSize = get('proofTblSize', 32)
     self._runSearchDlg.killerCount = get('killerCount', 2)
     self._runSearchDlg.heurCheck = get('heurEval', False)
+    self._runSearchDlg.wideningCheck = get('wideningCheck', False)
+    self._runSearchDlg.wideningMethod = get('wideningMethod', 'topn')
+    self._runSearchDlg.wideningParam = get('wideningParam', 5)
     self._runSearchDlg.gcHigh = get('gcHigh', '5000000')
     self._runSearchDlg.gcLow = get('gcLow', '3000000')
     self._runSearchDlg.gcCheck = get('gcCheck', True)
@@ -1461,6 +1520,9 @@ class RunSearchController(object):
         self._showTimeLeft = showTimeLeft
         self._killerCount = self._runSearchDlg.killerCount
         self._heurEval = self._runSearchDlg.heurCheck
+        self._wideningCheck = self._runSearchDlg.wideningCheck
+        self._wideningMethod = self._runSearchDlg.wideningMethod
+        self._wideningParam = self._runSearchDlg.wideningParam
         self._gcHigh = self._runSearchDlg.gcHigh
         self._gcLow = self._runSearchDlg.gcLow
         self._gcCheck = self._runSearchDlg.gcCheck
@@ -1482,6 +1544,9 @@ class RunSearchController(object):
         last.proofTblSize = int(self._runSearchDlg.proofTblSize)
         last.killerCount = self._runSearchDlg.killerCount
         last.heurEval = self._runSearchDlg.heurCheck
+        last.wideningCheck = self._runSearchDlg.wideningCheck
+        last.wideningMethod = self._runSearchDlg.wideningMethod
+        last.wideningParam = self._runSearchDlg.wideningParam
         last.gcHigh = self._runSearchDlg.gcHigh
         last.gcLow = self._runSearchDlg.gcLow
         last.gcCheck = self._runSearchDlg.gcCheck
@@ -1502,6 +1567,9 @@ class RunSearchController(object):
 
     elif command == RunSearchDialog.Command.memLimitCheck:
       self._runSearchDlg.enableMemLimit(self._runSearchDlg.memLimitCheck)
+
+    elif command == RunSearchDialog.Command.wideningCheck:
+      self._runSearchDlg.enableWidening(self._runSearchDlg.wideningCheck)
 
     elif command == RunSearchDialog.Command.gcCheck:
       self._runSearchDlg.enableGC(self._runSearchDlg.gcCheck)
@@ -1534,12 +1602,12 @@ class RunSearchController(object):
     dlg = self._runSearchDlg
 
     return (checkVar(dlg.timeLimitCheck, dlg.timeLimit, 'Time limit')
-            and checkVar(dlg.positionLimitCheck, dlg.positionLimit,
-                         'Position limit')
+            and checkVar(dlg.positionLimitCheck, dlg.positionLimit, 'Position limit')
             and checkVar(dlg.memLimitCheck, dlg.memLimit, 'Memory limit')
             and checkVar(True, dlg.transTblSize, 'Size of transposition table')
             and checkVar(True, dlg.proofTblSize, 'Size of proof table')
             and checkVar(True, dlg.killerCount, 'Killer count')
+            and checkVar(dlg.wideningCheck, dlg.wideningParam, 'Dynamic Widening Parameter')
             and checkVar(dlg.gcCheck, dlg.gcHigh, 'GC high threshold')
             and checkVar(dlg.gcCheck, dlg.gcLow, 'GC low threshold'))
             #and checkVar(True, dlg.moveCacheSize, 'Move cache size'))
