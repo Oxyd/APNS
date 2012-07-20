@@ -3,7 +3,7 @@
 
 '''cmdline.py -- the command line interface for the program.'''
 
-from interface.controller import Controller, SearchParameters
+from interface.controller import Controller, SearchParameters, clock
 import apnsmod
 import argparse
 import sys
@@ -226,7 +226,7 @@ def main():
       global start, startCpu
 
       start = time.time()
-      startCpu = time.clock()
+      startCpu = clock()
 
   controller.stateCallbacks.add(stateCallback)
   controller.loadGameCallbacks.add(cancelCallback)
@@ -310,7 +310,7 @@ def main():
     raise SystemExit(EXIT_ERROR)
 
   end = time.time()
-  endCpu = time.clock()
+  endCpu = clock()
 
   exitStatus = None
 

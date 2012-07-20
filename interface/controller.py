@@ -5,6 +5,19 @@ import time
 import re
 import sys
 
+try:
+  import resource
+  getrusageAvailable = True
+except ImportError:
+  getrusageAvailable = False
+
+def clock():
+  if getrusageAvailable:
+    u = resource.getrusage(resource.RUSAGE_SELF)
+    return u.ru_utime + u.ru_stime
+  else:
+    return time.clock()
+
 class _Callbacks(object):
   def __init__(self):
     object.__init__(self)
@@ -349,8 +362,8 @@ class Controller(object):
     else:
       self._search.logSink = apnsmod.NullSink()
 
-    self._searchStart = time.clock()
-    self._lastMeasurement = time.clock()
+    self._searchStart = clock()
+    self._lastMeasurement = clock()
     self._lastPosCount = self._posCount
     self._lastPosPerSec = 0
 
