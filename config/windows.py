@@ -54,8 +54,8 @@ def config(conf, bits, debug, profile):
         'boost-python':     boostBase + 'stage/lib/',
         'boost-random':     boostBase + 'stage/lib/',
         'boost-filesystem': boostBase + 'stage/lib/',
-        'boost-timer':      boostBase,
-        'boost-chrono':     boostBase,
+        'boost-timer':      boostBase + 'stage/lib/',
+        'boost-chrono':     boostBase + 'stage/lib/',
         'boost-system':     boostBase + 'stage/lib/',
         'python':           pythonBase + 'libs/',
         'gtest':            'C:/Users/Oxyd/Development/gtest-1.5.0/lib'
