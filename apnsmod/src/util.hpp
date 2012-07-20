@@ -2,8 +2,8 @@
 #define UTIL_HPP
 
 #include <boost/utility.hpp>
-#include <boost/timer.hpp>
 #include <boost/function.hpp>
+#include <boost/timer/timer.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -87,11 +87,11 @@ private:
   //! #ms_update_time milliseconds.
   virtual void do_update() = 0;
 
-  unsigned      ms_update_time_;
-  bool          stop_requested_;
-  unsigned      work_done_;
-  unsigned      work_total_;
-  boost::timer  update_timer_;
+  unsigned                ms_update_time_;
+  bool                    stop_requested_;
+  unsigned                work_done_;
+  unsigned                work_total_;
+  boost::timer::cpu_timer update_timer_;
 };
 
 /**

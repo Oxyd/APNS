@@ -12,11 +12,10 @@ operation_controller::operation_controller(unsigned ms_update_time)
 operation_controller::~operation_controller() { }
 
 void operation_controller::update() {
-  double const MS = 1000.0;
-
-  if (update_timer_.elapsed() >= ms_update_time_ / MS) {
+  boost::timer::cpu_times elapsed = update_timer_.elapsed();
+  if (elapsed.user + elapsed.system >= ms_update_time_ * 1000 * 1000) {
     do_update();
-    update_timer_.restart();
+    update_timer_ = boost::timer::cpu_timer();
   }
 }
 

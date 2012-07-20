@@ -45,6 +45,8 @@ def config(conf, bits, debug, profile):
         'boost-random':     boostBase,
         'boost-filesystem': boostBase,
         'boost-system':     boostBase,
+        'boost-timer':      boostBase,
+        'boost-chrono':     boostBase,
         'python':           pythonBase + 'include/',
         'gtest':            'C:/Users/Oxyd/Development/gtest-1.5.0/include'
       },
@@ -52,6 +54,8 @@ def config(conf, bits, debug, profile):
         'boost-python':     boostBase + 'stage/lib/',
         'boost-random':     boostBase + 'stage/lib/',
         'boost-filesystem': boostBase + 'stage/lib/',
+        'boost-timer':      boostBase,
+        'boost-chrono':     boostBase,
         'boost-system':     boostBase + 'stage/lib/',
         'python':           pythonBase + 'libs/',
         'gtest':            'C:/Users/Oxyd/Development/gtest-1.5.0/lib'
@@ -61,7 +65,10 @@ def config(conf, bits, debug, profile):
         'boost-python':     '',  # Use the auto-linking feature of MSVC.
         'boost-random':     '',
         'boost-filesystem': '',
+        'boost-timer':      '',
+        'boost-chrono':     '',
         'boost-system':     '',
+        'rt':               '',  # Not applicable on Windows.
         'gtest':            'gtest' if not debug else 'gtestd'
       },
       'extra':            lambda env: _extraSetup(env, bits, debug)

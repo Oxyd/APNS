@@ -28,6 +28,8 @@ def config(conf, bits, debug, profile):
         'boost-random':     '',
         'boost-filesystem': '',
         'boost-system':     '',
+        'boost-timer':      '',
+        'boost-chrono':     '',
         'gtest':            '',
         'python':           '/usr/include/python2.7/'
       },
@@ -36,6 +38,8 @@ def config(conf, bits, debug, profile):
         'boost-random':     '',  # Same as above.
         'boost-filesystem': '',
         'boost-system':     '',
+        'boost-timer':      '',
+        'boost-chrono':     '',
         'gtest':            '',
         'python':           '/usr/lib/python2.7/'
       },
@@ -45,6 +49,9 @@ def config(conf, bits, debug, profile):
         'boost-random':     'boost_random',
         'boost-filesystem': 'boost_filesystem',
         'boost-system':     'boost_system',
+        'boost-timer':      'boost_timer',
+        'boost-chrono':     'boost_chrono',
+        'rt':               'rt',
         'gtest':            'gtest',
       },
       'extra':            _setupPrefix

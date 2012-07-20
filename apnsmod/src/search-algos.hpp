@@ -9,7 +9,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/utility.hpp>
-#include <boost/timer.hpp>
+#include <boost/timer/timer.hpp>
 #include <boost/ref.hpp>
 #include <boost/circular_buffer.hpp>
 #include <boost/lambda/lambda.hpp>
@@ -681,11 +681,16 @@ public:
 
   //! Run the algorithm for ms_how_long milliseconds.
   void run(unsigned ms_how_long) {
-    boost::timer timer;
+    boost::timer::cpu_timer timer;
+    boost::timer::nanosecond_type const ns_end = ms_how_long * 1000 * 1000;
 
-    while (!finished() && (ms_how_long == 0 || 
-                           timer.elapsed() < ms_how_long / 1000.0))
+    while (!finished()) {
       iterate();
+
+      boost::timer::cpu_times const elapsed = timer.elapsed();
+      if (elapsed.system + elapsed.user >= ns_end)
+        break;
+    }
   }
 
   void iterate() {
