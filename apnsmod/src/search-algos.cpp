@@ -263,23 +263,8 @@ void do_update_numbers(Iter begin, Iter end, vertex& v) {
 
 }
 
-void update_numbers(vertex& v, std::size_t consider) {
-  if (consider == 0 || consider >= v.size())
-    do_update_numbers(v.begin(), v.end(), v);
-  else {
-    typedef std::vector<vertex*> children_cont;
-    children_cont children;
-    children.reserve(v.size());
-    for (vertex::iterator c = v.begin(); c != v.end(); ++c)
-      children.push_back(&*c);
-
-    std::stable_sort(children.begin(), children.end(),
-                     vertex_ptr_comparator(&v));
-
-    do_update_numbers(boost::make_indirect_iterator(children.begin()),
-                      boost::make_indirect_iterator(children.begin() + consider),
-                      v);
-  }
+void update_numbers(vertex& v) {
+  do_update_numbers(v.begin(), v.end(), v);
 }
 
 search_stack::search_stack(

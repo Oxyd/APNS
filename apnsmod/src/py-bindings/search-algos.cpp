@@ -78,15 +78,6 @@ export_algo(char const* name, char const* description) {
                   get_gc_high, set_gc_high,
                   "High threshold for garbage collector. Value of 0 disables "
                   "garbage collector completely.")
-    .add_property("heurEval",
-                  &Base::get_heur_eval, &Base::set_heur_eval,
-                  "Whether to use heuristic PN/DN initialization of new vertices.")
-    .add_property("dynWidening",
-                  &Base::get_dyn_widening, &Base::set_dyn_widening,
-                  "Which kind of dynamic widening to use.")
-    .add_property("dynWideningParam",
-                  &Base::get_dyn_widening_param, &Base::set_dyn_widening_param,
-                  "The parameter for dynamic widening.")
     .add_property("logSink",
                   &Base::log, &Base::log_into,
                   "Sink into which the algorithm shall output some debugging "
@@ -205,12 +196,6 @@ void export_search_algos() {
          "Sort children of the vertex.")
     .add_property("size", &apns::history_table::size,
                   "Number of steps remembered in this table.")
-    ;
-
-  enum_<apns::e_dyn_widening>("DynWidening")
-    .value("none", apns::none)
-    .value("fixed", apns::fixed)
-    .value("fraction", apns::fraction)
     ;
 
   export_algo<apns::proof_number_search>(

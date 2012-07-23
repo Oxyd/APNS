@@ -99,22 +99,12 @@ def main():
                            'If set to 0, don\'t use proof table')
   parser.add_argument('-k', '--killer-count', type=int, default=2, dest='killerCount',
                       help='Number of killer steps remembered for each level.')
-  #parser.add_argument('-M', '--move-cache-size', type=int, default=32,
-  #                    metavar='move cache size', dest='moveCacheSize',
-  #                    help='Size of the move cache')
   parser.add_argument('-g', '--gc-low', type=int, default=3000000,
                       metavar='gc low', dest='gcLow',
                       help='Garbage collector low threshold.')
   parser.add_argument('-G', '--gc-high', type=int, default=5000000,
                       metavar='gc high', dest='gcHigh',
                       help='Garbage collector high threshold.')
-  parser.add_argument('-H', '--heur-eval', const=True, default=False,
-                      action='store_const', dest='heurEval',
-                      help='Use heuristic initialization of new vertex\' PN/DN values')
-  parser.add_argument('--dyn-top', type=int, default=0, dest='dynTop',
-                      help='If nonzero, enable TOPn dynamic widening with given n.')
-  parser.add_argument('--dyn-rate', type=int, default=0, dest='dynRate',
-                      help='If nonzero, enable RATEn dynamic widening with given n.')
   parser.add_argument('-q', '--quiet', const=True, default=False,
                       action='store_const', dest='quiet',
                       help='Don\'t print any messages to standard output.')
@@ -162,21 +152,6 @@ def main():
   checkNum(args.gcLow, 'Garbage collector low threshold')
   checkNum(args.gcHigh, 'Garbage collector high threshold')
   checkNum(args.killerCount, 'Number of killers')
-  checkNum(args.dynTop, 'TOPn')
-  checkNum(args.dynRate, 'RATEn')
-
-  if args.dynTop > 0 and args.dynRate > 0:
-    print >> sys.stderr, 'Error: Can\'t specify both --dyn-top and --dyn-rate.'
-    raise SystemExit(EXIT_ERROR)
-
-  dynWidening = apnsmod.DynWidening.none
-  dynArg = 0
-  if args.dynTop > 0:
-    dynWidening = apnsmod.DynWidening.fixed
-    dynArg = args.dynTop
-  if args.dynRate > 0:
-    dynWidening = apnsmod.DynWidening.fraction
-    dynArg = args.dynRate
 
   params = SearchParameters()
   params.algo = args.algo
@@ -189,9 +164,6 @@ def main():
   params.gcHigh = args.gcHigh
   params.logFilename = args.logFilename
   params.killerCount = args.killerCount
-  params.heurEval = args.heurEval
-  params.dynWidening = dynWidening
-  params.dynWideningPar = dynArg
 
   controller = Controller()
   controller.searchParameters = params

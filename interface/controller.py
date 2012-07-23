@@ -166,13 +166,9 @@ class SearchParameters:
     self.memoryLimit    = None
     self.transTblSize   = None
     self.proofTblSize   = None
-    #self.moveCacheSize  = 32
     self.killerCount    = 2
     self.gcHigh         = 5000000
     self.gcLow          = 3000000
-    self.heurEval       = False
-    self.dynWidening    = apnsmod.DynWidening.none
-    self.dynWideningPar = 0
     self.logFilename    = None
 
 
@@ -346,9 +342,6 @@ class Controller(object):
 
     self._search.gcLow = int(self.searchParameters.gcLow)
     self._search.gcHigh = int(self.searchParameters.gcHigh)
-    self._search.heurEval = self.searchParameters.heurEval
-    self._search.dynWidening = self.searchParameters.dynWidening
-    self._search.dynWideningParam = self.searchParameters.dynWideningPar
     self._search.transpositionTable = self._transTbl
     self._search.proofTable = self._proofTbl
     self._search.killerDB = self._killerDb
