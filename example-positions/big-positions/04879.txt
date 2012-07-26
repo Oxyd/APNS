@@ -1,0 +1,12 @@
+24g
+ +-----------------+
+8|   r   r r r r   |
+7| r   M     c   r |
+6|   E x   c x     |
+5|   R H h         |
+4| m   D     d     |
+3|     C     x h D |
+2| R   C     e H   |
+1|   R   R       R |
+ +-----------------+
+   a b c d e f g h

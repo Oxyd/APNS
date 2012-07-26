@@ -1,0 +1,12 @@
+18g
+ +-----------------+
+8|               r |
+7| r   r     r r h |
+6| c D x r   x c H |
+5|   R   M   d R e |
+4|         r     D |
+3|     x E   C R   |
+2|     C           |
+1| R   R R R R     |
+ +-----------------+
+   a b c d e f g h
