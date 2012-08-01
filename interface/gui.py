@@ -348,13 +348,13 @@ class ResultsDisplay(Observable):
     self._position = BoardDisplay(self._content, imageManager)
     self._boardCtrl = BoardController(None, self._position, None)
 
-    self._zobristLbl = ttk.Label(self._content, text='Zobrist hash: ')
+    #self._zobristLbl = ttk.Label(self._content, text='Zobrist hash: ')
 
     self._tree.grid(row=0, column=0, sticky='NSEW')
     verticalScrollBar.grid(row=0, column=1, sticky='NS', padx=(3, 7))
     horizontalScrollBar.grid(row=1, column=0, sticky='WE', pady=(3, 7))
     self._position.widget.grid(row=0, column=2, sticky='N')
-    self._zobristLbl.grid(row=1, column=2, sticky='W')
+    #self._zobristLbl.grid(row=1, column=2, sticky='W')
 
     self._content.rowconfigure(0, weight=1)
     self._content.columnconfigure(0, weight=1)
@@ -449,7 +449,8 @@ class ResultsDisplay(Observable):
   def setZobrist(self, h):
     '''Update the displayed Zobrist hash value'''
 
-    self._zobristLbl['text'] = 'Zobrist hash: {0}'.format(h)
+    #self._zobristLbl['text'] = 'Zobrist hash: {0}'.format(h)
+    pass
 
 
   def _select(self, e):
